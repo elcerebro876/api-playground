@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, Fragment, useLayoutEffect } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment, useLayoutEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, type HistoryEntry } from "@/lib/storage";
 
 const cardTextSpring = {
   type: "spring" as const,
@@ -44,11 +45,22 @@ export default function Home() {
   const [headerValue, setHeaderValue] = useState("");
   const [response, setResponse] = useState<{ status?: number; ok?: boolean; time?: number; headers?: Record<string, string>; body?: string; error?: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<{ method: string; url: string; status: number | null; time: number | null; timestamp: number; headers: Record<string, string>; responseBody?: string; responseHeaders?: Record<string, string> }[]>([]);
+const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [apisTested, setApisTested] = useState(0);
+  const [streak, setStreak] = useState(1);
   const responseKey = useRef(0);
   const [headersFilter, setHeadersFilter] = useState("common");
   const [activeHistoryIndex, setActiveHistoryIndex] = useState<number | null>(null);
   const [explorerHovered, setExplorerHovered] = useState(false);
+
+  useEffect(() => {
+    const data = loadStoredData();
+    setHistory(data.history);
+    setApisTested(data.apisTestedCount);
+    const updated = applyStreakOnLoad(data);
+    setStreak(updated.streak);
+    saveStoredData(updated);
+  }, []);
 
   const handleHistorySelect = (item: any, index: number) => {
     setActiveHistoryIndex(index);
@@ -83,18 +95,29 @@ export default function Home() {
       setResponse(data);
       setHeadersFilter("common");
       const entry = { method: m, url: u, status: data.status, time: data.time, timestamp: Date.now(), headers: h, responseBody: data.body, responseHeaders: data.headers };
-      setHistory((prev) => [entry, ...prev]);
+      const nextHistory = [entry, ...history];
+      setHistory(nextHistory);
+      setApisTested((c) => c + 1);
+      saveStoredData({ history: nextHistory, apisTestedCount: apisTested + 1, streak, lastVisitDate: new Date().toDateString() });
       setActiveHistoryIndex(0);
       setLoading(false);
     } catch {
       responseKey.current += 1;
       setResponse({ error: "Network error" });
       setHeadersFilter("common");
-      setHistory((prev) => [{ method: m, url: u, status: null, time: null, timestamp: Date.now(), headers: h }, ...prev]);
+      const entry = { method: m, url: u, status: null, time: null, timestamp: Date.now(), headers: h };
+      const nextHistory = [entry, ...history];
+      setHistory(nextHistory);
+      saveStoredData({ history: nextHistory, apisTestedCount: apisTested, streak, lastVisitDate: new Date().toDateString() });
       setActiveHistoryIndex(0);
       setLoading(false);
     }
-  }, [method, url, headerKey, headerBearer, headerValue]);
+}, [method, url, headerKey, headerBearer, headerValue, history, apisTested, streak]);
+
+  const lowestLatency = useMemo(() => {
+    const times = history.map((item) => item.time).filter((t): t is number => typeof t === "number" && t > 0);
+    return times.length ? Math.min(...times) : null;
+  }, [history]);
 
   return (
     <div className={`relative h-screen overflow-hidden font-sans ${activeTheme === "Dark" ? "bg-[#111111]" : "bg-white"}`} style={{ minWidth: 900 }}>
@@ -184,15 +207,16 @@ export default function Home() {
           />
         </div>
         <AnimatePresence>
-          {explorerHovered && <ExplorerCard key="card" activeTheme={activeTheme} />}
+          {explorerHovered && <ExplorerCard key="card" activeTheme={activeTheme} apisTested={apisTested} streak={streak} lowestLatency={lowestLatency} />}
         </AnimatePresence>
       </div>
     </div>
   );
 }
 
-function ExplorerCard({ activeTheme }: { activeTheme: string }) {
+function ExplorerCard({ activeTheme, apisTested, streak, lowestLatency }: { activeTheme: string; apisTested: number; streak: number; lowestLatency: number | null }) {
   const isDark = activeTheme === "Dark";
+  const streakLabel = `${streak} ${streak === 1 ? "day" : "days"} streak`;
   return (
     <motion.div
       className="absolute"
@@ -215,15 +239,15 @@ function ExplorerCard({ activeTheme }: { activeTheme: string }) {
         <svg viewBox="0 0 16 16" style={{ width: 16, height: 16 }}>
           <path d="M7 0c0.66667 2.66667 2 4.83333 4 6.5 2 1.66667 3 3.5 3 5.5 0 1.85652-0.7375 3.63699-2.05025 4.94975-1.31276 1.31275-3.09323 2.05025-4.94975 2.05025-1.85652 0-3.63699-0.7375-4.94975-2.05025-1.31275-1.31275-2.05025-3.09323-2.05025-4.94975 0-1.08185 0.35089-2.13452 1-3 0 0.66304 0.26339 1.29893 0.73223 1.76777 0.46884 0.46884 1.10473 0.73223 1.76777 0.73223 0.66304 0 1.29893-0.26339 1.76777-0.73223 0.46884-0.46884 0.73223-1.10473 0.73223-1.76777 0-2-1.5-3-1.5-5 0-1.33333 0.83333-2.66667 2.5-4z" fill="#ff3636" transform="translate(3.3333 2) scale(0.6667)" />
         </svg>
-        <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 12, fontWeight: 500, letterSpacing: "-0.6px", color: "#ff3636", whiteSpace: "nowrap" }}>1 day streak</span>
+        <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 12, fontWeight: 500, letterSpacing: "-0.6px", color: "#ff3636", whiteSpace: "nowrap" }}>{streakLabel}</span>
       </div>
       <div style={{ position: "absolute", top: 78, left: 12, width: 217, height: 111, borderRadius: 8, backgroundColor: isDark ? "#1b1b1b" : "#ffffff", border: `0.8px solid ${isDark ? "#2d2d2d" : "#f2f2f2"}` }}>
         <span style={{ position: "absolute", top: 8, left: 8, fontSize: 12, fontWeight: 500, letterSpacing: "-0.6px", color: isDark ? "#f7f7f7" : "#4f4f4f" }}>Stats</span>
         <div style={{ position: "absolute", top: 36, left: 8, width: 4, height: 4, borderRadius: 2, backgroundColor: "#a0a0ff" }} />
-        <span style={{ position: "absolute", top: 32, left: 16, fontSize: 14, letterSpacing: "-0.7px", color: isDark ? "#adadad" : "#737373" }}>2 APIs tested</span>
+        <span style={{ position: "absolute", top: 32, left: 16, fontSize: 14, letterSpacing: "-0.7px", color: isDark ? "#adadad" : "#737373" }}>{apisTested} APIs tested</span>
         <div style={{ position: "absolute", top: 58, left: 8, width: 174, height: 0, borderTop: `0.8px solid ${isDark ? "#2d2d2d" : "#f2f2f2"}` }} />
         <div style={{ position: "absolute", top: 70, left: 8, width: 4, height: 4, borderRadius: 2, backgroundColor: "#a0a0ff" }} />
-        <span style={{ position: "absolute", top: 66, left: 16, fontSize: 14, fontWeight: 500, letterSpacing: "-0.7px", color: isDark ? "#ffffff" : "#3a3a3a" }}>291ms</span>
+        <span style={{ position: "absolute", top: 66, left: 16, fontSize: 14, fontWeight: 500, letterSpacing: "-0.7px", color: isDark ? "#ffffff" : "#3a3a3a" }}>{lowestLatency !== null ? `${lowestLatency}ms` : "--"}</span>
         <span style={{ position: "absolute", top: 66, left: 57, fontSize: 14, letterSpacing: "-0.7px", color: isDark ? "#adadad" : "#737373" }}>is the lowest latency you</span>
         <span style={{ position: "absolute", top: 85, left: 16, fontSize: 14, letterSpacing: "-0.7px", color: isDark ? "#adadad" : "#737373" }}>have hit</span>
       </div>
