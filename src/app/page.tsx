@@ -341,13 +341,13 @@ function Sidebar({
             </svg>
           </div>
           <span
-            className={`text-sm font-medium tracking-[-0.05em] ${activeTheme === "Dark" ? "text-[#d1d1d1]" : "text-[#696969]"}`}
+            className={`text-sm font-medium tracking-[-0.05em] ${activeTheme === "Dark" ? "text-[#f7f7f7]" : "text-[#696969]"}`}
             style={{ fontFamily: "Geist, var(--font-geist-sans)", fontWeight: 500 }}
           >
             No requests yet
           </span>
           <span
-            className={`text-xs tracking-[-0.04em] ${activeTheme === "Dark" ? "text-[#a0a0a0]" : "text-[#939393]"}`}
+            className={`text-xs tracking-[-0.04em] ${activeTheme === "Dark" ? "text-[#adadad]" : "text-[#939393]"}`}
             style={{ fontFamily: "Geist, var(--font-geist-sans)" }}
           >
             Your log fills in as you explore
@@ -357,7 +357,7 @@ function Sidebar({
         ) : (
           <div className="flex flex-col" style={{ padding: "8px 8px", gap: 16 }}>
             {history.slice(0, 50).map((item, i) => (
-              <div key={i} style={{ borderRadius: 6, padding: "6px 8px", cursor: "pointer", backgroundColor: activeTheme === "Dark" ? "#0f0f0f" : (i === activeHistoryIndex ? "#ffffff" : "transparent") }} onClick={() => onSelect(item, i)}>
+              <div key={i} style={{ borderRadius: 6, padding: "6px 8px", cursor: "pointer", backgroundColor: activeTheme === "Dark" ? (i === activeHistoryIndex ? "#0f0f0f" : "#161616") : (i === activeHistoryIndex ? "#ffffff" : "transparent") }} onClick={() => onSelect(item, i)}>
                 <div className="flex items-center" style={{ gap: 6 }}>
                   <span style={{ display: "inline-flex", alignItems: "center", borderRadius: 6, backgroundColor: activeTheme === "Dark" ? (methodBadgeColors[item.method] ?? methodBadgeColors.GET).darkBg : (methodBadgeColors[item.method] ?? methodBadgeColors.GET).lightBg, padding: "2px 6px", fontFamily: "Geist, var(--font-geist-sans)", fontSize: 12, fontWeight: 500, color: activeTheme === "Dark" ? (methodBadgeColors[item.method] ?? methodBadgeColors.GET).darkText : (methodBadgeColors[item.method] ?? methodBadgeColors.GET).lightText }}>{item.method}</span>
                   <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 12, color: activeTheme === "Dark" ? "#f7f7f7" : "#585858", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{item.url}</span>
@@ -542,7 +542,7 @@ function MainContent({
   const renderHistoryRow = (item: any, i: number) => (
     <div key={i} className="flex items-center" style={{ gap: 8, borderRadius: 6, padding: "10px 16px", cursor: "pointer", backgroundColor: isDark ? (hoveredRow === i ? "#1f1f1f" : "#0f0f0f") : (hoveredRow === i ? "#f7f7f7" : "#ffffff") }} onMouseEnter={() => setHoveredRow(i)} onMouseLeave={() => setHoveredRow(null)} onClick={() => { setShowHistory(false); onHistorySelect(item, i); }}>
       <div style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: methodDots[item.method] ?? "#008000", flexShrink: 0 }} />
-      <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 14, letterSpacing: "-0.7px", color: isDark ? "#d1d1d1" : "#636363", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{item.url}</span>
+      <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 14, letterSpacing: "-0.7px", color: isDark ? (hoveredRow === i ? "#f7f7f7" : "#adadad") : "#636363", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{item.url}</span>
     </div>
   );
   const [headerExpanded, setHeaderExpanded] = useState(false);
@@ -726,8 +726,8 @@ function MainContent({
                         <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 12, letterSpacing: "-0.48px", color: "#5b5bff" }}>
                           Add header
                         </span>
-                        <div style={{ display: "flex", alignItems: "center", borderRadius: 6, backgroundColor: "#e8e8e8", padding: "2px 4px" }}>
-                          <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 12, letterSpacing: "-0.48px", color: "#4d4d4d", textAlign: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", borderRadius: 6, backgroundColor: isDark ? "#1c1c1c" : "#e8e8e8", padding: "2px 4px" }}>
+                          <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 12, letterSpacing: "-0.48px", color: isDark ? "#d1d1d1" : "#4d4d4d", textAlign: "center" }}>
                             Coming soon
                           </span>
                         </div>
@@ -842,7 +842,7 @@ function MainContent({
               zIndex: 60,
               width: 573,
               height: modalHeight,
-              backgroundColor: isDark ? "#161616" : "#ffffff",
+              backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
               ...(isDark ? {} : { border: "0.8px solid #f2f2f2" }),
               borderRadius: 10,
             }}
@@ -863,7 +863,7 @@ function MainContent({
                 <circle cx="9" cy="9" r="7.5" stroke="#9e9e9e" strokeWidth="1.4" />
                 <path d="M6 6l6 6M12 6l-6 6" stroke="#9e9e9e" strokeWidth="1.4" strokeLinecap="round" />
               </svg>
-              <div className="absolute" style={{ left: 16, top: 51, right: 16, height: 0.8, backgroundColor: "#f2f2f2" }} />
+              <div className="absolute" style={{ left: 16, top: 51, right: 16, height: 0.8, backgroundColor: isDark ? "#2d2d2d" : "#f2f2f2" }} />
             </motion.div>
             <motion.div variants={cardItemVariants}>
               <div className="hide-scrollbar" style={{ position: "absolute", left: 16, top: 67, right: 16, bottom: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -871,8 +871,8 @@ function MainContent({
                   <div className="flex flex-col items-center" style={{ gap: 12, paddingTop: 66 }}>
                     <img src="/history-empty.png" alt="" style={{ width: 70, height: 70 }} />
                     <div className="flex flex-col items-center" style={{ gap: 8 }}>
-                      <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 14, fontWeight: 500, letterSpacing: "-0.7px", color: isDark ? "#d1d1d1" : "#696969" }}>No requests yet</span>
-                      <span style={{ width: 280, textAlign: "center", fontFamily: "Geist, var(--font-geist-sans)", fontSize: 14, letterSpacing: "-0.56px", lineHeight: "20px", color: isDark ? "#a0a0a0" : "#939393" }}>Try one of the demo buttons above, or send your first request.</span>
+                      <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 14, fontWeight: 500, letterSpacing: "-0.7px", color: isDark ? "#f7f7f7" : "#696969" }}>No requests yet</span>
+                      <span style={{ width: 280, textAlign: "center", fontFamily: "Geist, var(--font-geist-sans)", fontSize: 14, letterSpacing: "-0.56px", lineHeight: "20px", color: isDark ? "#adadad" : "#939393" }}>Try one of the demo buttons above, or send your first request.</span>
                     </div>
                   </div>
                 ) : (
