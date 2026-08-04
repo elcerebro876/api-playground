@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Synapse - API Playground",
+  title: "Playground",
   description: "Lightweight API testing tool",
 };
 
