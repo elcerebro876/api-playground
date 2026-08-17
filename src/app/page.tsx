@@ -268,7 +268,7 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
                     ))}
                   </div>
                 )}
-              <div style={{ position: "absolute", left: 16, top: 725 }}>
+<div style={{ position: "absolute", left: 16, bottom: "calc(24px + env(safe-area-inset-bottom))" }}>
                 <ThemeToggle activeTheme={activeTheme} onThemeChange={onThemeChange} />
               </div>
             </div>
@@ -299,7 +299,7 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
                 onClick={() => setNavExplorer(false)}
               />
             )}
-            <div style={{ position: "absolute", left: 16, top: 764, zIndex: 10, cursor: "pointer" }} onClick={() => setNavExplorer((v) => !v)}>
+            <div style={{ position: "absolute", left: 16, bottom: "calc(24px + env(safe-area-inset-bottom))", zIndex: 10, cursor: "pointer" }} onClick={() => setNavExplorer((v) => !v)}>
               <div className="overflow-hidden" style={{ width: 24, height: 24, borderRadius: 8 }}>
                 <img src="/Explorer%20image.jpg" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }} />
               </div>
@@ -311,7 +311,7 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
         )}
       </AnimatePresence>      <AnimatePresence initial={false}>
         {loading || response ? (
-          <motion.div key="result" className="flex flex-col" style={{ width: "100%", padding: "80px 16px 0", minHeight: 0, position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} initial={{ opacity: 0, scale: 0.92, y: 28 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
+          <motion.div key="result" className="flex flex-col" style={{ width: "100%", padding: "80px 16px calc(18px + env(safe-area-inset-bottom))", minHeight: 0, position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} initial={{ opacity: 0, scale: 0.92, y: 28 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
             <motion.div style={{ width: "100%", flex: 1, minHeight: 0, maxHeight: 636, borderRadius: 16, backgroundColor: isDark ? "#161616" : "#fcfcfc" }}>
               <MobileResultSection activeTheme={activeTheme} method={method} url={url} response={loading ? null : response} headersFilter={headersFilter} setHeadersFilter={setHeadersFilter} />
             </motion.div>
