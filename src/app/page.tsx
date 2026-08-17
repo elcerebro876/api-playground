@@ -130,6 +130,7 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
   setHeadersFilter: (v: string) => void;
 }) {  const isDark = activeTheme === "Dark";
   const [showDropdown, setShowDropdown] = useState(false);
+  const [resultDropdown, setResultDropdown] = useState(false);
   const [headerExpanded, setHeaderExpanded] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
   const [cleanSheetDismissed, setCleanSheetDismissed] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("cleanSheetDismissed") === "1");
@@ -142,7 +143,7 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
   useEffect(() => {    setLocalUrl(url);
   }, [url]);
   const contentWidth = "min(343px, calc(100vw - 32px))";
-  return (    <div className="relative flex h-screen flex-col overflow-hidden" style={{ backgroundColor: isDark ? "#1b1b1b" : "#f5f5f5", fontFamily: "Geist, var(--font-geist-sans)" }}>            <div style={{ position: "absolute", left: 16, top: 40, display: "flex", flexDirection: "column", gap: 8, zIndex: 10, cursor: "pointer" }} onClick={() => setShowNav(true)}>
+  return (    <div className="relative flex flex-col overflow-hidden" style={{ height: "100dvh", backgroundColor: isDark ? "#1b1b1b" : "#f5f5f5", fontFamily: "Geist, var(--font-geist-sans)" }}>            <div style={{ position: "absolute", left: 16, top: 40, display: "flex", flexDirection: "column", gap: 8, zIndex: 10, cursor: "pointer" }} onClick={() => setShowNav(true)}>
         {[0, 1, 2].map((i) => (
           <div key={i} style={{ width: 24, height: 1, backgroundColor: isDark ? "#ffffff" : "#595959" }} />
         ))}
@@ -310,10 +311,59 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
         )}
       </AnimatePresence>      <AnimatePresence initial={false}>
         {loading || response ? (
-          <motion.div key="result" className="flex flex-col" style={{ width: "100%", padding: "80px 16px 0", minHeight: 0, position: "absolute", left: 0, right: 0, top: 0 }} initial={{ opacity: 0, scale: 0.92, y: 28 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
-            <motion.div style={{ width: "100%", borderRadius: 16, backgroundColor: isDark ? "#161616" : "#fcfcfc" }}>
+          <motion.div key="result" className="flex flex-col" style={{ width: "100%", padding: "80px 16px 0", minHeight: 0, position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} initial={{ opacity: 0, scale: 0.92, y: 28 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
+            <motion.div style={{ width: "100%", flex: 1, minHeight: 0, maxHeight: 636, borderRadius: 16, backgroundColor: isDark ? "#161616" : "#fcfcfc" }}>
               <MobileResultSection activeTheme={activeTheme} method={method} url={url} response={loading ? null : response} headersFilter={headersFilter} setHeadersFilter={setHeadersFilter} />
             </motion.div>
+            <div style={{ marginTop: 24, flexShrink: 0, height: 52, boxSizing: "border-box", borderRadius: 12, border: isDark ? "0.8px solid #312f2f" : "0.8px solid #f2f2f2", backgroundColor: isDark ? "#161616" : "#ffffff", display: "flex", alignItems: "center", padding: "0 12px", overflow: "hidden" }}>
+              <div className="relative">
+                <button onClick={() => setResultDropdown((v) => !v)} className="flex items-center" style={{ gap: 4, borderRadius: 8, border: isDark ? "0.8px solid #312f2f" : "0.8px solid #f2f2f2", backgroundColor: isDark ? "#171717" : "#fcfcfc", padding: "6px 8px", cursor: "pointer" }}>
+                  <span style={{ width: 12, height: 12, borderRadius: "50%", backgroundColor: methodDots[method] ?? "#008000", flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 400, letterSpacing: "-0.48px", color: isDark ? "#ffffff" : "#5a5a5a", fontFamily: "Geist, var(--font-geist-sans)" }}>{method}</span>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M4 6l6 6 6-6" stroke="#5a5a5a" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <AnimatePresence>
+                  {resultDropdown && (
+                    <motion.div
+                      key="result-method-dropdown"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 25, mass: 0.8 }}
+                      style={{ position: "absolute", left: 0, bottom: "calc(100% + 6px)", zIndex: 30, width: 140, borderRadius: 8, backgroundColor: isDark ? "#0f0f0f" : "#ffffff", border: isDark ? "0.8px solid #312f2f" : "none", boxShadow: isDark ? "0 12px 14px rgba(61, 61, 61, 0.30)" : "0 12px 14px rgba(219, 219, 219, 0.30)", padding: 4, overflow: "hidden" }}
+                    >
+                      {methods.map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => { setMethod(m); setResultDropdown(false); }}
+                          className="flex items-center"
+                          style={{ width: "100%", gap: 6, padding: "6px 8px", borderRadius: 6, backgroundColor: m === method ? (isDark ? "#1f1f1f" : "#f7f7f7") : "transparent", cursor: "pointer" }}
+                        >
+                          <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: methodDots[m] ?? "#008000" }} />
+                          <span style={{ fontSize: 12, color: isDark ? "#d1d1d1" : "#5a5a5a", fontFamily: "Geist, var(--font-geist-sans)" }}>{m}</span>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+              <input
+                type="text"
+                placeholder="Paste an endpoint..."
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="placeholder:text-[#9e9e9e]"
+                style={{ flex: 1, minWidth: 0, background: "transparent", outline: "none", border: "none", fontSize: 14, letterSpacing: "-0.56px", color: isDark ? "#d1d1d1" : "#5a5a5a", fontFamily: "Geist, var(--font-geist-sans)", marginLeft: 13, marginRight: 12 }}
+              />
+              <button onClick={() => onSend()} disabled={loading} style={{ display: "flex", alignItems: "center", borderRadius: 6, backgroundColor: "#5b5bff", padding: "6px 8px", cursor: "pointer", opacity: loading ? 0.6 : 1 }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M3.333 8h9.334" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M8 3.333l4.667 4.667L8 12.667" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
           </motion.div>
         ) : (
           <motion.div key="explorer" className="flex flex-col justify-center" style={{ width: "100%", padding: "0 16px", minHeight: 0, position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.22, ease: "easeOut" }}>
@@ -356,7 +406,7 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
           </motion.div>
         )}
       </AnimatePresence>
-      <div style={{ position: "absolute", left: 0, right: 0, bottom: 48, textAlign: "center" }}>        <span style={{ fontSize: 12, letterSpacing: "-0.48px", color: "#939393" }}>Lightweight API testing</span>      </div>      {showHistory && (        <MobileHistoryModal          isDark={isDark}          onClose={() => setShowHistory(false)}          history={history}          onSelect={(item, i) => {            setShowHistory(false);
+      {showHistory && (        <MobileHistoryModal          isDark={isDark}          onClose={() => setShowHistory(false)}          history={history}          onSelect={(item, i) => {            setShowHistory(false);
             onHistorySelect(item, i);
            }}        />      )}
       <AnimatePresence>
@@ -602,11 +652,38 @@ function MobileResultSection({ activeTheme, method, url, response, headersFilter
 }) {
   const isDark = activeTheme === "Dark";
   const [bodyTab, setBodyTab] = useState("pretty");
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [showTopBlur, setShowTopBlur] = useState(false);
+  const [showBottomBlur, setShowBottomBlur] = useState(false);
   const bodyContentEl = useRef<HTMLElement | null>(null);
   const [bodyContentHeight, setBodyContentHeight] = useState(0);
   useLayoutEffect(() => {
     if (bodyContentEl.current) setBodyContentHeight(bodyContentEl.current.scrollHeight);
   });
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    if (max <= 0) {
+      setShowTopBlur(false);
+      setShowBottomBlur(false);
+    } else {
+      setShowTopBlur(el.scrollTop > 2);
+      setShowBottomBlur(el.scrollTop < max - 2);
+    }
+  }, [response, bodyContentHeight]);
+  const handleScroll = () => {
+    const el = rootRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    if (max <= 0) {
+      setShowTopBlur(false);
+      setShowBottomBlur(false);
+      return;
+    }
+    setShowTopBlur(el.scrollTop > 2);
+    setShowBottomBlur(el.scrollTop < max - 2);
+  };
   let parsedBody: any = null;
   let isJson = false;
   if (response) {
@@ -628,7 +705,8 @@ function MobileResultSection({ activeTheme, method, url, response, headersFilter
   const responseCardHeight = response ? bodyCardTop + (41 + bodyContentHeight + 12) + 12 : 480;
 const bodyEntries = isJson ? Object.entries(parsedBody) : [];
   return (
-    <div className="hide-scrollbar" style={{ position: "relative", width: "100%", height: 636, overflowY: "auto" }}>
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <div ref={rootRef} onScroll={handleScroll} className="hide-scrollbar" style={{ position: "relative", width: "100%", height: "100%", overflowY: "auto" }}>
       <div style={{ position: "absolute", left: 148, top: 4, width: 47, height: 4, borderRadius: 4, backgroundColor: isDark ? "#7a7a7a" : "#5a5a5a" }} />
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 25, delay: 0.15 }} style={{ position: "absolute", right: 12, top: 42, width: 181, height: 50, borderRadius: 10, backgroundColor: "#f7f7f7", display: "flex", alignItems: "center", padding: "0 16px" }}>
         <span style={{ width: 12, height: 12, borderRadius: "50%", backgroundColor: methodDots[method] || "#008000", flexShrink: 0 }} />
@@ -695,6 +773,29 @@ const bodyEntries = isJson ? Object.entries(parsedBody) : [];
           )}
         </AnimatePresence>
       </motion.div>
+      </div>
+      <AnimatePresence>
+        {showTopBlur && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            style={{ position: "absolute", top: 0, left: 0, right: 0, height: 32, zIndex: 10, pointerEvents: "none", borderRadius: "16px 16px 0 0", background: isDark ? "linear-gradient(to bottom, rgba(22, 22, 22, 0.85), rgba(22, 22, 22, 0))" : "linear-gradient(to bottom, rgba(252, 252, 252, 0.85), rgba(252, 252, 252, 0))", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", maskImage: "linear-gradient(to bottom, black 20%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, black 20%, transparent 100%)" }}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showBottomBlur && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 32, zIndex: 10, pointerEvents: "none", borderRadius: "0 0 16px 16px", background: isDark ? "linear-gradient(to top, rgba(22, 22, 22, 0.85), rgba(22, 22, 22, 0))" : "linear-gradient(to top, rgba(252, 252, 252, 0.85), rgba(252, 252, 252, 0))", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", maskImage: "linear-gradient(to top, black 20%, transparent 100%)", WebkitMaskImage: "linear-gradient(to top, black 20%, transparent 100%)" }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
