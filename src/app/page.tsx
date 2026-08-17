@@ -625,7 +625,7 @@ function MobileResultSection({ activeTheme, method, url, response, headersFilter
     ? allHeaders.filter(([k]) => commonKeys.includes(k.toLowerCase()))
     : allHeaders;
   const bodyCardTop = 62 + filteredHeaders.length * 32;
-  const responseCardHeight = Math.max(480, bodyCardTop + (41 + bodyContentHeight + 16) + 12);
+  const responseCardHeight = response ? bodyCardTop + (41 + bodyContentHeight + 12) + 12 : 480;
 const bodyEntries = isJson ? Object.entries(parsedBody) : [];
   return (
     <div className="hide-scrollbar" style={{ position: "relative", width: "100%", height: 636, overflowY: "auto" }}>
