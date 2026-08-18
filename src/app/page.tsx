@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef, Fragment, useLayoutEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, animate, useMotionValue, useTransform, type MotionValue } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
 import { loadStoredData, saveStoredData, applyStreakOnLoad, type HistoryEntry } from "@/lib/storage";
 const cardTextSpring = {  type: "spring" as const,  stiffness: 400,  damping: 25,  mass: 0.8,};
@@ -84,7 +84,7 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
   const lowestLatency = useMemo(() => {    const times = history.map((item) => item.time).filter((t): t is number => typeof t === "number" && t > 0);
     return times.length ? Math.min(...times) : null;
   }, [history]);
-  if (!mounted) {    return <div style={{ minHeight: "100vh", backgroundColor: activeTheme === "dark" ? "#0f0f0f" : "#fafafa" }} />;  }    if (isMobile) {    return (      <MobilePrimary activeTheme={activeTheme} onThemeChange={setActiveTheme} apisTested={apisTested} streak={streak} lowestLatency={lowestLatency} method={method}        setMethod={setMethod}        url={url}        setUrl={setUrl}        headerKey={headerKey}        setHeaderKey={setHeaderKey}        headerBearer={headerBearer}        setHeaderBearer={setHeaderBearer}        headerValue={headerValue}        setHeaderValue={setHeaderValue}        response={response}        loading={loading}        onSend={(opts) => sendRequest(opts)}        onClearResponse={() => { setResponse(null); setActiveHistoryIndex(null); setUrl(""); setMethod("GET"); setHeaderKey(""); setHeaderBearer(""); setHeaderValue(""); }}        history={history}        activeHistoryIndex={activeHistoryIndex}                onHistorySelect={handleHistorySelect}
+  if (!mounted) {    return <div style={{ minHeight: "100vh", backgroundColor: activeTheme === "dark" ? "#0f0f0f" : "#fafafa" }} />;  }    if (isMobile) {    return (      <MobilePrimary activeTheme={activeTheme} onThemeChange={setActiveTheme} apisTested={apisTested} streak={streak} lowestLatency={lowestLatency} method={method}        setMethod={setMethod}        url={url}        setUrl={setUrl}        headerKey={headerKey}        setHeaderKey={setHeaderKey}        headerBearer={headerBearer}        setHeaderBearer={setHeaderBearer}        headerValue={headerValue}        setHeaderValue={setHeaderValue}        response={response}        loading={loading}        onSend={(opts) => sendRequest(opts)}        onClearResponse={() => { setLoading(false); setResponse(null); setActiveHistoryIndex(null); setUrl(""); setMethod("GET"); setHeaderKey(""); setHeaderBearer(""); setHeaderValue(""); }}        history={history}        activeHistoryIndex={activeHistoryIndex}                onHistorySelect={handleHistorySelect}
         headersFilter={headersFilter}
         setHeadersFilter={setHeadersFilter}
       />    );
@@ -131,6 +131,12 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
 }) {  const isDark = activeTheme === "Dark";
   const [showDropdown, setShowDropdown] = useState(false);
   const [resultDropdown, setResultDropdown] = useState(false);
+  const sheetProgress = useMotionValue(0);
+  const wrapClip = useTransform(sheetProgress, (p) => `inset(${p * 50}% 0% ${p * 50}% 0%)`);
+  const sheetOpacity = useTransform(sheetProgress, (p) => 1 - p);
+  useEffect(() => {
+    if (loading || response) sheetProgress.set(0);
+  }, [loading, response]);
   const [headerExpanded, setHeaderExpanded] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
   const [cleanSheetDismissed, setCleanSheetDismissed] = useState(() => typeof window !== "undefined" && window.localStorage.getItem("cleanSheetDismissed") === "1");
@@ -244,7 +250,7 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
                     </div>
                   </div>
                 ) : (
-                  <div className="hide-scrollbar" style={{ position: "absolute", left: 12, top: 122, right: 12, bottom: 80, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div className="hide-scrollbar" style={{ position: "absolute", left: 12, top: 110, right: 12, bottom: 80, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
                     {history.map((item, i) => (
                     <div
                       key={i}
@@ -254,7 +260,7 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
                         borderRadius: 6,
                         padding: "10px 12px",
                         cursor: "pointer",
-                        backgroundColor: isDark ? (i === activeHistoryIndex ? "#1f1f1f" : "transparent") : (i === activeHistoryIndex ? "#f7f7f7" : "transparent"),
+                        backgroundColor: isDark ? (i === activeHistoryIndex ? "#1f1f1f" : "transparent") : (i === activeHistoryIndex ? "#ffffff" : "transparent"),
                       }}
                       onClick={() => {
                         onHistorySelect(item, i);
@@ -311,8 +317,28 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
         )}
       </AnimatePresence>      <AnimatePresence initial={false}>
         {loading || response ? (
-          <motion.div key="result" className="flex flex-col" style={{ width: "100%", padding: "80px 16px calc(18px + env(safe-area-inset-bottom))", minHeight: 0, position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} initial={{ opacity: 0, scale: 0.92, y: 28 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
-            <motion.div style={{ width: "100%", flex: 1, minHeight: 0, maxHeight: 636, borderRadius: 16, backgroundColor: isDark ? "#161616" : "#fcfcfc" }}>
+          <motion.div key="result" className="flex flex-col" style={{ width: "100%", padding: "80px 16px calc(18px + env(safe-area-inset-bottom))", minHeight: 0, position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} initial={{ opacity: 0, scale: 0.92, y: 28 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
+            <motion.div style={{ opacity: sheetOpacity, width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
+            <motion.div style={{ clipPath: wrapClip, position: "relative", width: "100%", flex: 1, minHeight: 0, maxHeight: 636, borderRadius: 16, backgroundColor: isDark ? "#161616" : "#fcfcfc" }}>
+            <motion.div
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 150 }}
+              dragElastic={0.35}
+              dragMomentum={false}
+              dragSnapToOrigin
+              onDrag={(e, info) => sheetProgress.set(Math.min(0.8, Math.max(0, info.offset.y / 150)))}
+              onDragEnd={(e, info) => {
+                if (info.offset.y > 80 || info.velocity.y > 500) {
+                  animate(sheetProgress, 0.8, { duration: 0.3, ease: "easeIn" });
+                  setTimeout(onClearResponse, 300);
+                } else {
+                  animate(sheetProgress, 0, { type: "spring", stiffness: 300, damping: 30 });
+                }
+              }}
+              style={{ position: "absolute", left: 16, right: 16, top: 0, height: 36, zIndex: 25, cursor: "grab", display: "flex", justifyContent: "center", alignItems: "flex-start", paddingTop: 4 }}
+            >
+              <div style={{ width: 47, height: 4, borderRadius: 4, backgroundColor: isDark ? "#7a7a7a" : "#5a5a5a" }} />
+            </motion.div>
               <MobileResultSection activeTheme={activeTheme} method={method} url={url} response={loading ? null : response} headersFilter={headersFilter} setHeadersFilter={setHeadersFilter} />
             </motion.div>
             <div style={{ marginTop: 24, flexShrink: 0, height: 52, boxSizing: "border-box", borderRadius: 12, border: isDark ? "0.8px solid #312f2f" : "0.8px solid #f2f2f2", backgroundColor: isDark ? "#161616" : "#ffffff", display: "flex", alignItems: "center", padding: "0 12px", overflow: "hidden" }}>
@@ -364,6 +390,7 @@ const [history, setHistory] = useState<HistoryEntry[]>([]);
                 </svg>
               </button>
             </div>
+          </motion.div>
           </motion.div>
         ) : (
           <motion.div key="explorer" className="flex flex-col justify-center" style={{ width: "100%", padding: "0 16px", minHeight: 0, position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.22, ease: "easeOut" }}>
@@ -647,7 +674,7 @@ function MobileResultSection({ activeTheme, method, url, response, headersFilter
   method: string;
   url: string;
   response: { status?: number; time?: number; headers?: Record<string, string>; body?: string; error?: string } | null;
-  headersFilter: string;
+headersFilter: string;
   setHeadersFilter: (v: string) => void;
 }) {
   const isDark = activeTheme === "Dark";
@@ -707,7 +734,6 @@ const bodyEntries = isJson ? Object.entries(parsedBody) : [];
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <div ref={rootRef} onScroll={handleScroll} className="hide-scrollbar" style={{ position: "relative", width: "100%", height: "100%", overflowY: "auto" }}>
-      <div style={{ position: "absolute", left: 148, top: 4, width: 47, height: 4, borderRadius: 4, backgroundColor: isDark ? "#7a7a7a" : "#5a5a5a" }} />
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 25, delay: 0.15 }} style={{ position: "absolute", right: 12, top: 42, width: 181, height: 50, borderRadius: 10, backgroundColor: "#f7f7f7", display: "flex", alignItems: "center", padding: "0 16px" }}>
         <span style={{ width: 12, height: 12, borderRadius: "50%", backgroundColor: methodDots[method] || "#008000", flexShrink: 0 }} />
         <span style={{ fontSize: 14, color: isDark ? "#d1d1d1" : "#5a5a5a", fontFamily: "Geist, var(--font-geist-sans)", flexShrink: 0, marginLeft: 4, marginRight: 4 }}>{method}</span>

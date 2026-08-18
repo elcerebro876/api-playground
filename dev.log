@@ -1,0 +1,389 @@
+▲ Next.js 16.2.11 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.100.120:3000
+✓ Ready in 5.8s
+
+ GET / 200 in 377ms (next.js: 10ms, application-code: 367ms)
+ GET / 200 in 323ms (next.js: 131ms, application-code: 191ms)
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.tsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <script>
+                      <RootLayout>
+                        <html lang="en" className="geist_a715...">
+                          <body
+                            className="min-h-full flex flex-col"
+-                           data-new-gr-c-s-check-loaded="14.1321.0"
+-                           data-gr-ext-installed=""
+                          >
+                  ...
+ 
+    at <unknown> (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:3439:25)
+    at runWithFiberInDEV (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:965:74)
+    at emitPendingHydrationWarnings (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:3438:13)
+    at completeWork (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:6885:102)
+    at runWithFiberInDEV (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:965:131)
+    at completeUnitOfWork (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9622:23)
+    at performUnitOfWork (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9557:28)
+    at workLoopConcurrentByScheduler (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9551:58)
+    at renderRootConcurrent (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9534:71)
+    at performWorkOnRoot (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_1amofcm._.js:2647:64) (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:3439:25)
+✓ Compiled in 637ms
+ GET / 200 in 667ms (next.js: 571ms, application-code: 97ms)
+✓ Compiled in 860ms
+⨯ ./src/app/page.tsx:411:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m409 |[0m             </motion.div>
+  [90m410 |[0m           </motion.div>
+[31m[1m>[0m [90m411 |[0m         )}
+  [90m    |[0m          [31m[1m^[0m
+  [90m412 |[0m       </[33mAnimatePresence[0m>
+  [90m413 |[0m       {showHistory && (        <[33mMobileHistoryModal[0m          isDark={isDark}          onCl...
+  [90m414 |[0m             onHistorySelect(item, i);
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 2.2s (next.js: 1371ms, application-code: 847ms)
+[browser] Uncaught Error: ./src/app/page.tsx:411:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  409 |             </motion.div>
+  410 |           </motion.div>
+> 411 |         )}
+      |          ^
+  412 |       </AnimatePresence>
+  413 |       {showHistory && (        <MobileHistoryModal          isDark={isDark}          onCl...
+  414 |             onHistorySelect(item, i);
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:411:10)
+    at <unknown> (Error: (./src/app/page.tsx:411:10)
+⨯ ./src/app/page.tsx:428:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m426 |[0m             </motion.div>
+  [90m427 |[0m           </motion.div>
+[31m[1m>[0m [90m428 |[0m         )}
+  [90m    |[0m          [31m[1m^[0m
+  [90m429 |[0m       </[33mAnimatePresence[0m>
+  [90m430 |[0m       {showHistory && (        <[33mMobileHistoryModal[0m          isDark={isDark}          onCl...
+  [90m431 |[0m             onHistorySelect(item, i);
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 99ms (next.js: 67ms, application-code: 32ms)
+✓ Compiled in 181ms
+ GET / 200 in 605ms (next.js: 127ms, application-code: 478ms)
+ GET / 200 in 53ms (next.js: 10ms, application-code: 43ms)
+ GET / 200 in 73ms (next.js: 14ms, application-code: 59ms)
+✓ Compiled in 221ms
+ GET / 200 in 301ms (next.js: 209ms, application-code: 92ms)
+ GET / 200 in 383ms (next.js: 13ms, application-code: 370ms)
+ GET / 200 in 59ms (next.js: 10ms, application-code: 50ms)
+ GET / 200 in 66ms (next.js: 10ms, application-code: 56ms)
+✓ Compiled in 266ms
+ GET / 200 in 268ms (next.js: 174ms, application-code: 94ms)
+ GET / 200 in 599ms (next.js: 18ms, application-code: 581ms)
+ GET / 200 in 67ms (next.js: 12ms, application-code: 55ms)
+ GET / 200 in 82ms (next.js: 15ms, application-code: 67ms)
+✓ Compiled in 271ms
+ GET / 200 in 708ms (next.js: 491ms, application-code: 217ms)
+ GET / 200 in 564ms (next.js: 22ms, application-code: 542ms)
+ GET / 200 in 86ms (next.js: 14ms, application-code: 73ms)
+✓ Compiled in 358ms
+ GET / 200 in 261ms (next.js: 181ms, application-code: 80ms)
+ GET / 200 in 414ms (next.js: 14ms, application-code: 400ms)
+ GET / 200 in 82ms (next.js: 10ms, application-code: 72ms)
+✓ Compiled in 3.8s
+ GET / 200 in 2.9s (next.js: 2.4s, application-code: 488ms)
+ GET / 200 in 850ms (next.js: 16ms, application-code: 834ms)
+ GET / 200 in 55ms (next.js: 10ms, application-code: 45ms)
+[browser] Updating a style property during rerender (border) when a conflicting property is set (borderRight) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+    at setValueForStyles (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:2025:29)
+    at setProp (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10736:17)
+    at updateProperties (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:11323:203)
+    at commitUpdate (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:11894:9)
+    at runWithFiberInDEV (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:965:74)
+    at commitHostUpdate (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:7421:13)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8298:100)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8286:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8286:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106) (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:2025:29)
+ GET / 200 in 65ms (next.js: 11ms, application-code: 54ms)
+[browser] Uncaught NotFoundError: Failed to execute 'releasePointerCapture' on 'Element': No active pointer with the given id is found.
+    at <unknown> (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:7907)
+    at p (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:9791)
+[browser] Uncaught NotFoundError: Failed to execute 'releasePointerCapture' on 'Element': No active pointer with the given id is found.
+    at <unknown> (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:7907)
+    at p (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:9791)
+[browser] Uncaught NotFoundError: Failed to execute 'releasePointerCapture' on 'Element': No active pointer with the given id is found.
+    at <unknown> (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:7907)
+    at p (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:9791)
+[browser] Uncaught NotFoundError: Failed to execute 'releasePointerCapture' on 'Element': No active pointer with the given id is found.
+    at <unknown> (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:7907)
+    at p (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:9791)
+[browser] Uncaught NotFoundError: Failed to execute 'releasePointerCapture' on 'Element': No active pointer with the given id is found.
+    at <unknown> (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:7907)
+    at p (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:9791)
+[browser] Uncaught NotFoundError: Failed to execute 'releasePointerCapture' on 'Element': No active pointer with the given id is found.
+    at <unknown> (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:7907)
+    at p (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:9791)
+[browser] Uncaught NotFoundError: Failed to execute 'releasePointerCapture' on 'Element': No active pointer with the given id is found.
+    at <unknown> (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:7907)
+    at p (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:9791)
+[browser] Uncaught NotFoundError: Failed to execute 'releasePointerCapture' on 'Element': No active pointer with the given id is found.
+    at <unknown> (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:7907)
+    at p (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:9791)
+[browser] Updating a style property during rerender (border) when a conflicting property is set (borderRight) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+    at setValueForStyles (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:2025:29)
+    at setProp (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10736:17)
+    at updateProperties (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:11323:203)
+    at commitUpdate (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:11894:9)
+    at runWithFiberInDEV (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:965:74)
+    at commitHostUpdate (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:7421:13)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8298:100)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8286:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8286:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106) (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:2025:29)
+[browser] Uncaught NotFoundError: Failed to execute 'releasePointerCapture' on 'Element': No active pointer with the given id is found.
+    at <unknown> (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:7907)
+    at p (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_next-devtools_index_090k2jm.js:3826:9791)
+ GET / 200 in 76ms (next.js: 9ms, application-code: 67ms)
+[browser] Updating a style property during rerender (border) when a conflicting property is set (borderRight) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+    at setValueForStyles (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:2025:29)
+    at setProp (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10736:17)
+    at updateProperties (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:11323:203)
+    at commitUpdate (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:11894:9)
+    at runWithFiberInDEV (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:965:74)
+    at commitHostUpdate (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:7421:13)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8298:100)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8286:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8286:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106) (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:2025:29)
+[browser] Updating a style property during rerender (border) when a conflicting property is set (borderRight) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values. 
+    at setValueForStyles (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:2025:29)
+    at setProp (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:10736:17)
+    at updateProperties (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:11323:203)
+    at commitUpdate (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:11894:9)
+    at runWithFiberInDEV (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:965:74)
+    at commitHostUpdate (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:7421:13)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8298:100)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8286:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8286:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8403:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8219:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106)
+    at commitMutationEffectsOnFiber (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8214:17)
+    at recursivelyTraverseMutationEffects (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:8205:106) (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_096_9a-._.js:2025:29)
+✓ Compiled in 631ms
+ GET / 200 in 347ms (next.js: 242ms, application-code: 105ms)
+ GET / 200 in 584ms (next.js: 21ms, application-code: 563ms)
+ GET / 200 in 69ms (next.js: 13ms, application-code: 56ms)
+ GET / 200 in 83ms (next.js: 12ms, application-code: 71ms)
+✓ Compiled in 2.1s
+ GET / 200 in 978ms (next.js: 530ms, application-code: 448ms)
+ GET / 200 in 231ms (next.js: 33ms, application-code: 198ms)
+ GET / 200 in 349ms (next.js: 14ms, application-code: 334ms)
