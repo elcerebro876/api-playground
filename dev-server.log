@@ -1,0 +1,1403 @@
+▲ Next.js 16.2.11 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.100.29:3000
+✓ Ready in 1883ms
+
+ GET / 200 in 2.7s (next.js: 2.2s, application-code: 461ms)
+ GET / 200 in 81ms (next.js: 10ms, application-code: 71ms)
+ GET / 200 in 69ms (next.js: 13ms, application-code: 56ms)
+✓ Compiled in 649ms
+ GET / 200 in 329ms (next.js: 253ms, application-code: 77ms)
+✓ Compiled in 225ms
+ GET / 200 in 189ms (next.js: 135ms, application-code: 54ms)
+✓ Compiled in 188ms
+ GET / 200 in 250ms (next.js: 171ms, application-code: 79ms)
+✓ Compiled in 253ms
+ GET / 200 in 163ms (next.js: 122ms, application-code: 41ms)
+✓ Compiled in 319ms
+ GET / 200 in 141ms (next.js: 106ms, application-code: 35ms)
+ GET / 200 in 242ms (next.js: 12ms, application-code: 230ms)
+ GET / 200 in 100ms (next.js: 12ms, application-code: 88ms)
+✓ Compiled in 213ms
+ GET / 200 in 244ms (next.js: 184ms, application-code: 59ms)
+ GET / 200 in 205ms (next.js: 10ms, application-code: 196ms)
+⨯ ./src/app/page.tsx:862:19
+Expected '</', got 'jsx text'
+  [90m860 |[0m               </svg>
+  [90m861 |[0m               <span style={{ fontFamily: [32m"Geist, var(--font-geist-sans)"[0m, fontSize: [35m12[0m, f...
+[31m[1m>[0m [90m862 |[0m             </div>
+  [90m    |[0m                   [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m863 |[0m             <div style={{ position: [32m"absolute"[0m, left: [35m12[0m, top: detailBig ? [35m44[0m : [35m40[0m, displ...
+  [90m    |[0m [31m[1m^^^^^^^^^^^^[0m
+  [90m864 |[0m               {selectedApi.logoColor ? <div style={{ width: [35m16[0m, height: [35m16[0m, borderRadius:.[35m.[0m.
+  [90m865 |[0m               <span style={{ fontFamily: [32m"Geist, var(--font-geist-sans)"[0m, fontSize: [35m12[0m, f...
+  [90m866 |[0m             </div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+✓ Compiled in 1155ms
+ GET / 500 in 1171ms (next.js: 847ms, application-code: 323ms)
+⨯ ./src/app/page.tsx:862:19
+Expected '</', got 'jsx text'
+  [90m860 |[0m               </svg>
+  [90m861 |[0m               <span style={{ fontFamily: [32m"Geist, var(--font-geist-sans)"[0m, fontSize: [35m12[0m, f...
+[31m[1m>[0m [90m862 |[0m             </div>
+  [90m    |[0m                   [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m863 |[0m             <div style={{ position: [32m"absolute"[0m, left: [35m12[0m, top: detailBig ? [35m44[0m : [35m40[0m, displ...
+  [90m    |[0m [31m[1m^^^^^^^^^^^^[0m
+  [90m864 |[0m               {selectedApi.logoColor ? <div style={{ width: [35m16[0m, height: [35m16[0m, borderRadius:.[35m.[0m.
+  [90m865 |[0m               <span style={{ fontFamily: [32m"Geist, var(--font-geist-sans)"[0m, fontSize: [35m12[0m, f...
+  [90m866 |[0m             </div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+⨯ ./src/app/page.tsx:862:19
+Expected '</', got 'jsx text'
+  [90m860 |[0m               </svg>
+  [90m861 |[0m               <span style={{ fontFamily: [32m"Geist, var(--font-geist-sans)"[0m, fontSize: [35m12[0m, f...
+[31m[1m>[0m [90m862 |[0m             </div>
+  [90m    |[0m                   [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m863 |[0m             <div style={{ position: [32m"absolute"[0m, left: [35m12[0m, top: detailBig ? [35m44[0m : [35m40[0m, displ...
+  [90m    |[0m [31m[1m^^^^^^^^^^^^[0m
+  [90m864 |[0m               {selectedApi.logoColor ? <div style={{ width: [35m16[0m, height: [35m16[0m, borderRadius:.[35m.[0m.
+  [90m865 |[0m               <span style={{ fontFamily: [32m"Geist, var(--font-geist-sans)"[0m, fontSize: [35m12[0m, f...
+  [90m866 |[0m             </div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 67ms (next.js: 32ms, application-code: 35ms)
+ GET / 500 in 72ms (next.js: 52ms, application-code: 21ms)
+⨯ ./src/app/page.tsx:862:19
+Expected '</', got 'jsx text'
+  [90m860 |[0m               </svg>
+  [90m861 |[0m               <span style={{ fontFamily: [32m"Geist, var(--font-geist-sans)"[0m, fontSize: [35m12[0m, f...
+[31m[1m>[0m [90m862 |[0m             </div>
+  [90m    |[0m                   [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m863 |[0m             <div style={{ position: [32m"absolute"[0m, left: [35m12[0m, top: detailBig ? [35m44[0m : [35m40[0m, displ...
+  [90m    |[0m [31m[1m^^^^^^^^^^^^[0m
+  [90m864 |[0m               {selectedApi.logoColor ? <div style={{ width: [35m16[0m, height: [35m16[0m, borderRadius:.[35m.[0m.
+  [90m865 |[0m               <span style={{ fontFamily: [32m"Geist, var(--font-geist-sans)"[0m, fontSize: [35m12[0m, f...
+  [90m866 |[0m             </div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+[browser] Uncaught Error: ./src/app/page.tsx:862:19
+Expected '</', got 'jsx text'
+  860 |               </svg>
+  861 |               <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 12, f...
+> 862 |             </div>
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 863 |             <div style={{ position: "absolute", left: 12, top: detailBig ? 44 : 40, displ...
+      | ^^^^^^^^^^^^
+  864 |               {selectedApi.logoColor ? <div style={{ width: 16, height: 16, borderRadius:...
+  865 |               <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 12, f...
+  866 |             </div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:862:19)
+    at <unknown> (Error: (./src/app/page.tsx:862:19)
+⨯ ./src/app/page.tsx:919:13
+Expression expected
+  [90m917 |[0m             </div>
+  [90m918 |[0m           </motion.div>
+[31m[1m>[0m [90m919 |[0m           </>
+  [90m    |[0m             [31m[1m^[0m
+  [90m920 |[0m         )}
+  [90m921 |[0m       </[33mAnimatePresence[0m>
+  [90m922 |[0m     </motion.div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 86ms (next.js: 66ms, application-code: 20ms)
+[browser] Uncaught Error: ./src/app/page.tsx:919:13
+Expression expected
+  917 |             </div>
+  918 |           </motion.div>
+> 919 |           </>
+      |             ^
+  920 |         )}
+  921 |       </AnimatePresence>
+  922 |     </motion.div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:919:13)
+    at <unknown> (Error: (./src/app/page.tsx:919:13)
+⨯ ./src/app/page.tsx:866:19
+Expected '</', got 'jsx text'
+  [90m864 |[0m               {selectedApi.logoColor ? <div style={{ width: [35m16[0m, height: [35m16[0m, borderRadius:.[35m.[0m.
+  [90m865 |[0m               <span style={{ fontFamily: [32m"Geist, var(--font-geist-sans)"[0m, fontSize: [35m12[0m, f...
+[31m[1m>[0m [90m866 |[0m             </div>
+  [90m    |[0m                   [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m867 |[0m             <div style={{ position: [32m"absolute"[0m, left: [35m12[0m, top: [35m76[0m, width: [35m370[0m, height: de...
+  [90m    |[0m [31m[1m^^^^^^^^^^^^[0m
+  [90m868 |[0m               <span style={{ position: [32m"absolute"[0m, left: [35m12[0m, top: [35m12[0m, fontFamily: [32m"Geist,...[0m
+  [90m869 |[0m               <span style={{ position: [32m"absolute"[0m, left: [35m12[0m, top: [35m37[0m, right: [35m12[0m, fontFami...
+  [90m870 |[0m               {selectedApi.keyDesc ? (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 83ms (next.js: 71ms, application-code: 11ms)
+[browser] Uncaught Error: ./src/app/page.tsx:866:19
+Expected '</', got 'jsx text'
+  864 |               {selectedApi.logoColor ? <div style={{ width: 16, height: 16, borderRadius:...
+  865 |               <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 12, f...
+> 866 |             </div>
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 867 |             <div style={{ position: "absolute", left: 12, top: 76, width: 370, height: de...
+      | ^^^^^^^^^^^^
+  868 |               <span style={{ position: "absolute", left: 12, top: 12, fontFamily: "Geist,...
+  869 |               <span style={{ position: "absolute", left: 12, top: 37, right: 12, fontFami...
+  870 |               {selectedApi.keyDesc ? (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:866:19)
+    at <unknown> (Error: (./src/app/page.tsx:866:19)
+⨯ ./src/app/page.tsx:919:13
+Expression expected
+  [90m917 |[0m             </div>
+  [90m918 |[0m           </motion.div>
+[31m[1m>[0m [90m919 |[0m           </>
+  [90m    |[0m             [31m[1m^[0m
+  [90m920 |[0m         )}
+  [90m921 |[0m       </[33mAnimatePresence[0m>
+  [90m922 |[0m     </motion.div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 132ms (next.js: 88ms, application-code: 44ms)
+[browser] Uncaught Error: ./src/app/page.tsx:919:13
+Expression expected
+  917 |             </div>
+  918 |           </motion.div>
+> 919 |           </>
+      |             ^
+  920 |         )}
+  921 |       </AnimatePresence>
+  922 |     </motion.div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:919:13)
+    at <unknown> (Error: (./src/app/page.tsx:919:13)
+⨯ ./src/app/page.tsx:917:19
+Expected '</', got 'jsx text'
+  [90m915 |[0m                 </div>
+  [90m916 |[0m               </div>
+[31m[1m>[0m [90m917 |[0m             </div>
+  [90m    |[0m                   [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m918 |[0m           </motion.div>
+  [90m    |[0m [31m[1m^^^^^^^^^^[0m
+  [90m919 |[0m           </>
+  [90m920 |[0m         )}
+  [90m921 |[0m       </[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 59ms (next.js: 44ms, application-code: 15ms)
+[browser] Uncaught Error: ./src/app/page.tsx:917:19
+Expected '</', got 'jsx text'
+  915 |                 </div>
+  916 |               </div>
+> 917 |             </div>
+      |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 918 |           </motion.div>
+      | ^^^^^^^^^^
+  919 |           </>
+  920 |         )}
+  921 |       </AnimatePresence>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:917:19)
+    at <unknown> (Error: (./src/app/page.tsx:917:19)
+✓ Compiled in 266ms
+ GET / 200 in 665ms (next.js: 282ms, application-code: 383ms)
+⨯ ./src/app/page.tsx:919:26
+Expected '</', got 'jsx text'
+  [90m917 |[0m               </div>
+  [90m918 |[0m             </motion.div>
+[31m[1m>[0m [90m919 |[0m             </motion.div>
+  [90m    |[0m                          [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m920 |[0m           </motion.div>
+  [90m    |[0m [31m[1m^^^^^^^^^^[0m
+  [90m921 |[0m           </>
+  [90m922 |[0m         )}
+  [90m923 |[0m       </[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 91ms (next.js: 53ms, application-code: 37ms)
+⨯ ./src/app/page.tsx:919:26
+Expected '</', got 'jsx text'
+  [90m917 |[0m               </div>
+  [90m918 |[0m             </motion.div>
+[31m[1m>[0m [90m919 |[0m             </motion.div>
+  [90m    |[0m                          [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m920 |[0m           </motion.div>
+  [90m    |[0m [31m[1m^^^^^^^^^^[0m
+  [90m921 |[0m           </>
+  [90m922 |[0m         )}
+  [90m923 |[0m       </[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+⨯ ./src/app/page.tsx:919:26
+Expected '</', got 'jsx text'
+  [90m917 |[0m               </div>
+  [90m918 |[0m             </motion.div>
+[31m[1m>[0m [90m919 |[0m             </motion.div>
+  [90m    |[0m                          [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m920 |[0m           </motion.div>
+  [90m    |[0m [31m[1m^^^^^^^^^^[0m
+  [90m921 |[0m           </>
+  [90m922 |[0m         )}
+  [90m923 |[0m       </[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 75ms (next.js: 38ms, application-code: 36ms)
+ GET / 500 in 69ms (next.js: 52ms, application-code: 17ms)
+⨯ ./src/app/page.tsx:919:26
+Expected '</', got 'jsx text'
+  [90m917 |[0m               </div>
+  [90m918 |[0m             </motion.div>
+[31m[1m>[0m [90m919 |[0m             </motion.div>
+  [90m    |[0m                          [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m920 |[0m           </motion.div>
+  [90m    |[0m [31m[1m^^^^^^^^^^[0m
+  [90m921 |[0m           </>
+  [90m922 |[0m         )}
+  [90m923 |[0m       </[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+✓ Compiled in 600ms
+[browser] Uncaught Error: ./src/app/page.tsx:919:26
+Expected '</', got 'jsx text'
+  917 |               </div>
+  918 |             </motion.div>
+> 919 |             </motion.div>
+      |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 920 |           </motion.div>
+      | ^^^^^^^^^^
+  921 |           </>
+  922 |         )}
+  923 |       </AnimatePresence>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:919:26)
+    at <unknown> (Error: (./src/app/page.tsx:919:26)
+⨯ ./src/app/page.tsx:882:15
+Expected '</', got ')'
+  [90m880 |[0m                   </div>
+  [90m881 |[0m                 </div>
+[31m[1m>[0m [90m882 |[0m               ) : (
+  [90m    |[0m               [31m[1m^[0m
+  [90m883 |[0m                 <div style={{ position: [32m"absolute"[0m, left: [35m12[0m, top: [35m73[0m, width: [35m346[0m, height...
+  [90m884 |[0m                   <div style={{ position: [32m"absolute"[0m, left: [35m8[0m, top: [35m25[0m, display: [32m"flex"[0m, ...
+  [90m885 |[0m                     <svg viewBox=[32m"0 0 18 18"[0m width={[35m16[0m} height={[35m16[0m} fill=[32m"none"[0m style={{ ...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 72ms (next.js: 55ms, application-code: 17ms)
+[browser] Uncaught Error: ./src/app/page.tsx:882:15
+Expected '</', got ')'
+  880 |                   </div>
+  881 |                 </div>
+> 882 |               ) : (
+      |               ^
+  883 |                 <div style={{ position: "absolute", left: 12, top: 73, width: 346, height...
+  884 |                   <div style={{ position: "absolute", left: 8, top: 25, display: "flex", ...
+  885 |                     <svg viewBox="0 0 18 18" width={16} height={16} fill="none" style={{ ...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:882:15)
+    at <unknown> (Error: (./src/app/page.tsx:882:15)
+⨯ ./src/app/page.tsx:919:26
+Expected '</', got 'jsx text'
+  [90m917 |[0m               </div>
+  [90m918 |[0m             </motion.div>
+[31m[1m>[0m [90m919 |[0m             </motion.div>
+  [90m    |[0m                          [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m920 |[0m           </motion.div>
+  [90m    |[0m [31m[1m^^^^^^^^^^[0m
+  [90m921 |[0m           </>
+  [90m922 |[0m         )}
+  [90m923 |[0m       </[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 90ms (next.js: 67ms, application-code: 23ms)
+[browser] Uncaught Error: ./src/app/page.tsx:919:26
+Expected '</', got 'jsx text'
+  917 |               </div>
+  918 |             </motion.div>
+> 919 |             </motion.div>
+      |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 920 |           </motion.div>
+      | ^^^^^^^^^^
+  921 |           </>
+  922 |         )}
+  923 |       </AnimatePresence>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:919:26)
+    at <unknown> (Error: (./src/app/page.tsx:919:26)
+⨯ ./src/app/page.tsx:893:15
+Expected '</', got ')'
+  [90m891 |[0m                   </div>
+  [90m892 |[0m                 </div>
+[31m[1m>[0m [90m893 |[0m               )}
+  [90m    |[0m               [31m[1m^[0m
+  [90m894 |[0m               <div style={{ position: [32m"absolute"[0m, left: [35m12[0m, top: detailBig ? [35m155[0m : [35m161[0m, w...
+  [90m895 |[0m                 <div style={{ position: [32m"absolute"[0m, left: [35m8[0m, top: detailBig ? [35m10[0m : [35m8[0m, dis...
+  [90m896 |[0m                   <span style={{ width: [35m12[0m, height: [35m12[0m, borderRadius: [32m"50%"[0m, backgroundCo...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 89ms (next.js: 69ms, application-code: 19ms)
+[browser] Uncaught Error: ./src/app/page.tsx:893:15
+Expected '</', got ')'
+  891 |                   </div>
+  892 |                 </div>
+> 893 |               )}
+      |               ^
+  894 |               <div style={{ position: "absolute", left: 12, top: detailBig ? 155 : 161, w...
+  895 |                 <div style={{ position: "absolute", left: 8, top: detailBig ? 10 : 8, dis...
+  896 |                   <span style={{ width: 12, height: 12, borderRadius: "50%", backgroundCo...
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:893:15)
+    at <unknown> (Error: (./src/app/page.tsx:893:15)
+⨯ ./src/app/page.tsx:919:26
+Expected '</', got 'jsx text'
+  [90m917 |[0m               </div>
+  [90m918 |[0m             </motion.div>
+[31m[1m>[0m [90m919 |[0m             </motion.div>
+  [90m    |[0m                          [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m920 |[0m           </motion.div>
+  [90m    |[0m [31m[1m^^^^^^^^^^[0m
+  [90m921 |[0m           </>
+  [90m922 |[0m         )}
+  [90m923 |[0m       </[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 97ms (next.js: 78ms, application-code: 19ms)
+[browser] Uncaught Error: ./src/app/page.tsx:919:26
+Expected '</', got 'jsx text'
+  917 |               </div>
+  918 |             </motion.div>
+> 919 |             </motion.div>
+      |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 920 |           </motion.div>
+      | ^^^^^^^^^^
+  921 |           </>
+  922 |         )}
+  923 |       </AnimatePresence>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:919:26)
+    at <unknown> (Error: (./src/app/page.tsx:919:26)
+✓ Compiled in 2.3s
+ GET / 200 in 1054ms (next.js: 437ms, application-code: 617ms)
+ GET / 200 in 76ms (next.js: 12ms, application-code: 64ms)
+✓ Compiled in 703ms
+⨯ ./src/app/page.tsx:768:15
+Expected '</', got 'jsx text'
+  [90m766 |[0m
+  [90m767 |[0m         <div style={{ height: [35m1[0m, backgroundColor: isDark ? [32m"#2d2d2d"[0m : [32m"#f2f2f2"[0m }} />
+[31m[1m>[0m [90m768 |[0m         </div>
+  [90m    |[0m               [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m769 |[0m
+  [90m    |[0m [31m[1m^[0m
+[31m[1m>[0m [90m770 |[0m         <div style={{ borderRadius: [35m6[0m, backgroundColor: isDark ? [32m"#1b1b1b"[0m : [32m"#ffffff"[0m, b...
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m771 |[0m           <div style={{ display: [32m"flex"[0m, gap: [35m8[0m, marginBottom: [35m16[0m, flexWrap: [32m"wrap"[0m }}>
+  [90m772 |[0m           {filters.map(f => (
+  [90m773 |[0m             <button
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 124ms (next.js: 107ms, application-code: 17ms)
+⨯ ./src/app/page.tsx:768:15
+Expected '</', got 'jsx text'
+  [90m766 |[0m
+  [90m767 |[0m         <div style={{ height: [35m1[0m, backgroundColor: isDark ? [32m"#2d2d2d"[0m : [32m"#f2f2f2"[0m }} />
+[31m[1m>[0m [90m768 |[0m         </div>
+  [90m    |[0m               [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m769 |[0m
+  [90m    |[0m [31m[1m^[0m
+[31m[1m>[0m [90m770 |[0m         <div style={{ borderRadius: [35m6[0m, backgroundColor: isDark ? [32m"#1b1b1b"[0m : [32m"#ffffff"[0m, b...
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m771 |[0m           <div style={{ display: [32m"flex"[0m, gap: [35m8[0m, marginBottom: [35m16[0m, flexWrap: [32m"wrap"[0m }}>
+  [90m772 |[0m           {filters.map(f => (
+  [90m773 |[0m             <button
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 53ms (next.js: 32ms, application-code: 21ms)
+⨯ ./src/app/page.tsx:768:15
+Expected '</', got 'jsx text'
+  [90m766 |[0m
+  [90m767 |[0m         <div style={{ height: [35m1[0m, backgroundColor: isDark ? [32m"#2d2d2d"[0m : [32m"#f2f2f2"[0m }} />
+[31m[1m>[0m [90m768 |[0m         </div>
+  [90m    |[0m               [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m769 |[0m
+  [90m    |[0m [31m[1m^[0m
+[31m[1m>[0m [90m770 |[0m         <div style={{ borderRadius: [35m6[0m, backgroundColor: isDark ? [32m"#1b1b1b"[0m : [32m"#ffffff"[0m, b...
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m771 |[0m           <div style={{ display: [32m"flex"[0m, gap: [35m8[0m, marginBottom: [35m16[0m, flexWrap: [32m"wrap"[0m }}>
+  [90m772 |[0m           {filters.map(f => (
+  [90m773 |[0m             <button
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+⨯ ./src/app/page.tsx:768:15
+Expected '</', got 'jsx text'
+  [90m766 |[0m
+  [90m767 |[0m         <div style={{ height: [35m1[0m, backgroundColor: isDark ? [32m"#2d2d2d"[0m : [32m"#f2f2f2"[0m }} />
+[31m[1m>[0m [90m768 |[0m         </div>
+  [90m    |[0m               [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m769 |[0m
+  [90m    |[0m [31m[1m^[0m
+[31m[1m>[0m [90m770 |[0m         <div style={{ borderRadius: [35m6[0m, backgroundColor: isDark ? [32m"#1b1b1b"[0m : [32m"#ffffff"[0m, b...
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m771 |[0m           <div style={{ display: [32m"flex"[0m, gap: [35m8[0m, marginBottom: [35m16[0m, flexWrap: [32m"wrap"[0m }}>
+  [90m772 |[0m           {filters.map(f => (
+  [90m773 |[0m             <button
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 71ms (next.js: 37ms, application-code: 34ms)
+ GET / 500 in 66ms (next.js: 51ms, application-code: 15ms)
+⨯ ./src/app/page.tsx:768:15
+Expected '</', got 'jsx text'
+  [90m766 |[0m
+  [90m767 |[0m         <div style={{ height: [35m1[0m, backgroundColor: isDark ? [32m"#2d2d2d"[0m : [32m"#f2f2f2"[0m }} />
+[31m[1m>[0m [90m768 |[0m         </div>
+  [90m    |[0m               [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m769 |[0m
+  [90m    |[0m [31m[1m^[0m
+[31m[1m>[0m [90m770 |[0m         <div style={{ borderRadius: [35m6[0m, backgroundColor: isDark ? [32m"#1b1b1b"[0m : [32m"#ffffff"[0m, b...
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m771 |[0m           <div style={{ display: [32m"flex"[0m, gap: [35m8[0m, marginBottom: [35m16[0m, flexWrap: [32m"wrap"[0m }}>
+  [90m772 |[0m           {filters.map(f => (
+  [90m773 |[0m             <button
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+[browser] Uncaught Error: ./src/app/page.tsx:768:15
+Expected '</', got 'jsx text'
+  766 |
+  767 |         <div style={{ height: 1, backgroundColor: isDark ? "#2d2d2d" : "#f2f2f2" }} />
+> 768 |         </div>
+      |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 769 |
+      | ^
+> 770 |         <div style={{ borderRadius: 6, backgroundColor: isDark ? "#1b1b1b" : "#ffffff", b...
+      | ^^^^^^^^
+  771 |           <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+  772 |           {filters.map(f => (
+  773 |             <button
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:768:15)
+    at <unknown> (Error: (./src/app/page.tsx:768:15)
+✓ Compiled in 261ms
+ GET / 200 in 409ms (next.js: 160ms, application-code: 249ms)
+✓ Compiled in 347ms
+⨯ ./src/app/page.tsx:832:15
+Expected '</', got 'jsx text'
+  [90m830 |[0m ))}
+  [90m831 |[0m         </motion.div>
+[31m[1m>[0m [90m832 |[0m         </div>
+  [90m    |[0m               [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m833 |[0m         </div>
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m834 |[0m       </div>
+  [90m835 |[0m       <[33mAnimatePresence[0m>
+  [90m836 |[0m         {selectedApi && (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 58ms (next.js: 46ms, application-code: 13ms)
+⨯ ./src/app/page.tsx:832:15
+Expected '</', got 'jsx text'
+  [90m830 |[0m ))}
+  [90m831 |[0m         </motion.div>
+[31m[1m>[0m [90m832 |[0m         </div>
+  [90m    |[0m               [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m833 |[0m         </div>
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m834 |[0m       </div>
+  [90m835 |[0m       <[33mAnimatePresence[0m>
+  [90m836 |[0m         {selectedApi && (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+⨯ ./src/app/page.tsx:832:15
+Expected '</', got 'jsx text'
+  [90m830 |[0m ))}
+  [90m831 |[0m         </motion.div>
+[31m[1m>[0m [90m832 |[0m         </div>
+  [90m    |[0m               [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m833 |[0m         </div>
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m834 |[0m       </div>
+  [90m835 |[0m       <[33mAnimatePresence[0m>
+  [90m836 |[0m         {selectedApi && (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 43ms (next.js: 21ms, application-code: 22ms)
+ GET / 500 in 47ms (next.js: 33ms, application-code: 14ms)
+⨯ ./src/app/page.tsx:832:15
+Expected '</', got 'jsx text'
+  [90m830 |[0m ))}
+  [90m831 |[0m         </motion.div>
+[31m[1m>[0m [90m832 |[0m         </div>
+  [90m    |[0m               [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m833 |[0m         </div>
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m834 |[0m       </div>
+  [90m835 |[0m       <[33mAnimatePresence[0m>
+  [90m836 |[0m         {selectedApi && (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+[browser] Uncaught Error: ./src/app/page.tsx:832:15
+Expected '</', got 'jsx text'
+  830 | ))}
+  831 |         </motion.div>
+> 832 |         </div>
+      |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 833 |         </div>
+      | ^^^^^^^^
+  834 |       </div>
+  835 |       <AnimatePresence>
+  836 |         {selectedApi && (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:832:15)
+    at <unknown> (Error: (./src/app/page.tsx:832:15)
+✓ Compiled in 217ms
+ GET / 200 in 486ms (next.js: 159ms, application-code: 327ms)
+ GET / 200 in 99ms (next.js: 9ms, application-code: 89ms)
+ GET /dashboard 404 in 2.0s (next.js: 1527ms, application-code: 512ms)
+✓ Compiled in 1282ms
+ GET / 200 in 1270ms (next.js: 1161ms, application-code: 109ms)
+✓ Compiled in 609ms
+ GET / 200 in 463ms (next.js: 338ms, application-code: 125ms)
+✓ Compiled in 864ms
+ GET / 200 in 1393ms (next.js: 1218ms, application-code: 175ms)
+✓ Compiled in 418ms
+ GET / 200 in 877ms (next.js: 659ms, application-code: 217ms)
+✓ Compiled in 773ms
+ GET / 200 in 646ms (next.js: 504ms, application-code: 142ms)
+✓ Compiled in 640ms
+ GET / 200 in 575ms (next.js: 431ms, application-code: 144ms)
+✓ Compiled in 195ms
+ GET / 200 in 458ms (next.js: 295ms, application-code: 163ms)
+✓ Compiled in 318ms
+ GET / 200 in 754ms (next.js: 530ms, application-code: 224ms)
+✓ Compiled in 302ms
+ GET / 200 in 481ms (next.js: 315ms, application-code: 166ms)
+✓ Compiled in 310ms
+ GET / 200 in 561ms (next.js: 448ms, application-code: 112ms)
+✓ Compiled in 251ms
+ GET / 200 in 564ms (next.js: 476ms, application-code: 88ms)
+✓ Compiled in 400ms
+ GET / 200 in 547ms (next.js: 412ms, application-code: 135ms)
+✓ Compiled in 968ms
+⨯ ./src/app/page.tsx:851:22
+Expected '</', got 'jsx text'
+  [90m849 |[0m ))}
+  [90m850 |[0m         </motion.div>
+[31m[1m>[0m [90m851 |[0m         </motion.div>
+  [90m    |[0m                      [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m852 |[0m         </div>
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m853 |[0m       <[33mAnimatePresence[0m>
+  [90m854 |[0m         {showTopBlur && (
+  [90m855 |[0m           <motion.div
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 125ms (next.js: 91ms, application-code: 33ms)
+⨯ ./src/app/page.tsx:851:22
+Expected '</', got 'jsx text'
+  [90m849 |[0m ))}
+  [90m850 |[0m         </motion.div>
+[31m[1m>[0m [90m851 |[0m         </motion.div>
+  [90m    |[0m                      [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m852 |[0m         </div>
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m853 |[0m       <[33mAnimatePresence[0m>
+  [90m854 |[0m         {showTopBlur && (
+  [90m855 |[0m           <motion.div
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 66ms (next.js: 36ms, application-code: 31ms)
+⨯ ./src/app/page.tsx:851:22
+Expected '</', got 'jsx text'
+  [90m849 |[0m ))}
+  [90m850 |[0m         </motion.div>
+[31m[1m>[0m [90m851 |[0m         </motion.div>
+  [90m    |[0m                      [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m852 |[0m         </div>
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m853 |[0m       <[33mAnimatePresence[0m>
+  [90m854 |[0m         {showTopBlur && (
+  [90m855 |[0m           <motion.div
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+⨯ ./src/app/page.tsx:851:22
+Expected '</', got 'jsx text'
+  [90m849 |[0m ))}
+  [90m850 |[0m         </motion.div>
+[31m[1m>[0m [90m851 |[0m         </motion.div>
+  [90m    |[0m                      [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31m[1m>[0m [90m852 |[0m         </div>
+  [90m    |[0m [31m[1m^^^^^^^^[0m
+  [90m853 |[0m       <[33mAnimatePresence[0m>
+  [90m854 |[0m         {showTopBlur && (
+  [90m855 |[0m           <motion.div
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 75ms (next.js: 36ms, application-code: 39ms)
+[browser] Uncaught Error: ./src/app/page.tsx:851:22
+Expected '</', got 'jsx text'
+  849 | ))}
+  850 |         </motion.div>
+> 851 |         </motion.div>
+      |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 852 |         </div>
+      | ^^^^^^^^
+  853 |       <AnimatePresence>
+  854 |         {showTopBlur && (
+  855 |           <motion.div
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:851:22)
+    at <unknown> (Error: (./src/app/page.tsx:851:22)
+⨯ ./src/app/page.tsx:968:1
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m966 |[0m     </motion.div>
+  [90m967 |[0m   );
+[31m[1m>[0m [90m968 |[0m }
+  [90m    |[0m [31m[1m^[0m
+  [90m969 |[0m
+  [90m970 |[0m [36mfunction[0m [33mUrlInputBar[0m({  compact,  activeTheme,  method,  setMethod,  url,  setUrl,  loadi...
+  [90m971 |[0m   method: string;
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 98ms (next.js: 72ms, application-code: 26ms)
+[browser] Uncaught Error: ./src/app/page.tsx:968:1
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  966 |     </motion.div>
+  967 |   );
+> 968 | }
+      | ^
+  969 |
+  970 | function UrlInputBar({  compact,  activeTheme,  method,  setMethod,  url,  setUrl,  loadi...
+  971 |   method: string;
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:968:1)
+    at <unknown> (Error: (./src/app/page.tsx:968:1)
+✓ Compiled in 450ms
+ GET / 200 in 1447ms (next.js: 347ms, application-code: 1100ms)
+✓ Compiled in 1225ms
+ GET / 200 in 910ms (next.js: 716ms, application-code: 194ms)
+✓ Compiled in 2.2s
+⨯ ./src/app/page.tsx:885:12
+Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  [90m883 |[0m             transition={{ duration: [35m0.18[0m }}
+  [90m884 |[0m             style={{ position: [32m"absolute"[0m, top: [35m0[0m, left: [35m0[0m, right: [35m0[0m, height: [35m32[0m, zIndex:.[35m..[0m
+[31m[1m>[0m [90m885 |[0m           />
+  [90m    |[0m            [31m[1m^[0m
+  [90m886 |[0m         )}
+  [90m887 |[0m       </[33mAnimatePresence[0m>
+  [90m888 |[0m       <[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+
+./src/app/page.tsx:886:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m884 |[0m             style={{ position: [32m"absolute"[0m, top: [35m0[0m, left: [35m0[0m, right: [35m0[0m, height: [35m32[0m, zIndex:.[35m..[0m
+  [90m885 |[0m           />
+[31m[1m>[0m [90m886 |[0m         )}
+  [90m    |[0m          [31m[1m^[0m
+  [90m887 |[0m       </[33mAnimatePresence[0m>
+  [90m888 |[0m       <[33mAnimatePresence[0m>
+  [90m889 |[0m         {showBottomBlur && (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 169ms (next.js: 109ms, application-code: 60ms)
+⨯ ./src/app/page.tsx:885:12
+Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  [90m883 |[0m             transition={{ duration: [35m0.18[0m }}
+  [90m884 |[0m             style={{ position: [32m"absolute"[0m, top: [35m0[0m, left: [35m0[0m, right: [35m0[0m, height: [35m32[0m, zIndex:.[35m..[0m
+[31m[1m>[0m [90m885 |[0m           />
+  [90m    |[0m            [31m[1m^[0m
+  [90m886 |[0m         )}
+  [90m887 |[0m       </[33mAnimatePresence[0m>
+  [90m888 |[0m       <[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+
+./src/app/page.tsx:886:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m884 |[0m             style={{ position: [32m"absolute"[0m, top: [35m0[0m, left: [35m0[0m, right: [35m0[0m, height: [35m32[0m, zIndex:.[35m..[0m
+  [90m885 |[0m           />
+[31m[1m>[0m [90m886 |[0m         )}
+  [90m    |[0m          [31m[1m^[0m
+  [90m887 |[0m       </[33mAnimatePresence[0m>
+  [90m888 |[0m       <[33mAnimatePresence[0m>
+  [90m889 |[0m         {showBottomBlur && (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 89ms (next.js: 57ms, application-code: 32ms)
+⨯ ./src/app/page.tsx:885:12
+Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  [90m883 |[0m             transition={{ duration: [35m0.18[0m }}
+  [90m884 |[0m             style={{ position: [32m"absolute"[0m, top: [35m0[0m, left: [35m0[0m, right: [35m0[0m, height: [35m32[0m, zIndex:.[35m..[0m
+[31m[1m>[0m [90m885 |[0m           />
+  [90m    |[0m            [31m[1m^[0m
+  [90m886 |[0m         )}
+  [90m887 |[0m       </[33mAnimatePresence[0m>
+  [90m888 |[0m       <[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+
+./src/app/page.tsx:886:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m884 |[0m             style={{ position: [32m"absolute"[0m, top: [35m0[0m, left: [35m0[0m, right: [35m0[0m, height: [35m32[0m, zIndex:.[35m..[0m
+  [90m885 |[0m           />
+[31m[1m>[0m [90m886 |[0m         )}
+  [90m    |[0m          [31m[1m^[0m
+  [90m887 |[0m       </[33mAnimatePresence[0m>
+  [90m888 |[0m       <[33mAnimatePresence[0m>
+  [90m889 |[0m         {showBottomBlur && (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+⨯ ./src/app/page.tsx:885:12
+Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  [90m883 |[0m             transition={{ duration: [35m0.18[0m }}
+  [90m884 |[0m             style={{ position: [32m"absolute"[0m, top: [35m0[0m, left: [35m0[0m, right: [35m0[0m, height: [35m32[0m, zIndex:.[35m..[0m
+[31m[1m>[0m [90m885 |[0m           />
+  [90m    |[0m            [31m[1m^[0m
+  [90m886 |[0m         )}
+  [90m887 |[0m       </[33mAnimatePresence[0m>
+  [90m888 |[0m       <[33mAnimatePresence[0m>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+
+./src/app/page.tsx:886:10
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  [90m884 |[0m             style={{ position: [32m"absolute"[0m, top: [35m0[0m, left: [35m0[0m, right: [35m0[0m, height: [35m32[0m, zIndex:.[35m..[0m
+  [90m885 |[0m           />
+[31m[1m>[0m [90m886 |[0m         )}
+  [90m    |[0m          [31m[1m^[0m
+  [90m887 |[0m       </[33mAnimatePresence[0m>
+  [90m888 |[0m       <[33mAnimatePresence[0m>
+  [90m889 |[0m         {showBottomBlur && (
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 92ms (next.js: 47ms, application-code: 45ms)
+ GET / 500 in 128ms (next.js: 78ms, application-code: 50ms)
+[browser] Uncaught Error: ./src/app/page.tsx:885:12
+Unexpected token. Did you mean `{'>'}` or `&gt;`?
+  883 |             transition={{ duration: 0.18 }}
+  884 |             style={{ position: "absolute", top: 0, left: 0, right: 0, height: 32, zIndex:...
+> 885 |           />
+      |            ^
+  886 |         )}
+  887 |       </AnimatePresence>
+  888 |       <AnimatePresence>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:885:12)
+    at <unknown> (Error: (./src/app/page.tsx:885:12)
+✓ Compiled in 1004ms
+ GET / 200 in 965ms (next.js: 405ms, application-code: 560ms)
+✓ Compiled in 2.4s
+ GET / 200 in 1212ms (next.js: 887ms, application-code: 325ms)
+ GET / 200 in 137ms (next.js: 22ms, application-code: 115ms)
+✓ Compiled in 341ms
+ GET / 200 in 542ms (next.js: 412ms, application-code: 130ms)
+✓ Compiled in 987ms
+ GET / 200 in 662ms (next.js: 524ms, application-code: 138ms)
+✓ Compiled in 851ms
+ GET / 200 in 784ms (next.js: 435ms, application-code: 349ms)
+ GET / 200 in 155ms (next.js: 28ms, application-code: 127ms)
+✓ Compiled in 594ms
+ GET / 200 in 705ms (next.js: 449ms, application-code: 256ms)
+ GET / 200 in 117ms (next.js: 38ms, application-code: 79ms)
+✓ Compiled in 235ms
+ GET / 200 in 504ms (next.js: 377ms, application-code: 127ms)
+✓ Compiled in 715ms
+ GET / 200 in 845ms (next.js: 682ms, application-code: 163ms)
+✓ Compiled in 881ms
+ GET / 200 in 932ms (next.js: 772ms, application-code: 160ms)
+✓ Compiled in 634ms
+ GET / 200 in 567ms (next.js: 391ms, application-code: 177ms)
+✓ Compiled in 673ms
+ GET / 200 in 1408ms (next.js: 622ms, application-code: 786ms)
+ GET / 200 in 204ms (next.js: 20ms, application-code: 184ms)

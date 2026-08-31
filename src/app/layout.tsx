@@ -14,7 +14,6 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Playground",
-  description: "Lightweight API testing tool",
 };
 
 export default function RootLayout({

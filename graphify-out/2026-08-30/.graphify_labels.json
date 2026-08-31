@@ -1,0 +1,18 @@
+{
+  "0": "page.tsx",
+  "1": "devDependencies",
+  "2": "compilerOptions",
+  "3": "dependencies",
+  "4": "include",
+  "5": "package.json",
+  "6": "LoadingState.tsx",
+  "7": "layout.tsx",
+  "8": "README.md",
+  "9": "AGENTS.md",
+  "10": "eslint.config.mjs",
+  "11": "next.config.ts",
+  "12": "postcss.config.mjs",
+  "13": "route.js",
+  "14": "icons.tsx",
+  "15": "CLAUDE.md"
+}
