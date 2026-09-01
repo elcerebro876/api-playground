@@ -35,6 +35,10 @@
   100% { background-position: -200% 0; }
 }
 
+@keyframes btn-ripple {
+  to { transform: scale(12); opacity: 0; }
+}
+
 @theme inline {
   --color-background: var(--primary-bg);
   --color-foreground: var(--foreground);
