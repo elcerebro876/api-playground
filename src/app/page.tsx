@@ -719,9 +719,9 @@ style={{
               <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 16, fontWeight: 500, letterSpacing: "-0.8px", color: isDark ? "#ffffff" : "#222" }}>Browse API</span>
               <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 14, letterSpacing: "-0.56px", lineHeight: "20px", color: isDark ? "#adadad" : "#939393", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>Pick a use case, test a real API in seconds, Stripe, OpenAI, and 13 more — ready to poke at.</span>
             </div>
-            <div style={{ flexShrink: 0, alignSelf: "flex-start", display: "flex", alignItems: "center", borderRadius: 6, backgroundColor: "#5a5aff", padding: "6px 12px", cursor: "pointer" }}>
+            <RippleButton style={{ flexShrink: 0, alignSelf: "flex-start", display: "flex", alignItems: "center", borderRadius: 6, backgroundColor: "#5a5aff", padding: "6px 12px", cursor: "pointer" }}>
               <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 14, fontWeight: 500, color: "white", textAlign: "center" }}>Search</span>
-            </div>
+            </RippleButton>
           </div>
         </motion.div>
       )}
