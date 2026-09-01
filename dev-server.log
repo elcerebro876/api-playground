@@ -1402,3 +1402,4 @@ Import traces:
  GET / 200 in 1408ms (next.js: 622ms, application-code: 786ms)
  GET / 200 in 204ms (next.js: 20ms, application-code: 184ms)
  GET / 200 in 562ms (next.js: 123ms, application-code: 439ms)
+ GET / 200 in 5.1s (next.js: 2.6s, application-code: 2.5s)
