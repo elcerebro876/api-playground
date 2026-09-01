@@ -771,7 +771,7 @@ function BrowseApiSection({ compact, w1440, isDark, onBack }: { compact?: boolea
         <span style={{ fontFamily: "Geist, var(--font-geist-sans)", fontSize: 16, fontWeight: 500, color: "#939393" }}>Discover</span>
       </div>
 
-      <div style={{ borderRadius: 6, backgroundColor: isDark ? "#1b1b1b" : "#ffffff", padding: "16px 16px 0", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ borderRadius: 6, backgroundColor: isDark ? "#1b1b1b" : "#ffffff", padding: "16px 16px 16px", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <div className="hide-scrollbar" style={{ display: "flex", flexDirection: "column" }}>
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, ease: "easeOut" }} style={{ position: "sticky", top: 0, zIndex: 2, backgroundColor: isDark ? "#1b1b1b" : "#ffffff", paddingBottom: 16 }}>
         <div style={{ borderRadius: 6, backgroundColor: isDark ? "#1a1a2e" : "#e4e4ff", display: "inline-flex", padding: "4px 10px", marginBottom: 16, width: "fit-content" }}>

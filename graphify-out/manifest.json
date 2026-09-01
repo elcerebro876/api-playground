@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "src/app/page.tsx": {
-    "mtime": 1788202036.531454,
-    "ast_hash": "b8b5d5dc09dadf3713eb0d5dbe5cdb88",
+    "mtime": 1788223231.4911187,
+    "ast_hash": "ea54daa015c247fe5c3c69d399add2a8",
     "semantic_hash": ""
   },
   "src/components/LoadingState.tsx": {
