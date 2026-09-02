@@ -1592,3 +1592,5 @@ Import traces:
  GET / 200 in 176ms (next.js: 134ms, application-code: 42ms)
 ✓ Compiled in 314ms
  GET / 200 in 191ms (next.js: 145ms, application-code: 46ms)
+✓ Compiled in 164ms
+ GET / 200 in 215ms (next.js: 125ms, application-code: 91ms)
