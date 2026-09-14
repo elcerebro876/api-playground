@@ -6822,9 +6822,9 @@ function MainContent({
             exit={{ x: 420, opacity: 0 }}
             transition={{ duration: 0.28, ease: "easeOut" }}
             style={{
-              position: "absolute",
-              top: 12,
-              right: 12,
+              position: "fixed",
+              top: 24,
+              right: 24,
               bottom: "auto",
               width: "min(498px, calc(100% - 24px))",
               maxHeight: "calc(100% - 24px)",
