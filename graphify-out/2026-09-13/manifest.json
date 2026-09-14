@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "src/app/page.tsx": {
-    "mtime": 1789343249.0910103,
-    "ast_hash": "09e531e26a9390561a51a692fdc11bdd",
+    "mtime": 1789338663.876655,
+    "ast_hash": "bcde70411a1a9cb4190d209423dce1b7",
     "semantic_hash": ""
   },
   "src/components/LoadingState.tsx": {
@@ -237,11 +237,6 @@
   "public/rest-countries.png": {
     "mtime": 1788973362.4027762,
     "ast_hash": "6c01a27bf1f9c80ddd36d22ab804a4a4",
-    "semantic_hash": ""
-  },
-  "public/explain-avatar.png": {
-    "mtime": 1789339247.752221,
-    "ast_hash": "ee2bf5f6f898bb74fef11eb64734acf6",
     "semantic_hash": ""
   }
 }

@@ -9,10 +9,12 @@ export interface HistoryEntry {
   headers?: Record<string, string>;
   responseBody?: string;
   responseHeaders?: Record<string, string>;
+  apiName?: string;
 }
 
 export interface StoredData {
   history: HistoryEntry[];
+  discoveryHistory: HistoryEntry[];
   apisTestedCount: number;
   streak: number;
   lastVisitDate: string;
@@ -20,6 +22,7 @@ export interface StoredData {
 
 const DEFAULTS: StoredData = {
   history: [],
+  discoveryHistory: [],
   apisTestedCount: 0,
   streak: 1,
   lastVisitDate: "",
@@ -32,6 +35,9 @@ export function loadStoredData(): StoredData {
     const p = JSON.parse(raw);
     return {
       history: Array.isArray(p.history) ? p.history : [],
+      discoveryHistory: Array.isArray(p.discoveryHistory)
+        ? p.discoveryHistory
+        : [],
       apisTestedCount: typeof p.apisTestedCount === "number" ? p.apisTestedCount : 0,
       streak: typeof p.streak === "number" ? p.streak : 1,
       lastVisitDate: typeof p.lastVisitDate === "string" ? p.lastVisitDate : "",

@@ -17,12 +17,9 @@ import {
   type MotionValue,
 } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
-import {
-  loadStoredData,
-  saveStoredData,
-  applyStreakOnLoad,
-  type HistoryEntry,
-} from "@/lib/storage";
+import { Sparkle } from "@/components/icons";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, type HistoryEntry } from "@/lib/storage";
+import type { ExplainPayload } from "@/lib/explain";
 const cardTextSpring = {
   type: "spring" as const,
   stiffness: 400,
@@ -137,6 +134,7 @@ export default function Home() {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [discoveryHistory, setDiscoveryHistory] = useState<HistoryEntry[]>([]);
   const [apisTested, setApisTested] = useState(0);
   const [streak, setStreak] = useState(1);
   const responseKey = useRef(0);
@@ -144,6 +142,19 @@ export default function Home() {
   const [activeHistoryIndex, setActiveHistoryIndex] = useState<number | null>(
     null,
   );
+  const [activeDiscoveryIndex, setActiveDiscoveryIndex] = useState<
+    number | null
+  >(null);
+  const [explainCtx, setExplainCtx] = useState<{
+    apiName: string;
+    url: string;
+  } | null>(null);
+  const [explainPopupOpen, setExplainPopupOpen] = useState(false);
+  const [explainPanelOpen, setExplainPanelOpen] = useState(false);
+  const [explainLoading, setExplainLoading] = useState(false);
+  const [explainError, setExplainError] = useState(false);
+  const [explainData, setExplainData] = useState<ExplainPayload | null>(null);
+  const firstNoAuthPopupShown = useRef(false);
   const [explorerHovered, setExplorerHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
@@ -174,6 +185,7 @@ export default function Home() {
   useEffect(() => {
     const data = loadStoredData();
     setHistory(data.history);
+    setDiscoveryHistory(data.discoveryHistory);
     setApisTested(data.apisTestedCount);
     const updated = applyStreakOnLoad(data);
     setStreak(updated.streak);
@@ -181,6 +193,7 @@ export default function Home() {
   }, []);
   const handleHistorySelect = (item: any, index: number) => {
     setActiveHistoryIndex(index);
+    setActiveDiscoveryIndex(null);
     setMethod(item.method);
     setUrl(item.url);
     if (item.responseBody) {
@@ -192,12 +205,36 @@ export default function Home() {
       });
       setHeadersFilter("common");
     }
+    setExplainCtx(null);
+    setExplainPopupOpen(false);
+  };
+  const handleDiscoverySelect = (item: any, index: number) => {
+    setActiveDiscoveryIndex(index);
+    setActiveHistoryIndex(null);
+    setMethod(item.method);
+    setUrl(item.url);
+    if (item.responseBody) {
+      setResponse({
+        status: item.status,
+        time: item.time,
+        body: item.responseBody,
+        headers: item.responseHeaders,
+      });
+      setHeadersFilter("common");
+    }
+    if (item.apiName) {
+      setExplainCtx({ apiName: item.apiName, url: item.url });
+    } else {
+      setExplainCtx(null);
+    }
+    setExplainPopupOpen(false);
   };
   const sendRequest = useCallback(
     async (opts?: {
       method?: string;
       url?: string;
       headers?: Record<string, string>;
+      apiName?: string;
     }) => {
       setLoading(true);
       setResponse(null);
@@ -234,22 +271,50 @@ export default function Home() {
           headers: h,
           responseBody: data.body,
           responseHeaders: data.headers,
+          ...(opts?.apiName ? { apiName: opts.apiName } : {}),
         };
-        const nextHistory = [entry, ...history];
-        setHistory(nextHistory);
+        const nextHistory = [
+          entry,
+          ...history.filter((it) => !(it.method === m && it.url === u)),
+        ];
+        const nextDiscovery = [
+          entry,
+          ...discoveryHistory.filter((it) => !(it.method === m && it.url === u)),
+        ];
+        if (opts?.apiName) {
+          setDiscoveryHistory(nextDiscovery);
+          setActiveDiscoveryIndex(0);
+        } else {
+          setHistory(nextHistory);
+          setActiveHistoryIndex(0);
+        }
         setApisTested((c) => c + 1);
         saveStoredData({
-          history: nextHistory,
+          history: opts?.apiName ? history : nextHistory,
+          discoveryHistory: opts?.apiName ? nextDiscovery : discoveryHistory,
           apisTestedCount: apisTested + 1,
           streak,
           lastVisitDate: new Date().toDateString(),
         });
-        setActiveHistoryIndex(0);
+        if (opts?.apiName) {
+          setExplainCtx({ apiName: opts.apiName, url: u });
+          if (!firstNoAuthPopupShown.current) {
+            firstNoAuthPopupShown.current = true;
+            setExplainPopupOpen(true);
+          } else {
+            setExplainPopupOpen(false);
+          }
+        } else {
+          setExplainCtx(null);
+          setExplainPopupOpen(false);
+        }
         setLoading(false);
       } catch {
         responseKey.current += 1;
         setResponse({ error: "Network error" });
         setHeadersFilter("common");
+        setExplainCtx((prev) => (opts?.apiName ? prev : null));
+        setExplainPopupOpen(false);
         const entry = {
           method: m,
           url: u,
@@ -257,16 +322,30 @@ export default function Home() {
           time: null,
           timestamp: Date.now(),
           headers: h,
+          ...(opts?.apiName ? { apiName: opts.apiName } : {}),
         };
-        const nextHistory = [entry, ...history];
-        setHistory(nextHistory);
+        const nextHistory = [
+          entry,
+          ...history.filter((it) => !(it.method === m && it.url === u)),
+        ];
+        const nextDiscovery = [
+          entry,
+          ...discoveryHistory.filter((it) => !(it.method === m && it.url === u)),
+        ];
+        if (opts?.apiName) {
+          setDiscoveryHistory(nextDiscovery);
+          setActiveDiscoveryIndex(0);
+        } else {
+          setHistory(nextHistory);
+          setActiveHistoryIndex(0);
+        }
         saveStoredData({
-          history: nextHistory,
+          history: opts?.apiName ? history : nextHistory,
+          discoveryHistory: opts?.apiName ? nextDiscovery : discoveryHistory,
           apisTestedCount: apisTested,
           streak,
           lastVisitDate: new Date().toDateString(),
         });
-        setActiveHistoryIndex(0);
         setLoading(false);
       }
     },
@@ -277,10 +356,45 @@ export default function Home() {
       headerBearer,
       headerValue,
       history,
+      discoveryHistory,
       apisTested,
       streak,
     ],
   );
+  const openExplain = useCallback(async () => {
+    if (!explainCtx || !response) return;
+    setExplainPopupOpen(false);
+    setExplainPanelOpen(true);
+    setExplainLoading(true);
+    setExplainError(false);
+    setExplainData(null);
+    try {
+      const res = await fetch("/api/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: explainCtx.url,
+          apiName: explainCtx.apiName,
+          status: response.status ?? 0,
+          body: response.body ?? "",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setExplainError(true);
+        return;
+      }
+      setExplainData(data as ExplainPayload);
+    } catch {
+      setExplainError(true);
+    } finally {
+      setExplainLoading(false);
+    }
+  }, [explainCtx, response]);
+  const closeExplain = useCallback((event?: { preventDefault: () => void }) => {
+    event?.preventDefault();
+    setExplainPanelOpen(false);
+  }, []);
   const lowestLatency = useMemo(() => {
     const times = history
       .map((item) => item.time)
@@ -394,8 +508,12 @@ export default function Home() {
                   method: item.method,
                   url: item.url,
                   headers: item.headers,
+                  ...(item.apiName ? { apiName: item.apiName } : {}),
                 })
               }
+              discoveryHistory={discoveryHistory}
+              activeDiscoveryIndex={activeDiscoveryIndex}
+              onDiscoverySelect={handleDiscoverySelect}
               compact={isCompact}
             />{" "}
           </motion.div>{" "}
@@ -429,6 +547,16 @@ export default function Home() {
               response={response}
               loading={loading}
               onSend={(opts) => sendRequest(opts)}
+              onClearResponse={() => {
+                setLoading(false);
+                setResponse(null);
+                setActiveHistoryIndex(null);
+                setUrl("");
+                setMethod("GET");
+                setHeaderKey("");
+                setHeaderBearer("");
+                setHeaderValue("");
+              }}
               responseKey={responseKey.current}
               headersFilter={headersFilter}
               setHeadersFilter={setHeadersFilter}
@@ -437,6 +565,16 @@ export default function Home() {
               onHistorySelect={handleHistorySelect}
               compact={isCompact}
               w1440={is1440}
+              explainCtx={explainCtx}
+              explainPopupOpen={explainPopupOpen}
+              onExplainPopupSkip={() => setExplainPopupOpen(false)}
+              onExplainPopupAnalyze={() => openExplain()}
+              explainPanelOpen={explainPanelOpen}
+              explainLoading={explainLoading}
+              explainError={explainError}
+              explainData={explainData}
+              onOpenExplain={openExplain}
+              onCloseExplain={closeExplain}
             />{" "}
           </motion.div>{" "}
         </div>{" "}
@@ -2838,6 +2976,9 @@ function Sidebar({
   onSelect,
   onRetry,
   compact,
+  discoveryHistory,
+  activeDiscoveryIndex,
+  onDiscoverySelect,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -2846,6 +2987,9 @@ function Sidebar({
   activeHistoryIndex: number | null;
   onSelect: (item: any, index: number) => void;
   onRetry: (item: any) => void;
+  discoveryHistory: any[];
+  activeDiscoveryIndex: number | null;
+  onDiscoverySelect: (item: any, index: number) => void;
 }) {
   return (
     <div
@@ -2904,6 +3048,7 @@ function Sidebar({
       >
         {" "}
         {history.length === 0 ? (
+          discoveryHistory.length > 0 ? null : (
           <div className="flex flex-1 flex-col items-center justify-center">
             {" "}
             <div
@@ -3203,6 +3348,7 @@ function Sidebar({
               </span>{" "}
             </div>{" "}
           </div>
+          )
         ) : (
           <div
             className="flex flex-col"
@@ -3280,6 +3426,133 @@ function Sidebar({
               </div>
             ))}{" "}
           </div>
+        )}{" "}
+        {discoveryHistory.length > 0 && (
+          <>
+            {" "}
+            <div
+              className="flex shrink-0 items-center px-4"
+              style={{ paddingTop: history.length === 0 ? 24 : 16 }}
+            >
+              {" "}
+              <span
+                className={`text-sm font-medium ${activeTheme === "Dark" ? "text-white" : "text-[#585858]"}`}
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontWeight: 500,
+                  letterSpacing: "-0.7px",
+                }}
+              >
+                {" "}
+                Discovery Logs{" "}
+              </span>{" "}
+              <div className="ml-auto flex h-4 w-4 items-center justify-center">
+                {" "}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {" "}
+                  <path
+                    d="M10.488 14.2794L5.3 14.2794C2.90867 14.2794 1.5 12.8734 1.5 10.4881L1.5 5.28806C1.5 2.90606 2.376 1.50006 4.762 1.50006L6.09533 1.50006C6.574 1.50073 7.02467 1.72539 7.31133 2.10873L7.92 2.91806C8.208 3.30073 8.65867 3.52606 9.13733 3.52673L11.024 3.52673C13.4153 3.52673 14.298 4.74406 14.298 7.17806L14.2793 10.4881C14.2793 12.8734 12.8733 14.2794 10.488 14.2794Z"
+                    stroke="#C6C6C6"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <line
+                    x1="4.98730469"
+                    x2="10.8106384"
+                    y1="9.64196777"
+                    y2="9.64196777"
+                    stroke="#C6C6C6"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>{" "}
+              </div>{" "}
+            </div>{" "}
+            <div
+              className="flex flex-col"
+              style={{ padding: "16px 8px 8px", gap: 16 }}
+            >
+              {" "}
+              {discoveryHistory.slice(0, 50).map((item, i) => (
+                <div
+                  key={i}
+                  style={{
+                    borderRadius: 6,
+                    padding: "6px 8px",
+                    cursor: "pointer",
+                    backgroundColor:
+                      activeTheme === "Dark"
+                        ? i === activeDiscoveryIndex
+                          ? "#0f0f0f"
+                          : "#161616"
+                        : i === activeDiscoveryIndex
+                          ? "#ffffff"
+                          : "transparent",
+                  }}
+                  onClick={() => onDiscoverySelect(item, i)}
+                >
+                  {" "}
+                  <div className="flex items-center" style={{ gap: 6 }}>
+                    {" "}
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        borderRadius: 6,
+                        backgroundColor:
+                          activeTheme === "Dark"
+                            ? (
+                                methodBadgeColors[item.method] ??
+                                methodBadgeColors.GET
+                              ).darkBg
+                            : (
+                                methodBadgeColors[item.method] ??
+                                methodBadgeColors.GET
+                              ).lightBg,
+                        padding: "2px 6px",
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color:
+                          activeTheme === "Dark"
+                            ? (
+                                methodBadgeColors[item.method] ??
+                                methodBadgeColors.GET
+                              ).darkText
+                            : (
+                                methodBadgeColors[item.method] ??
+                                methodBadgeColors.GET
+                              ).lightText,
+                      }}
+                    >
+                      {item.method}
+                    </span>{" "}
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 12,
+                        color: activeTheme === "Dark" ? "#f7f7f7" : "#585858",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        flex: 1,
+                      }}
+                    >
+                      {item.url}
+                    </span>{" "}
+                  </div>{" "}
+                </div>
+              ))}{" "}
+            </div>{" "}
+          </>
         )}{" "}
       </div>{" "}
       <div className="shrink-0 px-3 pb-3">
@@ -3696,6 +3969,7 @@ function MainContent({
   response,
   loading,
   onSend,
+  onClearResponse,
   responseKey,
   headersFilter,
   setHeadersFilter,
@@ -3704,6 +3978,16 @@ function MainContent({
   onHistorySelect,
   compact,
   w1440,
+  explainCtx,
+  explainPopupOpen,
+  onExplainPopupSkip,
+  onExplainPopupAnalyze,
+  explainPanelOpen,
+  explainLoading,
+  explainError,
+  explainData,
+  onOpenExplain,
+  onCloseExplain,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -3724,17 +4008,30 @@ function MainContent({
     method?: string;
     url?: string;
     headers?: Record<string, string>;
+    apiName?: string;
   }) => void;
+  onClearResponse: () => void;
   responseKey: number;
   headersFilter: string;
   setHeadersFilter: (v: string) => void;
   history: any[];
   activeHistoryIndex: number | null;
   onHistorySelect: (item: any, index: number) => void;
+  explainCtx: { apiName: string; url: string } | null;
+  explainPopupOpen: boolean;
+  onExplainPopupSkip: () => void;
+  onExplainPopupAnalyze: () => void;
+  explainPanelOpen: boolean;
+  explainLoading: boolean;
+  explainError: boolean;
+  explainData: ExplainPayload | null;
+  onOpenExplain: () => void;
+  onCloseExplain: () => void;
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
   const [showBrowseApi, setShowBrowseApi] = useState(false);
+  const isDiscovery = explainCtx !== null;
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const todayKey = new Date().toDateString();
   const isTodayItem = (t: number) => new Date(t).toDateString() === todayKey;
@@ -3832,6 +4129,15 @@ function MainContent({
       setResultHeight(resultContentRef.current.scrollHeight);
     }
   }, [headersFilter, response, headersCollapsed]);
+  const pillUrlRef = useRef<HTMLSpanElement>(null);
+  const [urlWrapped, setUrlWrapped] = useState(false);
+  useLayoutEffect(() => {
+    const el = pillUrlRef.current;
+    if (!el) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    setUrlWrapped(range.getClientRects().length > 1);
+  }, [url, loading, response, isDark, compact]);
   return (
     <div
       className="flex flex-1 flex-col"
@@ -3878,6 +4184,7 @@ function MainContent({
                   compact={compact}
                   w1440={w1440}
                   isDark={isDark}
+                  onSend={onSend}
                   onBack={() => setShowBrowseApi(false)}
                 />
               )}{" "}
@@ -4741,6 +5048,45 @@ function MainContent({
         {(loading || response) && (
           <>
             {" "}
+            {isDiscovery && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: 24,
+                  top: 24,
+                  width: 32,
+                  height: 32,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  backgroundColor: isDark ? "#161616" : "#ffffff",
+                  cursor: "pointer",
+                  zIndex: 3,
+                }}
+                title="Back to discovery"
+                onClick={() => {
+                  setShowBrowseApi(true);
+                  onClearResponse();
+                }}
+              >
+                {" "}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  style={{ flexShrink: 0 }}
+                >
+                  {" "}
+                  <path
+                    d="M8.77563 7.75953L8.77665 7.99559C8.77665 8.97668 8.71919 9.87112 8.63265 10.4542L8.55683 10.8168C8.51465 11.0088 8.45919 11.2275 8.40138 11.3391C8.18974 11.7474 7.77593 12 7.33303 12L7.29448 12C7.00576 11.9905 6.39922 11.7371 6.39922 11.7283C5.42323 11.3188 3.54031 10.0829 2.67067 9.20174L2.41795 8.93721C2.35178 8.86551 2.27743 8.78066 2.23127 8.71452C2.07709 8.51037 2 8.25776 2 8.00514C2 7.72315 2.08654 7.46099 2.25018 7.24656L2.50982 6.96635L2.56799 6.90655C3.35707 6.05104 5.41741 4.6521 6.49522 4.22398L6.65794 4.16161C6.85376 4.09143 7.12812 4.00771 7.29448 4C7.50611 4 7.70829 4.0492 7.90102 4.14614C8.14174 4.28199 8.33374 4.49642 8.43992 4.74904C8.50756 4.92381 8.61374 5.44887 8.61374 5.45842C8.71108 5.98783 8.76752 6.82321 8.77563 7.75953ZM14 8.00029C14 8.55913 13.5513 9.01223 12.9978 9.01223L10.5317 8.79413C10.0975 8.79413 9.74551 8.4387 9.74551 8.00029C9.74551 7.56115 10.0975 7.20646 10.5317 7.20646L12.9978 6.98836C13.5513 6.98836 14 7.44145 14 8.00029Z"
+                    fill={isDark ? "#F7F7F7" : "#5a5a5a"}
+                    fillRule="nonzero"
+                  />{" "}
+                </svg>{" "}
+              </div>
+            )}{" "}
             <div
               className="hide-scrollbar"
               style={{
@@ -4756,54 +5102,69 @@ function MainContent({
             >
               {" "}
               <div
-                className="flex items-center"
+                className="flex flex-col"
                 style={{
                   marginRight: 24,
                   marginTop: 24,
                   marginLeft: "auto",
                   width: "fit-content",
                   maxWidth: "calc(100% - 48px)",
-                  minHeight: 50,
+                  boxSizing: "border-box",
                   borderRadius: 10,
                   backgroundColor: isDark ? "#0f0f0f" : "#fcfcfc",
-                  gap: 4,
-                  padding: "0 16px",
-                  boxSizing: "border-box",
+                  padding: "14px 16px 12px",
+                  gap: 10,
                 }}
               >
                 {" "}
                 <div
-                  style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    backgroundColor: isDark ? "#00bf00" : "#008000",
-                  }}
-                />{" "}
-                <span
-                  style={{
-                    fontFamily: "Geist, var(--font-geist-sans)",
-                    fontSize: 14,
-                    color: isDark ? "#ffffff" : "#5a5a5a",
-                  }}
+                  className="flex items-center"
+                  style={{ gap: 12, alignItems: urlWrapped ? "flex-start" : "center" }}
                 >
-                  {method}
-                </span>{" "}
-                <span
-                  style={{
-                    display: "block",
-                    maxWidth: 520,
-                    whiteSpace: "normal",
-                    overflowWrap: "anywhere",
-                    wordBreak: "break-word",
-                    fontFamily: "Geist, var(--font-geist-sans)",
-                    fontSize: 14,
-                    color: isDark ? "#d1d1d1" : "#767676",
-                  }}
-                >
-                  {url || "/v1/nodes/status"}
-                </span>{" "}
+                  {" "}
+                  <div
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: "50%",
+                      backgroundColor: isDark ? "#00bf00" : "#008000",
+                      flexShrink: 0,
+                      marginTop: urlWrapped ? 6 : undefined,
+                    }}
+                  />{" "}
+                  <span
+                    ref={pillUrlRef}
+                    style={{
+                      display: "block",
+                      maxWidth: 375,
+                      whiteSpace: "normal",
+                      overflowWrap: "anywhere",
+                      wordBreak: "break-word",
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 14,
+                      color: isDark ? "#d1d1d1" : "#5a5a5a",
+                    }}
+                  >
+                    {url || "/v1/nodes/status"}
+                  </span>{" "}
+                </div>{" "}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  {" "}
+                  <span
+                    style={{
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      letterSpacing: "-0.6px",
+                      color: isDark ? "#00bf00" : "#008000",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {method}
+                  </span>{" "}
+                </div>{" "}
               </div>{" "}
+              {!isDiscovery && (
               <div
                 className="flex items-center"
                 style={{
@@ -4930,7 +5291,8 @@ function MainContent({
                 >
                   Edit
                 </span>{" "}
-              </div>{" "}
+              </div>
+              )}{" "}
               <motion.div
                 animate={{ height: resultHeight }}
                 transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
@@ -5200,6 +5562,13 @@ function MainContent({
                               opacity: headersCollapsed ? 0 : 1,
                             }}
                             transition={{ duration: 0.2, ease: "easeInOut" }}
+                            onAnimationComplete={() => {
+                              if (resultContentRef.current) {
+                                setResultHeight(
+                                  resultContentRef.current.scrollHeight,
+                                );
+                              }
+                            }}
                             style={{ overflow: "hidden" }}
                           >
                             {" "}
@@ -5519,6 +5888,7 @@ function MainContent({
                   )}{" "}
                 </div>{" "}
               </motion.div>{" "}
+              {!isDiscovery && (
               <div
                 className="flex items-center"
                 style={{
@@ -5569,7 +5939,8 @@ function MainContent({
                 >
                   Retry
                 </span>{" "}
-              </div>{" "}
+              </div>
+              )}{" "}
             </div>{" "}
             <div
               style={{
@@ -5578,7 +5949,7 @@ function MainContent({
                 right: 0,
                 bottom: 0,
                 zIndex: 10,
-                padding: "0 0 4px",
+                padding: "0 0 18px",
                 display: "flex",
                 justifyContent: "center",
                 background: "transparent",
@@ -5588,15 +5959,120 @@ function MainContent({
               }}
             >
               {" "}
-              <UrlInputBar
-                activeTheme={activeTheme}
-                method={method}
-                setMethod={setMethod}
-                url={url}
-                setUrl={setUrl}
-                loading={loading}
-                onSend={onSend}
-              />{" "}
+              {explainCtx &&
+              !response?.error &&
+              response?.status != null &&
+              response.status >= 200 &&
+              response.status < 300 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 400,
+                    damping: 28,
+                    delay: 0.15,
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: 12,
+                    borderRadius: 10,
+                    backgroundColor: isDark ? "#0f0f0f" : "#fcfcfc",
+                    boxSizing: "border-box",
+                    width: "fit-content",
+                    maxWidth: "calc(100% - 32px)",
+                    cursor: "pointer",
+                  }}
+                  onClick={onOpenExplain}
+                >
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 8,
+                      flexShrink: 0,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <img
+                      src="/explain-avatar.png"
+                      alt=""
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 2,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 16,
+                        fontWeight: 500,
+                        letterSpacing: "-0.4px",
+                        color: isDark ? "#ffffff" : "#222222",
+                      }}
+                    >
+                      Want this explained?
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        letterSpacing: "-0.4px",
+                        color: "#939393",
+                      }}
+                    >
+                      Who it&rsquo;s for, what it does, and an idea to build
+                      with it.
+                    </span>
+                  </div>
+                  <span
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: 28,
+                      padding: "0 8px",
+                      borderRadius: 6,
+                      backgroundColor: "#5A5AFF",
+                      color: "#ffffff",
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 12,
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      alignSelf: "flex-start",
+                    }}
+                  >
+                    Analyze now
+                  </span>
+                </motion.div>
+              ) : (
+                <UrlInputBar
+                  activeTheme={activeTheme}
+                  method={method}
+                  setMethod={setMethod}
+                  url={url}
+                  setUrl={setUrl}
+                  loading={loading}
+                  onSend={onSend}
+                />
+              )}{" "}
             </div>{" "}
           </>
         )}{" "}
@@ -6106,6 +6582,277 @@ function MainContent({
           </div>{" "}
         </motion.div>
       )}{" "}
+      <AnimatePresence>
+        {" "}
+        {explainPanelOpen && (
+          <motion.div
+            key="ai-explain-panel"
+            initial={{ x: 360, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 360, opacity: 0 }}
+            transition={{ duration: 0.28, ease: "easeOut" }}
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: 340,
+              zIndex: 60,
+              backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
+              borderLeft: isDark
+                ? "0.8px solid #2d2d2d"
+                : "0.8px solid #f2f2f2",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            {" "}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "16px",
+                borderBottom: isDark
+                  ? "0.8px solid #2d2d2d"
+                  : "0.8px solid #f2f2f2",
+              }}
+            >
+              {" "}
+              <Sparkle size={16} color="#5A5AFF" />{" "}
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 15,
+                  fontWeight: 500,
+                  letterSpacing: "-0.6px",
+                  color: isDark ? "#ffffff" : "#222",
+                }}
+              >
+                AI Explanation
+              </span>{" "}
+              <div
+                onClick={onCloseExplain}
+                style={{
+                  marginLeft: "auto",
+                  cursor: "pointer",
+                  padding: 4,
+                  display: "flex",
+                }}
+                title="Close"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M3 3l10 10M13 3L3 13"
+                    stroke="#9e9e9e"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>{" "}
+            </div>{" "}
+            <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+              {" "}
+              {explainLoading ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                  }}
+                >
+                  {" "}
+                  {[
+                    "Who it's for",
+                    "Problem it solves",
+                    "What this request did",
+                    "What the response means",
+                    "Idea you can build",
+                  ].map((label, i) => (
+                    <div key={label} style={{ display: "flex", gap: 8 }}>
+                      {" "}
+                      <div
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: 7,
+                          backgroundColor: isDark ? "#2f2f7a" : "#e6e6ff",
+                          flexShrink: 0,
+                          marginTop: 2,
+                          animation: "pixel-on 1s ease-in-out infinite",
+                        }}
+                      />{" "}
+                      <div
+                        style={{
+                          flex: 1,
+                          height: 44,
+                          borderRadius: 6,
+                          backgroundColor: isDark ? "#1b1b1b" : "#f5f5f5",
+                          animation: "pixel-on 1s ease-in-out infinite",
+                          animationDelay: `${i * 0.12}s`,
+                        }}
+                      />{" "}
+                    </div>
+                  ))}{" "}
+                </div>
+              ) : explainError ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                    padding: "16px 0",
+                  }}
+                >
+                  {" "}
+                  <span
+                    style={{
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 13,
+                      lineHeight: "19px",
+                      letterSpacing: "-0.3px",
+                      color: isDark ? "#adadad" : "#636363",
+                    }}
+                  >
+                    Couldn&rsquo;t generate an explanation, try again.
+                  </span>{" "}
+                  <div
+                    onClick={onOpenExplain}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      borderRadius: 6,
+                      backgroundColor: "#5A5AFF",
+                      padding: "8px 14px",
+                      cursor: "pointer",
+                      width: "fit-content",
+                    }}
+                  >
+                    {" "}
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: "#ffffff",
+                      }}
+                    >
+                      Try again
+                    </span>{" "}
+                  </div>{" "}
+                </div>
+              ) : explainData ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 16,
+                  }}
+                >
+                  {" "}
+                  {[
+                    {
+                      key: "target_users",
+                      label: "Who it's for",
+                    },
+                    {
+                      key: "problem_solved",
+                      label: "Problem it solves",
+                    },
+                    {
+                      key: "request_action",
+                      label: "What this request did",
+                    },
+                    {
+                      key: "expected_outcome",
+                      label: "What the response means",
+                    },
+                  ].map((row) => (
+                    <div key={row.key}>
+                      {" "}
+                      <span
+                        style={{
+                          fontFamily: "Geist, var(--font-geist-sans)",
+                          fontSize: 11,
+                          fontWeight: 500,
+                          letterSpacing: "-0.2px",
+                          color: "#9e9e9e",
+                        }}
+                      >
+                        {row.label}
+                      </span>{" "}
+                      <span
+                        style={{
+                          display: "block",
+                          marginTop: 4,
+                          fontFamily: "Geist, var(--font-geist-sans)",
+                          fontSize: 13,
+                          lineHeight: "19px",
+                          letterSpacing: "-0.3px",
+                          color: isDark ? "#e4e4e4" : "#3a3a3a",
+                        }}
+                      >
+                        {explainData[row.key as keyof ExplainPayload]}
+                      </span>{" "}
+                    </div>
+                  ))}{" "}
+                  <div style={{ marginTop: 4 }}>
+                    {" "}
+                    <div
+                      style={{
+                        borderRadius: 8,
+                        backgroundColor: isDark ? "#14142b" : "#f6f6ff",
+                        border: isDark
+                          ? "0.8px solid #2f2f7a"
+                          : "0.8px solid #e0e0ff",
+                        padding: 12,
+                      }}
+                    >
+                      {" "}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        {" "}
+                        <Sparkle size={13} color="#5A5AFF" />{" "}
+                        <span
+                          style={{
+                            fontFamily: "Geist, var(--font-geist-sans)",
+                            fontSize: 11,
+                            fontWeight: 500,
+                            letterSpacing: "-0.2px",
+                            color: "#5A5AFF",
+                          }}
+                        >
+                          Idea you can build
+                        </span>{" "}
+                      </div>{" "}
+                      <span
+                        style={{
+                          display: "block",
+                          marginTop: 6,
+                          fontFamily: "Geist, var(--font-geist-sans)",
+                          fontSize: 13,
+                          lineHeight: "19px",
+                          letterSpacing: "-0.3px",
+                          color: isDark ? "#d2d2ff" : "#4a4ab8",
+                        }}
+                      >
+                        {explainData.build_idea}
+                      </span>{" "}
+                    </div>{" "}
+                  </div>{" "}
+                </div>
+              ) : null}{" "}
+            </div>{" "}
+          </motion.div>
+        )}{" "}
+      </AnimatePresence>{" "}
     </div>
   );
 }
@@ -6113,11 +6860,18 @@ function BrowseApiSection({
   compact,
   w1440,
   isDark,
+  onSend,
   onBack,
 }: {
   compact?: boolean;
   w1440?: boolean;
   isDark: boolean;
+  onSend: (opts?: {
+    method?: string;
+    url?: string;
+    headers?: Record<string, string>;
+    apiName?: string;
+  }) => void;
   onBack: () => void;
 }) {
   const [activeFilter, setActiveFilter] = useState("Everything");
@@ -6297,7 +7051,7 @@ function BrowseApiSection({
       logo: "/rest-countries.png",
       logoColor: "#111111",
             height: 201,
-      url: "https://restcountries.com/v3.1/all",
+      url: "https://restcountries.com/v3.1/name/nigeria",
     },
     {
       name: "Bored API",
@@ -6312,7 +7066,7 @@ function BrowseApiSection({
       labelColor: "#0d8c0d",
       logoColor: "#111111",
             height: 201,
-      url: "https://www.boredapi.com/api/activity",
+      url: "https://bored-api.appbrewery.com/random",
     },
     {
       name: "Open-Meteo",
@@ -6328,7 +7082,7 @@ function BrowseApiSection({
       logo: "/open-meteo.png",
       logoColor: "#FAFAFA",
             height: 201,
-      url: "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41",
+      url: "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current_weather=true",
     },
     {
       name: "PokeAPI",
@@ -6344,7 +7098,7 @@ function BrowseApiSection({
       logo: "/pokeapi.png",
       logoColor: "#111111",
             height: 201,
-      url: "https://pokeapi.co/api/v2/pokemon/ditto",
+      url: "https://pokeapi.co/api/v2/pokemon/pikachu",
     },
     {
       name: "Dog CEO",
@@ -6920,6 +7674,13 @@ function BrowseApiSection({
                           gap: 4,
                           marginTop: 8,
                           cursor: "pointer",
+                        }}
+                        onClick={() => {
+                          onSend({
+                            method: "GET",
+                            url: api.url,
+                            apiName: api.tag === "No auth" ? api.name : undefined,
+                          });
                         }}
                       >
                         {" "}
