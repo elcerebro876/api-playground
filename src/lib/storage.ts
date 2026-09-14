@@ -55,6 +55,26 @@ export function saveStoredData(data: StoredData): void {
   }
 }
 
+const EXPLAIN_DISMISSED_KEY = "api-playground-explain-dismissed";
+
+export function loadExplainDismissed(): boolean {
+  try {
+    return window.localStorage.getItem(EXPLAIN_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveExplainDismissed(dismissed: boolean): void {
+  try {
+    if (dismissed) {
+      window.localStorage.setItem(EXPLAIN_DISMISSED_KEY, "1");
+    } else {
+      window.localStorage.removeItem(EXPLAIN_DISMISSED_KEY);
+    }
+  } catch { /* storage unavailable — silent fallback */ }
+}
+
 export function applyStreakOnLoad(data: StoredData, now: Date = new Date()): StoredData {
   const today = now.toDateString();
   const yesterday = new Date(now.getTime() - 86400000).toDateString();

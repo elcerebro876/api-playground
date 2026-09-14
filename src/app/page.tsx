@@ -18,7 +18,7 @@ import {
 } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
-import { loadStoredData, saveStoredData, applyStreakOnLoad, type HistoryEntry } from "@/lib/storage";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, type HistoryEntry } from "@/lib/storage";
 import type { ExplainPayload } from "@/lib/explain";
 const cardTextSpring = {
   type: "spring" as const,
@@ -155,6 +155,8 @@ export default function Home() {
   const [explainError, setExplainError] = useState(false);
   const [explainData, setExplainData] = useState<ExplainPayload | null>(null);
   const firstNoAuthPopupShown = useRef(false);
+  const [explainDismissed, setExplainDismissed] = useState(false);
+  const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explorerHovered, setExplorerHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
@@ -167,6 +169,12 @@ export default function Home() {
     check();
     mq.addEventListener("change", check);
     return () => mq.removeEventListener("change", check);
+  }, []);
+  useEffect(() => {
+    setExplainDismissed(loadExplainDismissed());
+    return () => {
+      if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
+    };
   }, []);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1024px)");
@@ -238,6 +246,11 @@ export default function Home() {
     }) => {
       setLoading(true);
       setResponse(null);
+      if (popupTimerRef.current) {
+        clearTimeout(popupTimerRef.current);
+        popupTimerRef.current = null;
+      }
+      setExplainPopupOpen(false);
       const m = opts?.method || method;
       const u = opts?.url || url;
       const h: Record<string, string> = {};
@@ -300,9 +313,18 @@ export default function Home() {
           setExplainCtx({ apiName: opts.apiName, url: u });
           if (!firstNoAuthPopupShown.current) {
             firstNoAuthPopupShown.current = true;
-            setExplainPopupOpen(true);
-          } else {
-            setExplainPopupOpen(false);
+          }
+          if (
+            data.status != null &&
+            data.status >= 200 &&
+            data.status < 300 &&
+            !loadExplainDismissed()
+          ) {
+            if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
+            popupTimerRef.current = setTimeout(() => {
+              popupTimerRef.current = null;
+              setExplainPopupOpen(true);
+            }, 1000);
           }
         } else {
           setExplainCtx(null);
@@ -311,6 +333,10 @@ export default function Home() {
         setLoading(false);
       } catch {
         responseKey.current += 1;
+        if (popupTimerRef.current) {
+          clearTimeout(popupTimerRef.current);
+          popupTimerRef.current = null;
+        }
         setResponse({ error: "Network error" });
         setHeadersFilter("common");
         setExplainCtx((prev) => (opts?.apiName ? prev : null));
@@ -567,6 +593,7 @@ export default function Home() {
               w1440={is1440}
               explainCtx={explainCtx}
               explainPopupOpen={explainPopupOpen}
+              bannerRevealed={explainDismissed}
               onExplainPopupSkip={() => setExplainPopupOpen(false)}
               onExplainPopupAnalyze={() => openExplain()}
               explainPanelOpen={explainPanelOpen}
@@ -654,6 +681,181 @@ export default function Home() {
           )}{" "}
         </AnimatePresence>{" "}
       </div>{" "}
+      <AnimatePresence>
+        {explainPopupOpen && (
+          <motion.div
+            key="explain-backdrop"
+            className="fixed inset-0"
+            style={{
+              zIndex: 50,
+              pointerEvents: "auto",
+              backdropFilter: "blur(42px)",
+              WebkitBackdropFilter: "blur(42px)",
+              background: activeTheme === "Dark"
+                ? "linear-gradient(-23.5deg, rgba(36, 36, 36, 0.47), rgba(129, 129, 129, 0))"
+                : "linear-gradient(-23.5deg, rgba(180, 180, 180, 0.47), rgba(230, 230, 230, 0))",
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.75 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+          />
+        )}
+      </AnimatePresence>{" "}
+      <AnimatePresence>
+        {explainPopupOpen && (
+          <motion.div
+            key="explain-dialog-center"
+            className="fixed inset-0"
+            style={{
+              zIndex: 60,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+              padding: 16,
+              boxSizing: "border-box",
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut", delay: 0.15 }}
+          >
+            <motion.div
+              key="explain-dialog"
+              style={{
+                width: "min(394px, 100%)",
+                backgroundColor: activeTheme === "Dark" ? "#161616" : "#ffffff",
+                borderRadius: 12,
+                padding: 12,
+                display: "flex",
+                flexDirection: "column",
+                boxSizing: "border-box",
+                pointerEvents: "auto",
+                ...(activeTheme === "Dark" ? {} : { border: "0.8px solid #f2f2f2" }),
+              }}
+              initial={{ opacity: 1, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 1, y: 6 }}
+              transition={{ type: "spring", stiffness: 400, damping: 28 }}
+            >
+            {/* Top row: avatar chip + Analyze now button */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 8,
+                  flexShrink: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <img
+                  src="/explain-avatar.png"
+                  alt=""
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }} />
+              <RippleButton
+                onClick={() => {
+                  setExplainPopupOpen(false);
+                  openExplain();
+                }}
+                className="transition-colors hover:bg-[#4a4aff]"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: 28,
+                  padding: "0 8px",
+                  borderRadius: 6,
+                  backgroundColor: "#5A5AFF",
+                  color: "#ffffff",
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 12,
+                  letterSpacing: "-0.4px",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  cursor: "pointer",
+                }}
+              >
+                Analyze now
+              </RippleButton>
+            </div>
+
+            {/* Title */}
+            <span
+              style={{
+                marginTop: 12,
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 16,
+                fontWeight: 500,
+                letterSpacing: "-0.5px",
+                color: activeTheme === "Dark" ? "rgba(255,255,255,0.9)" : "#585858",
+              }}
+            >
+              There's more to this response
+            </span>
+
+            {/* Subtitle */}
+            <span
+              style={{
+                marginTop: 4,
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 14,
+                fontWeight: 400,
+                lineHeight: "20px",
+                letterSpacing: "-0.4px",
+                color: "#939393",
+              }}
+            >
+              This response came back in {response?.time ?? "—"}ms. See who
+              it's for, what it does, and an idea for something you could build
+              with it
+            </span>
+
+            {/* Skip for now */}
+            <RippleButton
+              onClick={() => {
+                saveExplainDismissed(true);
+                setExplainDismissed(true);
+                setExplainPopupOpen(false);
+              }}
+              className={`transition-colors ${activeTheme === "Dark" ? "hover:bg-[#242424]" : "hover:bg-gray-50"}`}
+              style={{
+                marginTop: 16,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: 28,
+                padding: "0 8px",
+                borderRadius: 6,
+                backgroundColor: "transparent",
+                color: activeTheme === "Dark" ? "#cfcfcf" : "#393939",
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 14,
+                fontWeight: 500,
+                letterSpacing: "-0.4px",
+                whiteSpace: "nowrap",
+                width: "fit-content",
+                cursor: "pointer",
+              }}
+            >
+              Skip for now
+            </RippleButton>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>{" "}
     </div>
   );
 }
@@ -1509,6 +1711,7 @@ function MobilePrimary({
                 <RippleButton
                   onClick={() => onSend()}
                   disabled={loading}
+                  className="transition-colors hover:bg-[#4a4aff]"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1758,6 +1961,7 @@ function MobilePrimary({
                   <RippleButton
                     onClick={() => onSend()}
                     disabled={loading}
+                    className="transition-colors hover:bg-[#4a4aff]"
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -3980,6 +4184,7 @@ function MainContent({
   w1440,
   explainCtx,
   explainPopupOpen,
+  bannerRevealed,
   onExplainPopupSkip,
   onExplainPopupAnalyze,
   explainPanelOpen,
@@ -4019,6 +4224,7 @@ function MainContent({
   onHistorySelect: (item: any, index: number) => void;
   explainCtx: { apiName: string; url: string } | null;
   explainPopupOpen: boolean;
+  bannerRevealed: boolean;
   onExplainPopupSkip: () => void;
   onExplainPopupAnalyze: () => void;
   explainPanelOpen: boolean;
@@ -5960,6 +6166,7 @@ function MainContent({
             >
               {" "}
               {explainCtx &&
+              bannerRevealed &&
               !response?.error &&
               response?.status != null &&
               response.status >= 200 &&
@@ -6042,7 +6249,8 @@ function MainContent({
                       with it.
                     </span>
                   </div>
-                  <span
+                  <RippleButton
+                    className="transition-colors hover:bg-[#4a4aff]"
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -6060,9 +6268,9 @@ function MainContent({
                     }}
                   >
                     Analyze now
-                  </span>
+                  </RippleButton>
                 </motion.div>
-              ) : (
+              ) : explainCtx ? null : (
                 <UrlInputBar
                   activeTheme={activeTheme}
                   method={method}
@@ -6586,22 +6794,45 @@ function MainContent({
         {" "}
         {explainPanelOpen && (
           <motion.div
+            key="ai-explain-backdrop"
+            className="fixed inset-0"
+            style={{
+              zIndex: 55,
+              backdropFilter: "blur(42px)",
+              WebkitBackdropFilter: "blur(42px)",
+              background: isDark
+                ? "linear-gradient(-23.5deg, rgba(36, 36, 36, 0.47), rgba(129, 129, 129, 0))"
+                : "linear-gradient(-23.5deg, rgba(180, 180, 180, 0.47), rgba(230, 230, 230, 0))",
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.75 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+          />
+        )}
+        {explainPanelOpen && (
+          <motion.div
             key="ai-explain-panel"
-            initial={{ x: 360, opacity: 0 }}
+            initial={{ x: 420, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 360, opacity: 0 }}
+            exit={{ x: 420, opacity: 0 }}
             transition={{ duration: 0.28, ease: "easeOut" }}
             style={{
               position: "absolute",
-              top: 0,
-              right: 0,
-              bottom: 0,
-              width: 340,
+              top: 12,
+              right: 12,
+              bottom: "auto",
+              width: "min(498px, calc(100% - 24px))",
+              maxHeight: "calc(100% - 24px)",
               zIndex: 60,
-              backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
-              borderLeft: isDark
+              backgroundColor: isDark ? "#161616" : "#ffffff",
+              border: isDark
                 ? "0.8px solid #2d2d2d"
                 : "0.8px solid #f2f2f2",
+              borderRadius: 16,
+              boxShadow: isDark
+                ? "0 16px 48px rgba(0,0,0,0.55)"
+                : "0 16px 48px rgba(0,0,0,0.12)",
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
@@ -6614,9 +6845,6 @@ function MainContent({
                 alignItems: "center",
                 gap: 8,
                 padding: "16px",
-                borderBottom: isDark
-                  ? "0.8px solid #2d2d2d"
-                  : "0.8px solid #f2f2f2",
               }}
             >
               {" "}
@@ -6624,10 +6852,10 @@ function MainContent({
               <span
                 style={{
                   fontFamily: "Geist, var(--font-geist-sans)",
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: 500,
-                  letterSpacing: "-0.6px",
-                  color: isDark ? "#ffffff" : "#222",
+                  letterSpacing: "-0.5px",
+                  color: isDark ? "#ffffff" : "#282828",
                 }}
               >
                 AI Explanation
@@ -6642,55 +6870,94 @@ function MainContent({
                 }}
                 title="Close"
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                   <path
-                    d="M3 3l10 10M13 3L3 13"
-                    stroke="#9e9e9e"
+                    d="M5.749 2.063C3.483 2.063 2.063 3.667 2.063 5.937L2.063 12.063C2.063 14.333 3.476 15.938 5.749 15.938L12.25 15.938C14.523 15.938 15.938 14.333 15.938 12.063L15.938 5.937C15.938 3.667 14.523 2.063 12.25 2.063L5.749 2.063Z"
+                    stroke={isDark ? "#a4a4a4" : "#282828"}
+                    strokeWidth="1.4"
+                  />
+                  <path
+                    d="M10.797 7.196L7.203 10.79M10.798 10.793L7.201 7.195"
+                    stroke={isDark ? "#a4a4a4" : "#282828"}
                     strokeWidth="1.4"
                     strokeLinecap="round"
                   />
                 </svg>
               </div>{" "}
             </div>{" "}
-            <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-              {" "}
-              {explainLoading ? (
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "0 16px 16px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                  borderRadius: 12,
+                  backgroundColor: isDark ? "#161616" : "#ffffff",
+                  border: isDark ? "0.8px solid #2a2a2a" : "0.8px solid #f2f2f2",
+                  padding: 16,
+                }}
+              >
+                {" "}
+                {explainLoading ? (
                 <div
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    gap: 14,
+                    gap: 16,
                   }}
                 >
                   {" "}
                   {[
-                    "Who it's for",
+                    "Target users",
                     "Problem it solves",
                     "What this request did",
-                    "What the response means",
-                    "Idea you can build",
+                    "Expected outcome",
+                    "Build Idea",
                   ].map((label, i) => (
-                    <div key={label} style={{ display: "flex", gap: 8 }}>
+                    <div
+                      key={label}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
                       {" "}
                       <div
                         style={{
-                          width: 14,
+                          width: label === "Build Idea" ? 84 : 100,
                           height: 14,
-                          borderRadius: 7,
-                          backgroundColor: isDark ? "#2f2f7a" : "#e6e6ff",
-                          flexShrink: 0,
-                          marginTop: 2,
+                          borderRadius: 4,
+                          backgroundColor: isDark
+                            ? label === "Build Idea"
+                              ? "#2b2b6e"
+                              : "#2a2a2a"
+                            : label === "Build Idea"
+                              ? "#e6e6ff"
+                              : "#f0f0f0",
                           animation: "pixel-on 1s ease-in-out infinite",
+                          animationDelay: `${i * 0.12}s`,
                         }}
                       />{" "}
                       <div
                         style={{
-                          flex: 1,
-                          height: 44,
+                          height: 36,
                           borderRadius: 6,
-                          backgroundColor: isDark ? "#1b1b1b" : "#f5f5f5",
+                          backgroundColor: isDark
+                            ? label === "Build Idea"
+                              ? "#16162e"
+                              : "#1d1d1d"
+                            : label === "Build Idea"
+                              ? "#f0f0ff"
+                              : "#f9f9f9",
                           animation: "pixel-on 1s ease-in-out infinite",
-                          animationDelay: `${i * 0.12}s`,
+                          animationDelay: `${i * 0.12 + 0.06}s`,
                         }}
                       />{" "}
                     </div>
@@ -6755,7 +7022,7 @@ function MainContent({
                   {[
                     {
                       key: "target_users",
-                      label: "Who it's for",
+                      label: "Target users",
                     },
                     {
                       key: "problem_solved",
@@ -6767,88 +7034,98 @@ function MainContent({
                     },
                     {
                       key: "expected_outcome",
-                      label: "What the response means",
+                      label: "Expected outcome",
                     },
                   ].map((row) => (
-                    <div key={row.key}>
+                    <div
+                      key={row.key}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                        borderRadius: 8,
+                        backgroundColor: isDark ? "#1d1d1d" : "#f9f9f9",
+                        padding: 8,
+                      }}
+                    >
                       {" "}
                       <span
                         style={{
                           fontFamily: "Geist, var(--font-geist-sans)",
-                          fontSize: 11,
+                          fontSize: 14,
                           fontWeight: 500,
-                          letterSpacing: "-0.2px",
-                          color: "#9e9e9e",
+                          letterSpacing: "-0.5px",
+                          color: isDark ? "#b0b0b0" : "#585858",
                         }}
                       >
                         {row.label}
                       </span>{" "}
                       <span
                         style={{
-                          display: "block",
-                          marginTop: 4,
                           fontFamily: "Geist, var(--font-geist-sans)",
-                          fontSize: 13,
-                          lineHeight: "19px",
-                          letterSpacing: "-0.3px",
-                          color: isDark ? "#e4e4e4" : "#3a3a3a",
+                          fontSize: 14,
+                          lineHeight: "20px",
+                          letterSpacing: "-0.4px",
+                          color: isDark ? "#c4c4c4" : "#696666",
+                          backgroundColor: isDark ? "#262626" : "#efefef",
+                          borderRadius: 6,
+                          padding: "8px 12px",
+                          minHeight: 36,
+                          display: "flex",
+                          alignItems: "center",
                         }}
                       >
                         {explainData[row.key as keyof ExplainPayload]}
                       </span>{" "}
                     </div>
                   ))}{" "}
-                  <div style={{ marginTop: 4 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      borderRadius: 8,
+                      backgroundColor: isDark ? "#16162e" : "#f0f0ff",
+                      padding: 8,
+                    }}
+                  >
                     {" "}
                     <div
                       style={{
-                        borderRadius: 8,
-                        backgroundColor: isDark ? "#14142b" : "#f6f6ff",
-                        border: isDark
-                          ? "0.8px solid #2f2f7a"
-                          : "0.8px solid #e0e0ff",
-                        padding: 12,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}
                     >
                       {" "}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        {" "}
-                        <Sparkle size={13} color="#5A5AFF" />{" "}
-                        <span
-                          style={{
-                            fontFamily: "Geist, var(--font-geist-sans)",
-                            fontSize: 11,
-                            fontWeight: 500,
-                            letterSpacing: "-0.2px",
-                            color: "#5A5AFF",
-                          }}
-                        >
-                          Idea you can build
-                        </span>{" "}
-                      </div>{" "}
+                      <Sparkle size={16} color="#5A5AFF" />{" "}
                       <span
                         style={{
-                          display: "block",
-                          marginTop: 6,
                           fontFamily: "Geist, var(--font-geist-sans)",
-                          fontSize: 13,
-                          lineHeight: "19px",
-                          letterSpacing: "-0.3px",
-                          color: isDark ? "#d2d2ff" : "#4a4ab8",
+                          fontSize: 14,
+                          fontWeight: 500,
+                          letterSpacing: "-0.5px",
+                          color: "#5A5AFF",
                         }}
                       >
-                        {explainData.build_idea}
+                        Build Idea
                       </span>{" "}
                     </div>{" "}
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        lineHeight: "20px",
+                        letterSpacing: "-0.4px",
+                        color: isDark ? "#8f8fff" : "#5A5AFF",
+                      }}
+                    >
+                      {explainData.build_idea}
+                    </span>{" "}
                   </div>{" "}
                 </div>
               ) : null}{" "}
+              </div>{" "}
             </div>{" "}
           </motion.div>
         )}{" "}
@@ -7365,6 +7642,7 @@ function BrowseApiSection({
                   style={{
                     fontFamily: "Geist, var(--font-geist-sans)",
                     fontSize: 14,
+                    fontWeight: 500,
                     color: "#999999",
                   }}
                 >
@@ -8703,6 +8981,7 @@ function BrowseApiSection({
                         </div>
                       ) : null}{" "}
                       <RippleButton
+                        className="transition-colors hover:bg-[#4a4aff]"
                         style={{
                           position: "absolute",
                           left: 8,
