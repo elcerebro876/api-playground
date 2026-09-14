@@ -462,6 +462,7 @@ export default function Home() {
           setLoading(false);
           setResponse(null);
           setActiveHistoryIndex(null);
+          setActiveDiscoveryIndex(null);
           setUrl("");
           setMethod("GET");
           setHeaderKey("");
@@ -577,6 +578,7 @@ export default function Home() {
                 setLoading(false);
                 setResponse(null);
                 setActiveHistoryIndex(null);
+                setActiveDiscoveryIndex(null);
                 setUrl("");
                 setMethod("GET");
                 setHeaderKey("");
@@ -612,6 +614,7 @@ export default function Home() {
         onClick={() => {
           setResponse(null);
           setActiveHistoryIndex(null);
+          setActiveDiscoveryIndex(null);
           setUrl("");
           setMethod("GET");
           setHeaderKey("");
@@ -6272,6 +6275,7 @@ function MainContent({
                 </motion.div>
               ) : explainCtx ? null : (
                 <UrlInputBar
+                  glass
                   activeTheme={activeTheme}
                   method={method}
                   setMethod={setMethod}
@@ -9114,6 +9118,7 @@ function BrowseApiSection({
 }
 function UrlInputBar({
   compact,
+  glass,
   activeTheme,
   method,
   setMethod,
@@ -9123,6 +9128,7 @@ function UrlInputBar({
   onSend,
 }: {
   compact?: boolean;
+  glass?: boolean;
   activeTheme: string;
   method: string;
   setMethod: (m: string) => void;
@@ -9238,7 +9244,15 @@ function UrlInputBar({
       style={{
         border: isDark ? "0.8px solid #2a2a2a" : "0.8px solid #f2f2f2",
         borderRadius: 8,
-        backgroundColor: isDark ? "#121212" : "#ffffff",
+        backgroundColor: glass
+          ? isDark
+            ? "rgba(18, 18, 18, 0.72)"
+            : "rgba(255, 255, 255, 0.72)"
+          : isDark
+            ? "#121212"
+            : "#ffffff",
+        backdropFilter: glass ? "blur(8px)" : undefined,
+        WebkitBackdropFilter: glass ? "blur(8px)" : undefined,
         transition: "background-color 0.4s ease, border-color 0.4s ease",
       }}
     >
