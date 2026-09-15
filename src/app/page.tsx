@@ -37,6 +37,8 @@ const cardItemVariants = {
   exit: { opacity: 0, y: 10, transition: cardTextSpring },
 };
 const headersPanelTransition = { duration: 0.25, ease: "easeInOut" as const };
+const HISTORY_LIMIT = 50;
+const MAX_STORED_BODY = 100_000;
 const commonKeys = [
   "content-type",
   "date",
@@ -131,13 +133,30 @@ export default function Home() {
     headers?: Record<string, string>;
     body?: string;
     error?: string;
+    isBinary?: boolean;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [discoveryHistory, setDiscoveryHistory] = useState<HistoryEntry[]>([]);
   const [apisTested, setApisTested] = useState(0);
   const [streak, setStreak] = useState(1);
-  const responseKey = useRef(0);
+  const [responseKey, setResponseKey] = useState(0);
+  const historyRef = useRef<HistoryEntry[]>([]);
+  const discoveryHistoryRef = useRef<HistoryEntry[]>([]);
+  const apisTestedRef = useRef(0);
+  const streakRef = useRef(1);
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+  useEffect(() => {
+    discoveryHistoryRef.current = discoveryHistory;
+  }, [discoveryHistory]);
+  useEffect(() => {
+    apisTestedRef.current = apisTested;
+  }, [apisTested]);
+  useEffect(() => {
+    streakRef.current = streak;
+  }, [streak]);
   const [headersFilter, setHeadersFilter] = useState("common");
   const [activeHistoryIndex, setActiveHistoryIndex] = useState<number | null>(
     null,
@@ -163,16 +182,24 @@ export default function Home() {
   const [is1440, setIs1440] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    setMounted(true);
     const mq = window.matchMedia("(max-width: 767px)");
     const check = () => setIsMobile(mq.matches);
-    check();
+    const frame = requestAnimationFrame(() => {
+      setMounted(true);
+      check();
+    });
     mq.addEventListener("change", check);
-    return () => mq.removeEventListener("change", check);
+    return () => {
+      cancelAnimationFrame(frame);
+      mq.removeEventListener("change", check);
+    };
   }, []);
   useEffect(() => {
-    setExplainDismissed(loadExplainDismissed());
+    const frame = requestAnimationFrame(() =>
+      setExplainDismissed(loadExplainDismissed()),
+    );
     return () => {
+      cancelAnimationFrame(frame);
       if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
     };
   }, []);
@@ -192,22 +219,25 @@ export default function Home() {
   }, []);
   useEffect(() => {
     const data = loadStoredData();
-    setHistory(data.history);
-    setDiscoveryHistory(data.discoveryHistory);
-    setApisTested(data.apisTestedCount);
     const updated = applyStreakOnLoad(data);
-    setStreak(updated.streak);
     saveStoredData(updated);
+    const frame = requestAnimationFrame(() => {
+      setHistory(data.history);
+      setDiscoveryHistory(data.discoveryHistory);
+      setApisTested(data.apisTestedCount);
+      setStreak(updated.streak);
+    });
+    return () => cancelAnimationFrame(frame);
   }, []);
-  const handleHistorySelect = (item: any, index: number) => {
+  const handleHistorySelect = (item: HistoryEntry, index: number) => {
     setActiveHistoryIndex(index);
     setActiveDiscoveryIndex(null);
     setMethod(item.method);
     setUrl(item.url);
     if (item.responseBody) {
       setResponse({
-        status: item.status,
-        time: item.time,
+        status: item.status ?? undefined,
+        time: item.time ?? undefined,
         body: item.responseBody,
         headers: item.responseHeaders,
       });
@@ -216,15 +246,15 @@ export default function Home() {
     setExplainCtx(null);
     setExplainPopupOpen(false);
   };
-  const handleDiscoverySelect = (item: any, index: number) => {
+  const handleDiscoverySelect = (item: HistoryEntry, index: number) => {
     setActiveDiscoveryIndex(index);
     setActiveHistoryIndex(null);
     setMethod(item.method);
     setUrl(item.url);
     if (item.responseBody) {
       setResponse({
-        status: item.status,
-        time: item.time,
+        status: item.status ?? undefined,
+        time: item.time ?? undefined,
         body: item.responseBody,
         headers: item.responseHeaders,
       });
@@ -272,7 +302,7 @@ export default function Home() {
           }),
         });
         const data = await res.json();
-        responseKey.current += 1;
+        setResponseKey((k) => k + 1);
         setResponse(data);
         setHeadersFilter("common");
         const entry = {
@@ -282,31 +312,43 @@ export default function Home() {
           time: data.time,
           timestamp: Date.now(),
           headers: h,
-          responseBody: data.body,
+          responseBody:
+            typeof data.body === "string" && data.body.length > MAX_STORED_BODY
+              ? data.body.slice(0, MAX_STORED_BODY)
+              : data.body,
           responseHeaders: data.headers,
           ...(opts?.apiName ? { apiName: opts.apiName } : {}),
         };
         const nextHistory = [
           entry,
-          ...history.filter((it) => !(it.method === m && it.url === u)),
-        ];
+          ...historyRef.current.filter((it) => !(it.method === m && it.url === u)),
+        ].slice(0, HISTORY_LIMIT);
         const nextDiscovery = [
           entry,
-          ...discoveryHistory.filter((it) => !(it.method === m && it.url === u)),
-        ];
+          ...discoveryHistoryRef.current.filter(
+            (it) => !(it.method === m && it.url === u),
+          ),
+        ].slice(0, HISTORY_LIMIT);
         if (opts?.apiName) {
+          discoveryHistoryRef.current = nextDiscovery;
           setDiscoveryHistory(nextDiscovery);
           setActiveDiscoveryIndex(0);
         } else {
+          historyRef.current = nextHistory;
           setHistory(nextHistory);
           setActiveHistoryIndex(0);
         }
-        setApisTested((c) => c + 1);
+        setApisTested((c) => {
+          apisTestedRef.current = c + 1;
+          return c + 1;
+        });
         saveStoredData({
-          history: opts?.apiName ? history : nextHistory,
-          discoveryHistory: opts?.apiName ? nextDiscovery : discoveryHistory,
-          apisTestedCount: apisTested + 1,
-          streak,
+          history: opts?.apiName ? historyRef.current : nextHistory,
+          discoveryHistory: opts?.apiName
+            ? nextDiscovery
+            : discoveryHistoryRef.current,
+          apisTestedCount: apisTestedRef.current,
+          streak: streakRef.current,
           lastVisitDate: new Date().toDateString(),
         });
         if (opts?.apiName) {
@@ -332,7 +374,7 @@ export default function Home() {
         }
         setLoading(false);
       } catch {
-        responseKey.current += 1;
+        setResponseKey((k) => k + 1);
         if (popupTimerRef.current) {
           clearTimeout(popupTimerRef.current);
           popupTimerRef.current = null;
@@ -585,7 +627,7 @@ export default function Home() {
                 setHeaderBearer("");
                 setHeaderValue("");
               }}
-              responseKey={responseKey.current}
+              responseKey={responseKey}
               headersFilter={headersFilter}
               setHeadersFilter={setHeadersFilter}
               history={history}
@@ -770,6 +812,8 @@ export default function Home() {
               <div style={{ flex: 1, minWidth: 0 }} />
               <RippleButton
                 onClick={() => {
+                  saveExplainDismissed(true);
+                  setExplainDismissed(true);
                   setExplainPopupOpen(false);
                   openExplain();
                 }}
@@ -806,7 +850,7 @@ export default function Home() {
                 color: activeTheme === "Dark" ? "rgba(255,255,255,0.9)" : "#585858",
               }}
             >
-              There's more to this response
+              There&rsquo;s more to this response
             </span>
 
             {/* Subtitle */}
@@ -822,7 +866,7 @@ export default function Home() {
               }}
             >
               This response came back in {response?.time ?? "—"}ms. See who
-              it's for, what it does, and an idea for something you could build
+              it&rsquo;s for, what it does, and an idea for something you could build
               with it
             </span>
 
@@ -910,6 +954,7 @@ function MobilePrimary({
     headers?: Record<string, string>;
     body?: string;
     error?: string;
+    isBinary?: boolean;
   } | null;
   loading: boolean;
   onSend: (opts?: {
@@ -918,9 +963,9 @@ function MobilePrimary({
     headers?: Record<string, string>;
   }) => void;
   onClearResponse: () => void;
-  history: any[];
+  history: HistoryEntry[];
   activeHistoryIndex: number | null;
-  onHistorySelect: (item: any, index: number) => void;
+  onHistorySelect: (item: HistoryEntry, index: number) => void;
   headersFilter: string;
   setHeadersFilter: (v: string) => void;
 }) {
@@ -950,7 +995,8 @@ function MobilePrimary({
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
   const [localUrl, setLocalUrl] = useState(url);
   useEffect(() => {
-    setLocalUrl(url);
+    const frame = requestAnimationFrame(() => setLocalUrl(url));
+    return () => cancelAnimationFrame(frame);
   }, [url]);
   const contentWidth = "min(343px, calc(100vw - 32px))";
   return (
@@ -2633,7 +2679,7 @@ function MobilePrimary({
                 >
                   {" "}
                   <span style={{ fontWeight: 500 }}>Bearer Token</span> â€“ why
-                  it's just a string, no password flow{" "}
+                  it&rsquo;s just a string, no password flow{" "}
                 </motion.p>{" "}
                 <motion.p
                   variants={{
@@ -2674,8 +2720,8 @@ function MobileHistoryModal({
 }: {
   isDark: boolean;
   onClose: () => void;
-  history: any[];
-  onSelect: (item: any, index: number) => void;
+  history: HistoryEntry[];
+  onSelect: (item: HistoryEntry, index: number) => void;
 }) {
   const todayKey = new Date().toDateString();
   const isTodayItem = (t: number) => new Date(t).toDateString() === todayKey;
@@ -2705,7 +2751,7 @@ function MobileHistoryModal({
     573,
     (typeof window !== "undefined" ? window.innerWidth : 375) - 32,
   );
-  const row = (item: any, i: number) => (
+  const row = (item: HistoryEntry, i: number) => (
     <div
       key={i}
       className="flex items-center"
@@ -3181,7 +3227,6 @@ function Sidebar({
   history,
   activeHistoryIndex,
   onSelect,
-  onRetry,
   compact,
   discoveryHistory,
   activeDiscoveryIndex,
@@ -3190,13 +3235,13 @@ function Sidebar({
   activeTheme: string;
   compact: boolean;
   onThemeChange: (t: string) => void;
-  history: any[];
+  history: HistoryEntry[];
   activeHistoryIndex: number | null;
-  onSelect: (item: any, index: number) => void;
-  onRetry: (item: any) => void;
-  discoveryHistory: any[];
+  onSelect: (item: HistoryEntry, index: number) => void;
+  onRetry: (item: HistoryEntry) => void;
+  discoveryHistory: HistoryEntry[];
   activeDiscoveryIndex: number | null;
-  onDiscoverySelect: (item: any, index: number) => void;
+  onDiscoverySelect: (item: HistoryEntry, index: number) => void;
 }) {
   return (
     <div
@@ -4210,7 +4255,15 @@ function MainContent({
   setHeaderBearer: (v: string) => void;
   headerValue: string;
   setHeaderValue: (v: string) => void;
-  response: any;
+  response: {
+    status?: number;
+    ok?: boolean;
+    time?: number;
+    headers?: Record<string, string>;
+    body?: string;
+    error?: string;
+    isBinary?: boolean;
+  } | null;
   loading: boolean;
   onSend: (opts?: {
     method?: string;
@@ -4222,9 +4275,9 @@ function MainContent({
   responseKey: number;
   headersFilter: string;
   setHeadersFilter: (v: string) => void;
-  history: any[];
+  history: HistoryEntry[];
   activeHistoryIndex: number | null;
-  onHistorySelect: (item: any, index: number) => void;
+  onHistorySelect: (item: HistoryEntry, index: number) => void;
   explainCtx: { apiName: string; url: string } | null;
   explainPopupOpen: boolean;
   bannerRevealed: boolean;
@@ -4265,7 +4318,7 @@ function MainContent({
               : 0) +
             16,
         );
-  const renderHistoryRow = (item: any, i: number) => (
+  const renderHistoryRow = (item: HistoryEntry, i: number) => (
     <div
       key={i}
       className="flex items-center"
@@ -4330,8 +4383,11 @@ function MainContent({
   const resultContentRef = useRef<HTMLDivElement>(null);
   const [resultHeight, setResultHeight] = useState<number | "auto">("auto");
   useEffect(() => {
-    if (headerExpanded && !dismissedCheatSheet) setShowCheatSheet(true);
-    if (!headerExpanded) setShowCheatSheet(false);
+    const frame = requestAnimationFrame(() => {
+      if (headerExpanded && !dismissedCheatSheet) setShowCheatSheet(true);
+      if (!headerExpanded) setShowCheatSheet(false);
+    });
+    return () => cancelAnimationFrame(frame);
   }, [headerExpanded, dismissedCheatSheet]);
   useLayoutEffect(() => {
     if (resultContentRef.current) {
@@ -5569,8 +5625,8 @@ function MainContent({
                                 fontSize: 14,
                                 fontWeight: 500,
                                 color:
-                                  response.status >= 200 &&
-                                  response.status < 300
+                                  (response.status ?? 0) >= 200 &&
+                                  (response.status ?? 0) < 300
                                     ? "#008000"
                                     : "#dc143c",
                               }}
@@ -6088,8 +6144,10 @@ function MainContent({
                         >
                           {" "}
                           <BodyViewer
-                            body={response.body}
+                            body={response.body ?? ""}
                             isDark={isDark}
+                            isBinary={response.isBinary}
+                            contentType={response.headers?.["content-type"]}
                           />{" "}
                         </motion.div>
                       )}{" "}
@@ -6555,7 +6613,7 @@ function MainContent({
                     color: isDark ? "#8b8b8b" : "#9e9e9e",
                   }}
                 >
-                  why it's just a string, no password
+                  why it&rsquo;s just a string, no password
                 </motion.span>{" "}
                 <motion.span
                   variants={{
@@ -7015,7 +7073,10 @@ function MainContent({
                   </div>{" "}
                 </div>
               ) : explainData ? (
-                <div
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
                   style={{
                     display: "flex",
                     flexDirection: "column",
@@ -7127,7 +7188,7 @@ function MainContent({
                       {explainData.build_idea}
                     </span>{" "}
                   </div>{" "}
-                </div>
+                </motion.div>
               ) : null}{" "}
               </div>{" "}
             </div>{" "}
@@ -7742,7 +7803,7 @@ function BrowseApiSection({
                   : "repeat(3, 1fr)",
                 gap: 16,
                 gridAutoRows: "auto",
-                alignItems: compact || w1440 ? "start" : "stretch",
+                alignItems: "stretch",
               }}
             >
               {" "}
@@ -7765,7 +7826,12 @@ function BrowseApiSection({
                     padding: 12,
                     display: "flex",
                     flexDirection: "column",
-                    ...(compact || w1440 ? {} : { height: api.height ?? 205 }),
+                    height:
+                      api.tag === "No auth"
+                        ? compact || w1440
+                          ? 207
+                          : 210
+                        : (api.height ?? 205),
                     transition: "background-color 0.15s ease",
                     cursor: "pointer",
                   }}
@@ -7890,18 +7956,17 @@ function BrowseApiSection({
                         style={{
                           borderRadius: 4,
                           backgroundColor: isDark
-                            ? "#2E1800"
+                            ? "#004700"
                             : (api.panelBg ?? "#fff4e8"),
                           border: isDark
-                            ? "1px solid #934E00"
+                            ? "1px solid #004700"
                             : (api.panelBorder ?? "0.8px solid #FFE8CC"),
-                          width: 112,
-                          height: 26,
-                          padding: "0 6px",
+                          width: "fit-content",
+                          padding: 8,
                           display: "flex",
                           alignItems: "center",
                           gap: 8,
-                          marginTop: compact || w1440 ? 8 : 12,
+                          marginTop: 8,
                         }}
                       >
                         {" "}
@@ -7921,22 +7986,22 @@ function BrowseApiSection({
                           />{" "}
                           <path
                             d="M16.2188 8.63655C12.9487 7.79355 10.3935 5.2383 9.5505 1.9683L9.1875 0.560547L8.8245 1.9683C7.9815 5.2383 5.42629 7.79355 2.15629 8.63655L0.748535 8.99955L2.15629 9.3633C5.42629 10.2063 7.9815 12.7615 8.8245 16.0308L9.1875 17.4393L9.5505 16.0308C10.3935 12.7615 12.9487 10.2063 16.2188 9.3633L17.6265 8.99955L16.2188 8.63655Z"
-                            fill="rgb(13,140,13)"
+                            fill={isDark ? "rgb(80,255,80)" : "rgb(13,140,13)"}
                             fillRule="evenodd"
                           />{" "}
                           <path
                             d="M14.2509 5.81025C14.2509 4.93875 15.2064 3.936 16.1252 3.936C15.2409 3.936 14.2509 2.92275 14.2509 2.0625C14.2509 2.92275 13.2699 3.936 12.3774 3.936C13.2362 3.936 14.2509 4.9335 14.2509 5.81025Z"
-                            fill="rgb(13,140,13)"
+                            fill={isDark ? "rgb(80,255,80)" : "rgb(13,140,13)"}
                             fillRule="evenodd"
                           />{" "}
                         </svg>{" "}
                         <span
                           style={{
                             fontFamily: "Geist, var(--font-geist-sans)",
-                            fontSize: 12,
+                            fontSize: 14,
                             fontWeight: 500,
                             color: isDark
-                              ? "#DC7800"
+                              ? "#50FF50"
                               : (api.labelColor ?? "#DC7800"),
                             whiteSpace: "nowrap",
                             letterSpacing: -0.6,
@@ -7954,7 +8019,7 @@ function BrowseApiSection({
                           display: "flex",
                           alignItems: "center",
                           gap: 4,
-                          marginTop: 8,
+                          marginTop: 12,
                           cursor: "pointer",
                         }}
                         onClick={() => {
@@ -8710,7 +8775,7 @@ function BrowseApiSection({
                         style={{
                           position: "absolute",
                           left: 12,
-                          top: 73,
+                          top: 69,
                           width: 346,
                           height: detailBig ? 74 : 72,
                           borderRadius: 8,
@@ -9001,9 +9066,13 @@ function BrowseApiSection({
                                 ? detailBig
                                   ? 92
                                   : 80
-                                : detailBig
-                                  ? 50
-                                  : 44,
+                                : undefined,
+                          bottom:
+                            !selectedApi.auth &&
+                            !selectedApi.auth2 &&
+                            !selectedApi.authNote
+                              ? 8
+                              : undefined,
                           display: "flex",
                           alignItems: "center",
                           gap: 4,
@@ -9236,7 +9305,8 @@ function UrlInputBar({
       : "#2fb4b4";
   const [localUrl, setLocalUrl] = useState(url);
   useEffect(() => {
-    setLocalUrl(url);
+    const frame = requestAnimationFrame(() => setLocalUrl(url));
+    return () => cancelAnimationFrame(frame);
   }, [url]);
   return (
     <div
@@ -9763,7 +9833,7 @@ function IconlyPlus({
     </svg>
   );
 }
-function JsonView({ data, depth = 0 }: { data: any; depth?: number }) {
+function JsonView({ data, depth = 0 }: { data: unknown; depth?: number }) {
   const indent = depth * 16;
   if (data === null) return <span style={{ color: "#FE7C0B" }}>null</span>;
   if (typeof data === "boolean")
@@ -9774,9 +9844,9 @@ function JsonView({ data, depth = 0 }: { data: any; depth?: number }) {
     return (
       <span>
         {" "}
-        <span style={{ color: "#9e9e9e" }}>"</span>{" "}
+        <span style={{ color: "#9e9e9e" }}>&quot;</span>{" "}
         <span style={{ color: "#1BC95A" }}>{data}</span>{" "}
-        <span style={{ color: "#9e9e9e" }}>"</span>{" "}
+        <span style={{ color: "#9e9e9e" }}>&quot;</span>{" "}
       </span>
     );
   }
@@ -9803,7 +9873,8 @@ function JsonView({ data, depth = 0 }: { data: any; depth?: number }) {
     );
   }
   if (typeof data === "object" && data !== null) {
-    const keys = Object.keys(data);
+    const obj = data as Record<string, unknown>;
+    const keys = Object.keys(obj);
     if (keys.length === 0)
       return <span style={{ color: "#9e9e9e" }}>{"{}"}</span>;
     return (
@@ -9813,11 +9884,11 @@ function JsonView({ data, depth = 0 }: { data: any; depth?: number }) {
         {keys.map((key, i) => (
           <div key={key} style={{ paddingLeft: indent + 16 }}>
             {" "}
-            <span style={{ color: "#9e9e9e" }}>"</span>{" "}
+            <span style={{ color: "#9e9e9e" }}>&quot;</span>{" "}
             <span style={{ color: "#0396DC" }}>{key}</span>{" "}
-            <span style={{ color: "#9e9e9e" }}>"</span>{" "}
+            <span style={{ color: "#9e9e9e" }}>&quot;</span>{" "}
             <span style={{ color: "#9e9e9e" }}>: </span>{" "}
-            <JsonView data={data[key]} depth={depth + 1} />{" "}
+            <JsonView data={obj[key]} depth={depth + 1} />{" "}
             {i < keys.length - 1 && (
               <span style={{ color: "#9e9e9e" }}>,</span>
             )}{" "}
@@ -9832,22 +9903,66 @@ function JsonView({ data, depth = 0 }: { data: any; depth?: number }) {
   }
   return <span style={{ color: "#9e9e9e" }}>{String(data)}</span>;
 }
-function BodyViewer({ body, isDark }: { body: string; isDark: boolean }) {
+function BodyViewer({
+  body,
+  isDark,
+  isBinary = false,
+  contentType = "",
+}: {
+  body: string;
+  isDark: boolean;
+  isBinary?: boolean;
+  contentType?: string;
+}) {
   const [tab, setTab] = useState("pretty");
-  let parsed: any = null;
+  const cardStyle = {
+    borderRadius: 8,
+    border: isDark ? "0.8px solid #312f2f" : "0.8px solid #f2f2f2",
+    backgroundColor: isDark ? "#0f0f0f" : "#fcfcfc",
+    width: "100%",
+  };
+  if (isBinary) {
+    const isImage = /^image\//.test(contentType);
+    return (
+      <div style={cardStyle}>
+        {" "}
+        {isImage ? (
+          <img
+            src={`data:${contentType || "application/octet-stream"};base64,${body}`}
+            alt="Binary response preview"
+            style={{
+              maxWidth: "100%",
+              maxHeight: 310,
+              objectFit: "contain",
+              display: "block",
+              margin: "8px auto",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              padding: "10px 12px",
+              fontSize: 12,
+              fontWeight: 500,
+              fontFamily: "Geist, var(--font-geist-sans)",
+              color: "#9e9e9e",
+            }}
+          >
+            {" "}
+            Binary response · {Math.floor((body.length * 3) / 4)} bytes
+            (base64) · {contentType || "unknown type"}
+          </div>
+        )}{" "}
+      </div>
+    );
+  }
+  let parsed: unknown = null;
   try {
     parsed = JSON.parse(body);
   } catch {}
   const isJson = parsed !== null && typeof parsed === "object";
   return (
-    <div
-      style={{
-        borderRadius: 8,
-        border: isDark ? "0.8px solid #312f2f" : "0.8px solid #f2f2f2",
-        backgroundColor: isDark ? "#0f0f0f" : "#fcfcfc",
-        width: "100%",
-      }}
-    >
+    <div style={cardStyle}>
       {" "}
       <div className="flex items-center" style={{ padding: "12px 12px 0" }}>
         {" "}
@@ -9992,6 +10107,7 @@ function MobileResultSection({
     headers?: Record<string, string>;
     body?: string;
     error?: string;
+    isBinary?: boolean;
   } | null;
   headersFilter: string;
   setHeadersFilter: (v: string) => void;
@@ -10031,7 +10147,7 @@ function MobileResultSection({
     setShowTopBlur(el.scrollTop > 2);
     setShowBottomBlur(el.scrollTop < max - 2);
   };
-  let parsedBody: any = null;
+  let parsedBody: unknown = null;
   let isJson = false;
   if (response) {
     try {
@@ -10061,7 +10177,6 @@ function MobileResultSection({
   const responseCardHeight = response
     ? bodyCardTop + (41 + bodyContentHeight + 12) + 12
     : 480;
-  const bodyEntries = isJson ? Object.entries(parsedBody) : [];
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       {" "}
@@ -10527,7 +10642,31 @@ function MobileResultSection({
                       </span>{" "}
                     </div>{" "}
                   </div>{" "}
-                  {bodyTab === "pretty" && isJson ? (
+                  {response.isBinary ? (
+                    <div
+                      className="hide-scrollbar"
+                      style={{
+                        position: "absolute",
+                        top: 41,
+                        left: 12,
+                        right: 12,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        color: "#9e9e9e",
+                      }}
+                    >
+                      {" "}
+                      Binary response{" "}
+                      {response.body
+                        ? Math.floor((response.body.length * 3) / 4)
+                        : 0}{" "}
+                      bytes (base64){" "}
+                      {response.headers?.["content-type"]
+                        ? `· ${response.headers["content-type"]}`
+                        : ""}{" "}
+                    </div>
+                  ) : bodyTab === "pretty" && isJson ? (
                     <div
                       ref={(el) => {
                         bodyContentEl.current = el;

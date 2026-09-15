@@ -1,7 +1,29 @@
 import { getSupabase, type ExplainRecord } from "@/lib/supabase";
 import { generateExplanation, isGeminiConfigured } from "@/lib/explain";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
+
+// Cheap deterministic signature of the request so cached explanations are not
+// reused across requests that produced different responses (e.g. different
+// status codes or response bodies for the same URL).
+function requestSignature(responseBody: string): string {
+  const sample = responseBody.slice(0, 4000);
+  let h = 5381;
+  for (let i = 0; i < sample.length; i++) {
+    h = ((h << 5) + h + sample.charCodeAt(i)) >>> 0;
+  }
+  return h.toString(36);
+}
 
 export async function POST(request: Request) {
+  const ip = clientIp(request);
+  const rl = rateLimit(`explain:${ip}`);
+  if (!rl.ok) {
+    return Response.json(
+      { error: "Too many requests, try again later" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
+
   let payload: {
     url?: string;
     apiName?: string;
@@ -13,14 +35,18 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const endpointUrl = (payload.url ?? "").trim();
-  const apiName = (payload.apiName ?? "API").trim();
+  const endpointUrl = (payload.url ?? "").trim().slice(0, 500);
+  const apiName = (payload.apiName ?? "API").trim().slice(0, 100);
   const status = payload.status ?? 0;
   const responseBody = payload.body ?? "";
 
   if (!endpointUrl) {
     return Response.json({ error: "Missing url" }, { status: 400 });
   }
+
+  // Scope the cache to URL + status + a short body signature so one request's
+  // response-grounded explanation is never served for a materially different one.
+  const cacheKey = `${endpointUrl}\u0000${status}\u0000${requestSignature(responseBody)}`;
 
   const client = getSupabase();
 
@@ -29,7 +55,7 @@ export async function POST(request: Request) {
       const { data, error } = await client
         .from("explanations")
         .select("*")
-        .eq("endpoint_url", endpointUrl)
+        .eq("endpoint_url", cacheKey)
         .maybeSingle();
       if (error) throw error;
       if (data) {
@@ -76,7 +102,7 @@ export async function POST(request: Request) {
   }
 
   const record: ExplainRecord = {
-    endpoint_url: endpointUrl,
+    endpoint_url: cacheKey,
     api_name: apiName,
     target_users: explanation.target_users,
     problem_solved: explanation.problem_solved,
