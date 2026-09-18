@@ -12,6 +12,7 @@
     "@supabase/supabase-js": "^2.116.0",
     "framer-motion": "^12.42.2",
     "next": "16.2.11",
+    "posthog-js": "^1.434.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-syntax-highlighter": "^16.1.1"

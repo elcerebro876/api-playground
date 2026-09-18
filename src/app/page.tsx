@@ -20,6 +20,7 @@ import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
 import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, type HistoryEntry } from "@/lib/storage";
 import type { ExplainPayload } from "@/lib/explain";
+import { trackToolUsed } from "@/lib/posthog";
 const cardTextSpring = {
   type: "spring" as const,
   stiffness: 400,
@@ -291,6 +292,7 @@ export default function Home() {
         if (headerBearer) h["Authorization"] = `Bearer ${headerBearer}`;
       }
       try {
+        trackToolUsed({ method: m, url: u });
         const res = await fetch("/api/proxy", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
