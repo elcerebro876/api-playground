@@ -46,7 +46,11 @@ export async function POST(request: Request) {
 
   // Scope the cache to URL + status + a short body signature so one request's
   // response-grounded explanation is never served for a materially different one.
-  const cacheKey = `${endpointUrl}\u0000${status}\u0000${requestSignature(responseBody)}`;
+  const cacheKey = JSON.stringify([
+    endpointUrl,
+    status,
+    requestSignature(responseBody),
+  ]);
 
   const client = getSupabase();
 
@@ -69,7 +73,7 @@ export async function POST(request: Request) {
         return Response.json({ ...data, fromCache: true });
       }
     } catch {
-      // DB query failed: fall through to Gemini rather than failing outright.
+      // DB query failed: fall through to the model call rather than failing outright.
     }
   }
 

@@ -6,10 +6,15 @@
 - Local:         http://localhost:3000
 - Network:       http://192.168.100.29:3000
 - Environments: .env.local
-✓ Ready in 3.8s
+✓ Ready in 1464ms
 
-○ Compiling / ...
- GET / 200 in 8.9s (next.js: 6.4s, application-code: 2.5s)
- GET / 200 in 112ms (next.js: 17ms, application-code: 95ms)
- GET / 200 in 95ms (next.js: 9ms, application-code: 86ms)
- GET / 200 in 70ms (next.js: 11ms, application-code: 60ms)
+ GET / 200 in 1021ms (next.js: 509ms, application-code: 512ms)
+ POST /api/explain 500 in 3.1s (next.js: 491ms, application-code: 2.6s)
+ POST /api/explain 500 in 3.6s (next.js: 1075ms, application-code: 2.5s)
+ POST /api/explain 500 in 3.9s (next.js: 8ms, application-code: 3.9s)
+ POST /api/explain 500 in 5.3s (next.js: 7ms, application-code: 5.3s)
+ POST /api/explain 200 in 8.6s (next.js: 5ms, application-code: 8.6s)
+ POST /api/explain 500 in 1897ms (next.js: 7ms, application-code: 1890ms)
+ POST /api/explain 500 in 5.4s (next.js: 302ms, application-code: 5.1s)
+ POST /api/explain 200 in 7.3s (next.js: 16ms, application-code: 7.3s)
+ POST /api/explain 200 in 754ms (next.js: 8ms, application-code: 746ms)

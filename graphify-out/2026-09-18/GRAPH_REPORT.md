@@ -1,16 +1,16 @@
-# Graph Report - api-playground  (2026-09-14)
+# Graph Report - api-playground  (2026-09-18)
 
 ## Corpus Check
-- 18 files · ~48,115 words
+- 21 files · ~50,145 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 141 nodes · 149 edges · 16 communities (12 shown, 4 thin omitted)
+- 162 nodes · 190 edges · 16 communities (12 shown, 4 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `013af426`
+- Built from commit: `eebdd223`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -28,31 +28,32 @@
 - eslint.config.mjs
 - next.config.ts
 - postcss.config.mjs
+- route.js
 - route.ts
 
 ## God Nodes (most connected - your core abstractions)
 1. `compilerOptions` - 16 edges
-2. `include` - 7 edges
-3. `scripts` - 5 edges
-4. `POST()` - 4 edges
-5. `Home()` - 4 edges
-6. `getSupabase()` - 4 edges
-7. `lib` - 4 edges
-8. `LoadingState()` - 3 edges
-9. `isGeminiConfigured()` - 3 edges
-10. `generateExplanation()` - 3 edges
+2. `POST()` - 7 edges
+3. `Home()` - 7 edges
+4. `include` - 7 edges
+5. `scripts` - 5 edges
+6. `isPrivateIpv4()` - 4 edges
+7. `assertSafeTarget()` - 4 edges
+8. `getSupabase()` - 4 edges
+9. `lib` - 4 edges
+10. `PostHogInit()` - 3 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `Home()` --calls--> `trackToolUsed()`  [EXTRACTED]
+  src/app/page.tsx → src/lib/posthog.ts
+- `PostHogInit()` --calls--> `initPostHog()`  [EXTRACTED]
+  src/app/PostHogInit.tsx → src/lib/posthog.ts
 - `POST()` --calls--> `generateExplanation()`  [EXTRACTED]
   src/app/api/explain/route.ts → src/lib/explain.ts
-- `POST()` --calls--> `isGeminiConfigured()`  [EXTRACTED]
+- `POST()` --calls--> `isGatewayConfigured()`  [EXTRACTED]
   src/app/api/explain/route.ts → src/lib/explain.ts
-- `POST()` --calls--> `getSupabase()`  [EXTRACTED]
-  src/app/api/explain/route.ts → src/lib/supabase.ts
-- `Home()` --calls--> `applyStreakOnLoad()`  [EXTRACTED]
-  src/app/page.tsx → src/lib/storage.ts
-- `Home()` --calls--> `loadStoredData()`  [EXTRACTED]
-  src/app/page.tsx → src/lib/storage.ts
+- `POST()` --calls--> `clientIp()`  [EXTRACTED]
+  src/app/api/explain/route.ts → src/lib/rate-limit.ts
 
 ## Import Cycles
 - None detected.
@@ -61,7 +62,7 @@
 
 ### Community 0 - "page.tsx"
 Cohesion: 0.07
-Nodes (17): cardContentVariants, cardItemVariants, cardTextSpring, commonKeys, demoRequests, headersPanelTransition, Home(), methodBadgeColors (+9 more)
+Nodes (19): cardContentVariants, cardItemVariants, cardTextSpring, commonKeys, demoRequests, headersPanelTransition, Home(), methodBadgeColors (+11 more)
 
 ### Community 1 - "devDependencies"
 Cohesion: 0.11
@@ -72,8 +73,8 @@ Cohesion: 0.11
 Nodes (19): dom, dom.iterable, esnext, compilerOptions, allowJs, esModuleInterop, incremental, isolatedModules (+11 more)
 
 ### Community 3 - "dependencies"
-Cohesion: 0.15
-Nodes (13): framer-motion, next, dependencies, framer-motion, next, react, react-dom, react-syntax-highlighter (+5 more)
+Cohesion: 0.13
+Nodes (15): framer-motion, next, dependencies, framer-motion, next, posthog-js, react, react-dom (+7 more)
 
 ### Community 4 - "include"
 Cohesion: 0.20
@@ -88,19 +89,23 @@ Cohesion: 0.33
 Nodes (6): chevron, LoadingState(), orbit, ORBIT_ORDER, PATTERNS, useElapsed()
 
 ### Community 7 - "layout.tsx"
-Cohesion: 0.40
-Nodes (3): geistMono, geistSans, metadata
+Cohesion: 0.27
+Nodes (6): geistMono, geistSans, metadata, PostHogInit(), initPostHog(), trackToolUsed()
 
 ### Community 8 - "README.md"
 Cohesion: 0.50
 Nodes (3): Deploy on Vercel, Getting Started, Learn More
 
+### Community 13 - "route.js"
+Cohesion: 0.43
+Nodes (7): ALLOWED_METHODS, assertSafeTarget(), ipToInt(), isPrivateIpv4(), isPrivateIpv6(), POST(), V4_RANGES
+
 ### Community 14 - "route.ts"
-Cohesion: 0.38
-Nodes (7): POST(), ExplainPayload, generateExplanation(), isGeminiConfigured(), ExplainRecord, getSupabase(), isConfigured()
+Cohesion: 0.23
+Nodes (12): POST(), requestSignature(), ExplainPayload, generateExplanation(), isGatewayConfigured(), Bucket, buckets, clientIp() (+4 more)
 
 ## Knowledge Gaps
-- **71 isolated node(s):** `eslintConfig`, `nextConfig`, `name`, `version`, `private` (+66 more)
+- **76 isolated node(s):** `eslintConfig`, `nextConfig`, `name`, `version`, `private` (+71 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -108,15 +113,15 @@ Nodes (7): POST(), ExplainPayload, generateExplanation(), isGeminiConfigured(), 
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `devDependencies` to `package.json`?**
-  _High betweenness centrality (0.055) - this node is a cross-community bridge._
+  _High betweenness centrality (0.045) - this node is a cross-community bridge._
 - **Why does `dependencies` connect `dependencies` to `package.json`?**
-  _High betweenness centrality (0.041) - this node is a cross-community bridge._
+  _High betweenness centrality (0.037) - this node is a cross-community bridge._
 - **Why does `compilerOptions` connect `compilerOptions` to `include`?**
-  _High betweenness centrality (0.034) - this node is a cross-community bridge._
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **What connects `eslintConfig`, `nextConfig`, `name` to the rest of the system?**
-  _71 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _76 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `page.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.07308377896613191 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0746031746031746 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**
   _Cohesion score 0.10526315789473684 - nodes in this community are weakly interconnected._
 - **Should `compilerOptions` be split into smaller, more focused modules?**

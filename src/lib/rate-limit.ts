@@ -9,7 +9,7 @@ interface Bucket {
 
 // In-memory fixed-window rate limiter. Per-serverless-instance, so it is not a
 // global hard cap across many instances, but it blocks the common abuse
-// patterns (hammering an endpoint to rack up paid Gemini calls).
+// patterns (hammering an endpoint to rack up paid AI Gateway calls).
 const buckets = new Map<string, Bucket>();
 
 export function rateLimit(

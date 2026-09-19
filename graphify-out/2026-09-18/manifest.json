@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1789068982.3381703,
-    "ast_hash": "251633e7fa1e91a6c54f2a1a3e7decaf",
+    "mtime": 1789749317.2769437,
+    "ast_hash": "035fa36611b64b8b5cd90b3dbf2369c7",
     "semantic_hash": ""
   },
   "postcss.config.mjs": {
@@ -20,18 +20,18 @@
     "semantic_hash": ""
   },
   "src/app/api/proxy/route.js": {
-    "mtime": 1784979302.3604956,
-    "ast_hash": "f4a220f6aa0801af2f80c3a7455e7b61",
+    "mtime": 1789419459.5775075,
+    "ast_hash": "19356784340735476bbf6f50ab6fcce3",
     "semantic_hash": ""
   },
   "src/app/layout.tsx": {
-    "mtime": 1787763899.4101553,
-    "ast_hash": "8ee15b08ce4abc0af633eb015d4253ae",
+    "mtime": 1789749330.5161955,
+    "ast_hash": "222518b09515a33e821dd91fa6983b58",
     "semantic_hash": ""
   },
   "src/app/page.tsx": {
-    "mtime": 1789343249.0910103,
-    "ast_hash": "09e531e26a9390561a51a692fdc11bdd",
+    "mtime": 1789749337.9095497,
+    "ast_hash": "f422b14604bbb4f0cf10a6672be5b62a",
     "semantic_hash": ""
   },
   "src/components/LoadingState.tsx": {
@@ -40,13 +40,13 @@
     "semantic_hash": ""
   },
   "src/components/icons.tsx": {
-    "mtime": 1789069065.5590396,
-    "ast_hash": "4b9c376444c9a9ded1465252cc422ca7",
+    "mtime": 1789397974.7193425,
+    "ast_hash": "29758a833dc9198095c79f8c4bed3064",
     "semantic_hash": ""
   },
   "src/lib/storage.ts": {
-    "mtime": 1789327658.077582,
-    "ast_hash": "f4aef2b0729848aa574648dd2b44fd53",
+    "mtime": 1789382848.5765045,
+    "ast_hash": "94a716f5c04dcbc078bb29571acfc61e",
     "semantic_hash": ""
   },
   "tsconfig.json": {
@@ -200,13 +200,13 @@
     "semantic_hash": ""
   },
   "src/app/api/explain/route.ts": {
-    "mtime": 1789309945.3192048,
-    "ast_hash": "334f729c8919ae4d27c893de053e7403",
+    "mtime": 1789755640.7632208,
+    "ast_hash": "95c9f191f8bcce4de8a4f12f2bd135a8",
     "semantic_hash": ""
   },
   "src/lib/explain.ts": {
-    "mtime": 1789309821.9063663,
-    "ast_hash": "1688900d299153095fbb41aa9b588bef",
+    "mtime": 1789755542.9323654,
+    "ast_hash": "a568664aa9084a1ce880d125da86bc22",
     "semantic_hash": ""
   },
   "src/lib/supabase.ts": {
@@ -242,6 +242,21 @@
   "public/explain-avatar.png": {
     "mtime": 1789339247.752221,
     "ast_hash": "ee2bf5f6f898bb74fef11eb64734acf6",
+    "semantic_hash": ""
+  },
+  "src/app/PostHogInit.tsx": {
+    "mtime": 1789749325.3043194,
+    "ast_hash": "2939eab38f05de66f201f205d68ad2e0",
+    "semantic_hash": ""
+  },
+  "src/lib/posthog.ts": {
+    "mtime": 1789751087.5536566,
+    "ast_hash": "b2a836ad1f32f0acd145938a5e6e8c5f",
+    "semantic_hash": ""
+  },
+  "src/lib/rate-limit.ts": {
+    "mtime": 1789755643.7638648,
+    "ast_hash": "e36d2e9049ab8749e8b66507d2613ad9",
     "semantic_hash": ""
   }
 }

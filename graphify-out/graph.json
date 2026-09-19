@@ -1144,6 +1144,41 @@
       "norm_label": "sparkle()"
     },
     {
+      "label": "explain-gateway.ts",
+      "file_type": "code",
+      "source_file": "src/lib/explain-gateway.ts",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_lib_explain_gateway",
+      "community": 14,
+      "community_name": "route.ts",
+      "norm_label": "explain-gateway.ts"
+    },
+    {
+      "label": "isGatewayConfigured()",
+      "file_type": "code",
+      "source_file": "src/lib/explain-gateway.ts",
+      "source_location": "L14",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_lib_explain_gateway_isgatewayconfigured",
+      "community": 14,
+      "community_name": "route.ts",
+      "norm_label": "isgatewayconfigured()"
+    },
+    {
+      "label": "generateExplanation()",
+      "file_type": "code",
+      "source_file": "src/lib/explain-gateway.ts",
+      "source_location": "L20",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_lib_explain_gateway_generateexplanation",
+      "community": 14,
+      "community_name": "route.ts",
+      "norm_label": "generateexplanation()"
+    },
+    {
       "label": "explain.ts",
       "file_type": "code",
       "source_file": "src/lib/explain.ts",
@@ -1218,7 +1253,7 @@
       "label": "trackToolUsed()",
       "file_type": "code",
       "source_file": "src/lib/posthog.ts",
-      "source_location": "L17",
+      "source_location": "L20",
       "_callable": true,
       "_origin": "ast",
       "id": "src_lib_posthog_tracktoolused",
@@ -2556,7 +2591,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "src/app/api/explain/route.ts",
-      "source_location": "L49",
+      "source_location": "L52",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_app_api_explain_route_post",
@@ -2569,7 +2604,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/api/explain/route.ts",
-      "source_location": "L88",
+      "source_location": "L92",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_app_api_explain_route_post",
@@ -2581,7 +2616,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/api/explain/route.ts",
-      "source_location": "L76",
+      "source_location": "L80",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_app_api_explain_route_post",
@@ -2617,7 +2652,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/api/explain/route.ts",
-      "source_location": "L51",
+      "source_location": "L55",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_app_api_explain_route_post",
@@ -3410,6 +3445,52 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/explain-gateway.ts",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_explain_gateway",
+      "target": "src_lib_explain",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/explain-gateway.ts",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_explain_gateway",
+      "target": "src_lib_explain_explainpayload",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/explain-gateway.ts",
+      "source_location": "L20",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_explain_gateway",
+      "target": "src_lib_explain_gateway_generateexplanation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/lib/explain-gateway.ts",
+      "source_location": "L14",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_lib_explain_gateway",
+      "target": "src_lib_explain_gateway_isgatewayconfigured",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/explain.ts",
@@ -3457,7 +3538,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/lib/posthog.ts",
-      "source_location": "L17",
+      "source_location": "L20",
       "weight": 1.0,
       "_origin": "ast",
       "source": "src_lib_posthog",
@@ -4005,5 +4086,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "d61418596560eacad8bb9a22c90a1be07eed80f6"
+  "built_at_commit": "eebdd223c6c41efc114016f22016b1d4c226735e"
 }

@@ -1,16 +1,16 @@
 # Graph Report - api-playground  (2026-09-18)
 
 ## Corpus Check
-- 21 files · ~50,127 words
+- 22 files · ~50,569 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 162 nodes · 190 edges · 16 communities (12 shown, 4 thin omitted)
+- 165 nodes · 194 edges · 16 communities (12 shown, 4 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d6141859`
+- Built from commit: `eebdd223`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -101,7 +101,7 @@ Cohesion: 0.43
 Nodes (7): ALLOWED_METHODS, assertSafeTarget(), ipToInt(), isPrivateIpv4(), isPrivateIpv6(), POST(), V4_RANGES
 
 ### Community 14 - "route.ts"
-Cohesion: 0.23
+Cohesion: 0.19
 Nodes (12): POST(), requestSignature(), ExplainPayload, generateExplanation(), isGeminiConfigured(), Bucket, buckets, clientIp() (+4 more)
 
 ## Knowledge Gaps
@@ -113,11 +113,11 @@ Nodes (12): POST(), requestSignature(), ExplainPayload, generateExplanation(), i
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `devDependencies` to `package.json`?**
-  _High betweenness centrality (0.045) - this node is a cross-community bridge._
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
 - **Why does `dependencies` connect `dependencies` to `package.json`?**
-  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Why does `compilerOptions` connect `compilerOptions` to `include`?**
-  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+  _High betweenness centrality (0.024) - this node is a cross-community bridge._
 - **What connects `eslintConfig`, `nextConfig`, `name` to the rest of the system?**
   _76 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `page.tsx` be split into smaller, more focused modules?**
