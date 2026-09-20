@@ -274,14 +274,17 @@ export default function Home() {
       url?: string;
       headers?: Record<string, string>;
       apiName?: string;
+      suppressExplain?: boolean;
     }) => {
-      setLoading(true);
-      setResponse(null);
-      if (popupTimerRef.current) {
-        clearTimeout(popupTimerRef.current);
-        popupTimerRef.current = null;
+      if (!opts?.apiName) {
+        setLoading(true);
+        setResponse(null);
+        if (popupTimerRef.current) {
+          clearTimeout(popupTimerRef.current);
+          popupTimerRef.current = null;
+        }
+        setExplainPopupOpen(false);
       }
-      setExplainPopupOpen(false);
       const m = opts?.method || method;
       const u = opts?.url || url;
       const h: Record<string, string> = {};
@@ -304,9 +307,11 @@ export default function Home() {
           }),
         });
         const data = await res.json();
-        setResponseKey((k) => k + 1);
-        setResponse(data);
-        setHeadersFilter("common");
+        if (!opts?.apiName) {
+          setResponseKey((k) => k + 1);
+          setResponse(data);
+          setHeadersFilter("common");
+        }
         const entry = {
           method: m,
           url: u,
@@ -362,7 +367,8 @@ export default function Home() {
             data.status != null &&
             data.status >= 200 &&
             data.status < 300 &&
-            !loadExplainDismissed()
+            !loadExplainDismissed() &&
+            !opts?.suppressExplain
           ) {
             if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
             popupTimerRef.current = setTimeout(() => {
@@ -375,14 +381,17 @@ export default function Home() {
           setExplainPopupOpen(false);
         }
         setLoading(false);
+        return data;
       } catch {
-        setResponseKey((k) => k + 1);
+        if (!opts?.apiName) {
+          setResponseKey((k) => k + 1);
+          setResponse({ error: "Network error" });
+          setHeadersFilter("common");
+        }
         if (popupTimerRef.current) {
           clearTimeout(popupTimerRef.current);
           popupTimerRef.current = null;
         }
-        setResponse({ error: "Network error" });
-        setHeadersFilter("common");
         setExplainCtx((prev) => (opts?.apiName ? prev : null));
         setExplainPopupOpen(false);
         const entry = {
@@ -417,6 +426,7 @@ export default function Home() {
           lastVisitDate: new Date().toDateString(),
         });
         setLoading(false);
+        return { error: "Network error" };
       }
     },
     [
@@ -4272,6 +4282,7 @@ function MainContent({
     url?: string;
     headers?: Record<string, string>;
     apiName?: string;
+    suppressExplain?: boolean;
   }) => void;
   onClearResponse: () => void;
   responseKey: number;
@@ -7200,6 +7211,71 @@ function MainContent({
     </div>
   );
 }
+function extractAuthScheme(auth: string): {
+  header: string;
+  value: string;
+} {
+  if (!auth) return { header: "", value: "" };
+  const idx = auth.indexOf(":");
+  if (idx === -1) return { header: auth.trim(), value: "" };
+  return { header: auth.slice(0, idx).trim(), value: auth.slice(idx + 1).trim() };
+}
+function maskKey(value: string): string {
+  if (!value) return "";
+  if (value.length <= 8) return `${value.slice(0, 2)}********`;
+  return `${value.slice(0, 6)}*********${value.slice(-4)}`;
+}
+function renderAuthLine(auth: string, key: string): string {
+  const scheme = extractAuthScheme(auth);
+  if (auth === "API key") return `appid=${maskKey(key)}`;
+  if (!scheme.header || scheme.header.toLowerCase() === auth.toLowerCase())
+    return `${auth}: ${maskKey(key)}`;
+  if (!scheme.value) return `${scheme.header}: ${maskKey(key)}`;
+  const first = scheme.value.split(/\s+/)[0] ?? "";
+  if (/^(bearer|token|basic)$/i.test(first)) {
+    return `${scheme.header}: ${first} ${maskKey(key)}`;
+  }
+  return `${scheme.header}: ${maskKey(key)}`;
+}
+function buildCardRequest(
+  api: { url?: string; auth?: string; auth2?: string },
+  key: string,
+): { url: string; headers: Record<string, string> } {
+  const headers: Record<string, string> = {};
+  let url = api.url ?? "";
+  if (api.auth) {
+    const scheme = extractAuthScheme(api.auth);
+    if (api.auth === "API key") {
+      url = url + (url.includes("?") ? "&" : "?") + `appid=${encodeURIComponent(key)}`;
+    } else if (scheme.header.toLowerCase() === "authorization") {
+      const first = scheme.value.split(/\s+/)[0] ?? "";
+      headers["Authorization"] = /^(bearer|token|basic)$/i.test(first)
+        ? `${first} ${key}`
+        : key;
+    } else if (scheme.header) {
+      headers[scheme.header] = key;
+    }
+  }
+  if (api.auth2 && api.auth2.includes(":")) {
+    const idx = api.auth2.indexOf(":");
+    headers[api.auth2.slice(0, idx).trim()] = api.auth2.slice(idx + 1).trim();
+  }
+  return { url, headers };
+}
+function cardBodyPreview(body: unknown): string {
+  if (typeof body === "string") {
+    try {
+      return JSON.stringify(JSON.parse(body));
+    } catch {
+      return body;
+    }
+  }
+  try {
+    return body == null ? "" : JSON.stringify(body);
+  } catch {
+    return String(body);
+  }
+}
 function BrowseApiSection({
   compact,
   w1440,
@@ -7215,27 +7291,18 @@ function BrowseApiSection({
     url?: string;
     headers?: Record<string, string>;
     apiName?: string;
-  }) => void;
+    suppressExplain?: boolean;
+  }) =>
+    | Promise<{
+        status?: number | null;
+        time?: number | null;
+        body?: unknown;
+        error?: string;
+        [k: string]: unknown;
+      }>
+    | void;
   onBack: () => void;
 }) {
-  const [activeFilter, setActiveFilter] = useState("Everything");
-  const [hoveredApi, setHoveredApi] = useState<string | null>(null);
-  const [selectedApi, setSelectedApi] = useState<(typeof apis)[number] | null>(
-    null,
-  );
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [showTopBlur, setShowTopBlur] = useState(false);
-  const [showBottomBlur, setShowBottomBlur] = useState(false);
-  const detailBig = !compact;
-  const filters = [
-    "Everything",
-    "Payment",
-    "Auth",
-    "AI",
-    "Data",
-    "Comms",
-    "Quick wins",
-  ];
   const apis: {
     name: string;
     desc: string;
@@ -7259,6 +7326,7 @@ function BrowseApiSection({
     authNote?: string;
     getAKeyUrl?: string;
     infoNote?: string;
+    successLabel?: string;
   }[] = [
     {
       name: "Stripe",
@@ -7271,6 +7339,8 @@ function BrowseApiSection({
       url: "https://api.stripe.com/v1/balance",
       auth: "Authorization: Bearer sk_test....",
       infoNote: "Note: Key is free in test mode",
+      getAKeyUrl: "https://dashboard.stripe.com/apikeys",
+      successLabel: "Balance retrieved",
       height: 205,
     },
     {
@@ -7285,6 +7355,7 @@ function BrowseApiSection({
       auth: "Authorization: Bearer your_secret_key",
       infoNote: "Note: Key is free in test mode",
       getAKeyUrl: "https://dashboard.paystack.com/#/settings/developer",
+      successLabel: "Transaction initialized",
     },
     {
       name: "Clerk",
@@ -7298,6 +7369,7 @@ function BrowseApiSection({
       auth: "Authorization: Bearer your_secret_key",
       infoNote: "Note: Key is free, up to 1m monthly users",
       getAKeyUrl: "https://dashboard.clerk.com/apps",
+      successLabel: "Users fetched",
     },
     {
       name: "WorkOS",
@@ -7311,6 +7383,7 @@ function BrowseApiSection({
       auth: "Authorization: Bearer your_secret_key",
       infoNote: "Note: Key is free, up to 1m monthly users",
       getAKeyUrl: "https://dashboard.workos.com/api-keys",
+      successLabel: "Directories fetched",
     },
     {
       name: "OpenAI",
@@ -7324,6 +7397,7 @@ function BrowseApiSection({
       auth: "Authorization: Bearer your_api_key",
       infoNote: "Note: Key requires billing to use",
       getAKeyUrl: "https://platform.openai.com/api-keys",
+      successLabel: "Models fetched",
     },
     {
       name: "Anthropic",
@@ -7338,6 +7412,7 @@ function BrowseApiSection({
       auth2: "anthropic-version: 2023-06-01",
       infoNote: "Note: Key requires billing to use",
       getAKeyUrl: "https://console.anthropic.com/settings/keys",
+      successLabel: "Models fetched",
     },
     {
       name: "Replicate",
@@ -7351,6 +7426,7 @@ function BrowseApiSection({
       auth: "Authorization: Token your_api_token",
       infoNote: "Note: Key is free, comes with starter credit",
       getAKeyUrl: "https://replicate.com/account/api-tokens",
+      successLabel: "Models fetched",
     },
     {
       name: "OpenWeather",
@@ -7368,6 +7444,7 @@ function BrowseApiSection({
         "Appended to the request as &appid=your_key, never sent as a header",
       infoNote: "Note: Key is free on the standard tier",
       getAKeyUrl: "https://home.openweathermap.org/api_keys",
+      successLabel: "Weather retrieved",
     },
     {
       name: "Resend",
@@ -7380,6 +7457,8 @@ function BrowseApiSection({
       url: "https://api.resend.com/emails",
       auth: "Authorization: Bearer your_api_key",
       infoNote: "Note: Key is free, up to 3k emails/month",
+      getAKeyUrl: "https://resend.com/api-keys",
+      successLabel: "Email queued",
     },
     {
       name: "REST Countries",
@@ -7396,6 +7475,7 @@ function BrowseApiSection({
       logoColor: "#111111",
             height: 201,
       url: "https://restcountries.com/v3.1/name/nigeria",
+      successLabel: "Country fetched",
     },
     {
       name: "Bored API",
@@ -7411,6 +7491,7 @@ function BrowseApiSection({
       logoColor: "#111111",
             height: 201,
       url: "https://bored-api.appbrewery.com/random",
+      successLabel: "Activity fetched",
     },
     {
       name: "Open-Meteo",
@@ -7427,6 +7508,7 @@ function BrowseApiSection({
       logoColor: "#FAFAFA",
             height: 201,
       url: "https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current_weather=true",
+      successLabel: "Weather fetched",
     },
     {
       name: "PokeAPI",
@@ -7443,6 +7525,7 @@ function BrowseApiSection({
       logoColor: "#111111",
             height: 201,
       url: "https://pokeapi.co/api/v2/pokemon/pikachu",
+      successLabel: "Pokemon fetched",
     },
     {
       name: "Dog CEO",
@@ -7459,6 +7542,7 @@ function BrowseApiSection({
       logoColor: "#111111",
             height: 201,
       url: "https://dog.ceo/api/breeds/image/random",
+      successLabel: "Dog photo fetched",
     },
     {
       name: "Advice slip",
@@ -7475,7 +7559,160 @@ function BrowseApiSection({
       logoColor: "#FAFAFA",
             height: 201,
       url: "https://api.adviceslip.com/advice",
+      successLabel: "Advice fetched",
     },
+  ];
+  const [activeFilter, setActiveFilter] = useState("Everything");
+  const [hoveredApi, setHoveredApi] = useState<string | null>(null);
+  const [selectedApi, setSelectedApi] = useState<(typeof apis)[number] | null>(
+    null,
+  );
+  const [cardAuthValue, setCardAuthValue] = useState("");
+  const [cardStatus, setCardStatus] = useState<"idle" | "sending" | "sent">(
+    "idle",
+  );
+  const [cardResult, setCardResult] = useState<{
+    status?: number | null;
+    time?: number | null;
+    body?: unknown;
+    error?: string;
+  } | null>(null);
+  const [cardExpanded, setCardExpanded] = useState(false);
+  const [greenH, setGreenH] = useState(106);
+  const greenRef = useRef<HTMLDivElement | null>(null);
+  const selectApiForCard = (api: (typeof apis)[number]) => {
+    setSelectedApi(api);
+    setCardAuthValue("");
+    setCardStatus("idle");
+    setCardResult(null);
+    setCardExpanded(false);
+  };
+  const runCardRequest = async () => {
+    if (!selectedApi) return;
+    setCardStatus("sending");
+    const key = cardAuthValue?.trim() ? cardAuthValue : "";
+    const { url, headers } = buildCardRequest(selectedApi, key);
+    const data = await onSend({
+      method: "GET",
+      url,
+      headers: Object.keys(headers).length ? headers : undefined,
+      apiName: selectedApi.name,
+      suppressExplain: selectedApi.tag !== "No auth",
+    });
+    setCardResult({
+      status: data?.status,
+      time: data?.time,
+      body: data?.body,
+      error: data?.error,
+    });
+    setCardStatus("sent");
+  };
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const authJustFocusedRef = useRef(false);
+  const [showTopBlur, setShowTopBlur] = useState(false);
+  const [showBottomBlur, setShowBottomBlur] = useState(false);
+  const detailBig = !compact;
+  const cardRequestTop =
+    cardStatus === "sent"
+      ? 73
+      : selectedApi &&
+          (selectedApi.name === "OpenWeather" || selectedApi.name === "Paystack")
+        ? 175
+        : detailBig
+          ? 155
+          : 161;
+  const cardRequestHeight =
+    selectedApi && selectedApi.name === "OpenWeather"
+      ? 170
+      : selectedApi && selectedApi.auth2
+        ? 170
+        : detailBig
+          ? 128
+          : 116;
+  const responseTop =
+    (selectedApi ? cardRequestTop : 0) +
+    (selectedApi ? cardRequestHeight : 0) +
+    16;
+  const cardIdleBodyHeight =
+    selectedApi && selectedApi.name === "OpenWeather"
+      ? 391
+      : selectedApi && selectedApi.name === "Paystack"
+        ? detailBig
+          ? 349
+          : 337
+        : selectedApi && selectedApi.auth2
+          ? detailBig
+            ? 371
+            : 377
+          : detailBig
+            ? 329
+            : 323;
+  const cardBodyHeight =
+    cardStatus === "sent"
+      ? cardRequestTop + cardRequestHeight + 16 + greenH + 12
+      : cardIdleBodyHeight;
+  const cardIdleModalHeight =
+    selectedApi && selectedApi.name === "OpenWeather"
+      ? detailBig
+        ? 479
+        : 477
+      : selectedApi && selectedApi.name === "Paystack"
+        ? detailBig
+          ? 437
+          : 425
+        : selectedApi && selectedApi.auth2
+          ? detailBig
+            ? 459
+            : 469
+          : detailBig
+            ? 417
+            : 415;
+  const cardModalHeight =
+    cardStatus === "sent"
+      ? cardIdleModalHeight - cardIdleBodyHeight + cardBodyHeight
+      : cardIdleModalHeight;
+  const cardIdleModalMarginTop =
+    selectedApi && selectedApi.name === "OpenWeather"
+      ? detailBig
+        ? -239.5
+        : -238.5
+      : selectedApi && selectedApi.name === "Paystack"
+        ? detailBig
+          ? -218.5
+          : -212.5
+        : selectedApi && selectedApi.auth2
+          ? detailBig
+            ? -229.5
+            : -234.5
+          : detailBig
+            ? -208.5
+            : -207.5;
+  const cardModalMarginTop =
+    cardStatus === "sent" ? -cardModalHeight / 2 : cardIdleModalMarginTop;
+  useEffect(() => {
+    const el = greenRef.current;
+    if (cardStatus !== "sent" || !el) return;
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        setGreenH(Math.round(el.getBoundingClientRect().height) || 106);
+      });
+    });
+    ro.observe(el);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [cardStatus, cardResult, cardExpanded]);
+  const filters = [
+    "Everything",
+    "Payment",
+    "Auth",
+    "AI",
+    "Data",
+    "Comms",
+    "Quick wins",
   ];
   const filteredApis =
     activeFilter === "Everything"
@@ -7838,7 +8075,7 @@ function BrowseApiSection({
                     cursor: "pointer",
                   }}
                   onClick={() => {
-                    if (api.tag !== "No auth") setSelectedApi(api);
+                    if (api.tag !== "No auth") selectApiForCard(api);
                   }}
                 >
                   {" "}
@@ -8373,39 +8610,9 @@ function BrowseApiSection({
                 left: "50%",
                 top: "50%",
                 width: 394,
-                height:
-                  selectedApi.name === "OpenWeather"
-                    ? detailBig
-                      ? 479
-                      : 477
-                    : selectedApi.name === "Paystack"
-                      ? detailBig
-                        ? 437
-                        : 425
-                      : selectedApi.auth2
-                        ? detailBig
-                          ? 459
-                          : 469
-                        : detailBig
-                          ? 417
-                          : 415,
+                height: cardModalHeight,
                 marginLeft: -197,
-                marginTop:
-                  selectedApi.name === "OpenWeather"
-                    ? detailBig
-                      ? -239.5
-                      : -238.5
-                    : selectedApi.name === "Paystack"
-                      ? detailBig
-                        ? -218.5
-                        : -212.5
-                      : selectedApi.auth2
-                        ? detailBig
-                          ? -229.5
-                          : -234.5
-                        : detailBig
-                          ? -208.5
-                          : -207.5,
+                marginTop: cardModalMarginTop,
                 zIndex: 80,
                 backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
                 borderRadius: 12,
@@ -8561,20 +8768,7 @@ function BrowseApiSection({
                     left: 12,
                     top: 76,
                     width: 370,
-                    height:
-                      selectedApi.name === "OpenWeather"
-                        ? 391
-                        : selectedApi.name === "Paystack"
-                          ? detailBig
-                            ? 349
-                            : 337
-                          : selectedApi.auth2
-                            ? detailBig
-                              ? 371
-                              : 377
-                            : detailBig
-                              ? 329
-                              : 323,
+                    height: cardBodyHeight,
                     borderRadius: 10,
                     border: isDark
                       ? "0.8px solid #312F2F"
@@ -8630,7 +8824,7 @@ function BrowseApiSection({
                     >
                       {selectedApi.desc}
                     </motion.span>{" "}
-                    {selectedApi.keyDesc ? (
+                    {cardStatus !== "sent" && selectedApi.keyDesc ? (
                       <motion.div
                         variants={cardItemVariants}
                         style={{
@@ -8771,7 +8965,7 @@ function BrowseApiSection({
                           </span>{" "}
                         </div>{" "}
                       </motion.div>
-                    ) : (
+                    ) : cardStatus !== "sent" ? (
                       <motion.div
                         variants={cardItemVariants}
                         style={{
@@ -8834,19 +9028,21 @@ function BrowseApiSection({
                           </span>{" "}
                         </div>{" "}
                       </motion.div>
-                    )}{" "}
+                    ) : null}{" "}
                     <motion.div
                       variants={cardItemVariants}
                       style={{
                         position: "absolute",
                         left: 12,
                         top:
-                          selectedApi.name === "OpenWeather" ||
-                          selectedApi.name === "Paystack"
-                            ? 175
-                            : detailBig
-                              ? 155
-                              : 161,
+                          cardStatus === "sent"
+                            ? 73
+                            : selectedApi.name === "OpenWeather" ||
+                                selectedApi.name === "Paystack"
+                              ? 175
+                              : detailBig
+                                ? 155
+                                : 161,
                         width: 346,
                         height:
                           selectedApi.name === "OpenWeather"
@@ -8965,7 +9161,7 @@ function BrowseApiSection({
                             border: isDark
                               ? "0.8px solid #312F2F"
                               : "0.8px solid #f2f2f2",
-                            backgroundColor: isDark ? "#212121" : "#ffffff",
+                            backgroundColor: "#FAFAFA",
                             boxSizing: "border-box",
                             display: "flex",
                             alignItems: "center",
@@ -8973,20 +9169,78 @@ function BrowseApiSection({
                           }}
                         >
                           {" "}
-                          <span
+                          {cardStatus === "sent" ? (
+                            <span
+                              onClick={() => setCardStatus("idle")}
+                              title="Click to edit key"
+                              style={{
+                                fontFamily: "Geist, var(--font-geist-sans)",
+                                fontSize: detailBig ? 14 : 12,
+                                letterSpacing: detailBig ? "-0.56px" : "-0.48px",
+                                color: isDark ? "#F7F7F7" : "#5A5A5A",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                width: "100%",
+                                cursor: "text",
+                              }}
+                            >
+                              {renderAuthLine(
+                                selectedApi.auth,
+                                cardAuthValue,
+                              )}
+                            </span>
+                          ) : (
+<input
+                            key={selectedApi.name}
+                            type="text"
+                            placeholder={selectedApi.auth}
+                            value={cardAuthValue}
+                            onChange={(e) => setCardAuthValue(e.target.value)}
+                            aria-label="API key"
+                            spellCheck={false}
+                            dir="ltr"
+                            onFocus={() => {
+                              authJustFocusedRef.current = true;
+                            }}
+                            onClick={(e) => {
+                              const el = e.currentTarget;
+                              if (authJustFocusedRef.current) {
+                                authJustFocusedRef.current = false;
+                                el.setSelectionRange(0, 0);
+                                el.scrollLeft = 0;
+                              }
+                            }}
+                            onPaste={(e) => {
+                              const el = e.currentTarget;
+                              requestAnimationFrame(() => {
+                                el.setSelectionRange(0, 0);
+                                el.scrollLeft = 0;
+                              });
+                            }}
+                            className={
+                              isDark
+                                ? "placeholder:text-[#d1d1d1]"
+                                : "placeholder:text-[#9e9e9e]"
+                            }
                             style={{
                               fontFamily: "Geist, var(--font-geist-sans)",
                               fontSize: detailBig ? 14 : 12,
                               letterSpacing: detailBig ? "-0.56px" : "-0.48px",
-                              color: isDark ? "#D1D1D1" : "#9e9e9e",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
+                              color: cardAuthValue
+                                ? isDark
+                                  ? "#5A5A5A"
+                                  : "#595959"
+                                : isDark
+                                  ? "#D1D1D1"
+                                  : "#9e9e9e",
                               width: "100%",
+                              background: "transparent",
+                              border: "none",
+                              outline: "none",
                             }}
-                          >
-                            {selectedApi.auth}
-                          </span>{" "}
+                          />
+                          )}{" "}
                         </div>
                       ) : null}{" "}
                       {selectedApi.auth2 ? (
@@ -9051,8 +9305,117 @@ function BrowseApiSection({
                           </span>{" "}
                         </div>
                       ) : null}{" "}
+                      {cardStatus === "sent" ? (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: 8,
+                            right: 6,
+                            top: selectedApi.authNote
+                              ? detailBig
+                                ? 134
+                                : 124
+                              : selectedApi.auth2
+                                ? detailBig
+                                  ? 134
+                                  : 124
+                                : selectedApi.auth
+                                  ? detailBig
+                                    ? 92
+                                    : 80
+                                  : undefined,
+                            bottom:
+                              !selectedApi.auth &&
+                              !selectedApi.auth2 &&
+                              !selectedApi.authNote
+                                ? 8
+                                : undefined,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            height: 28,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                              height: 28,
+                              padding: "0 8px",
+                              borderRadius: 6,
+                              boxSizing: "border-box",
+                              backgroundColor: isDark ? "#2A2A5E" : "#BFBFFF",
+                            }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                              <path
+                                d="M10.8943 7.16304L7.72766 10.2005C7.63366 10.2907 7.50699 10.3413 7.37433 10.3413C7.24166 10.3413 7.11433 10.2907 7.02033 10.2005L5.43966 8.68176C5.24433 8.49424 5.24433 8.19024 5.43966 8.00272C5.63566 7.8152 5.95233 7.81648 6.14699 8.00272L7.37433 9.18224L10.187 6.48398C10.3823 6.29646 10.699 6.2971 10.8943 6.48398C11.0897 6.6715 11.0897 6.97552 10.8943 7.16304ZM8.16699 2.10254C3.36833 2.10254 1.66699 3.73582 1.66699 8.34256C1.66699 12.9493 3.36833 14.5826 8.16699 14.5826C12.9657 14.5826 14.667 12.9493 14.667 8.34256C14.667 3.73582 12.9657 2.10254 8.16699 2.10254Z"
+                                fill="#ffffff"
+                                fillRule="evenodd"
+                              />
+                            </svg>
+                            <span
+                              style={{
+                                fontFamily: "Geist, var(--font-geist-sans)",
+                                fontSize: 12,
+                                letterSpacing: "-0.48px",
+                                fontWeight: 400,
+                                color: "#ffffff",
+                              }}
+                            >
+                              Sent
+                            </span>
+                          </div>
+                          <div
+                            onClick={() => runCardRequest()}
+                            role="button"
+                            title="Retry"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                              marginLeft: "auto",
+                              height: 28,
+                              boxSizing: "border-box",
+                              color: "#5A5AFF",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                              <path
+                                d="M2 8C2 9.18669 2.35189 10.3467 3.01118 11.3334C3.67047 12.3201 4.60754 13.0892 5.7039 13.5433C6.80026 13.9974 8.00666 14.1162 9.17054 13.8847C10.3344 13.6532 11.4035 13.0818 12.2426 12.2426C13.0818 11.4035 13.6532 10.3344 13.8847 9.17054C14.1162 8.00666 13.9974 6.80026 13.5433 5.7039C13.0892 4.60754 12.3201 3.67047 11.3334 3.01118C10.3467 2.35189 9.18669 2 8 2C7.16903 2.00313 6.34636 2.16556 5.57656 2.47851C4.80677 2.79145 4.10411 3.2491 3.50667 3.82667L2 5.33333"
+                                stroke="#5B5BFF"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M2 2L2 5.33333L5.33333 5.33333"
+                                stroke="#5B5BFF"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            <span
+                              style={{
+                                fontFamily: "Geist, var(--font-geist-sans)",
+                                fontSize: 12,
+                                letterSpacing: "-0.6px",
+                                fontWeight: 500,
+                                color: "#5A5AFF",
+                              }}
+                            >
+                              Retry
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
                       <RippleButton
                         className="transition-colors hover:bg-[#4a4aff]"
+                        disabled={cardStatus === "sending"}
+                        onClick={() => runCardRequest()}
                         style={{
                           position: "absolute",
                           left: 8,
@@ -9083,6 +9446,8 @@ function BrowseApiSection({
                           padding: "6px 6px",
                           height: 28,
                           boxSizing: "border-box",
+                          opacity: cardStatus === "sending" ? 0.6 : 1,
+                          cursor: cardStatus === "sending" ? "not-allowed" : "pointer",
                         }}
                       >
                         {" "}
@@ -9094,8 +9459,9 @@ function BrowseApiSection({
                             color: "#ffffff",
                           }}
                         >
-                          Send
+                          {cardStatus === "sending" ? "Sending" : "Send"}
                         </span>{" "}
+                        {cardStatus !== "sending" ? (
                         <svg
                           width="16"
                           height="16"
@@ -9117,9 +9483,12 @@ function BrowseApiSection({
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           />{" "}
-                        </svg>{" "}
-                      </RippleButton>{" "}
+                        </svg>
+                        ) : null}{" "}
+                      </RippleButton>
+                      )}{" "}
                     </motion.div>{" "}
+                    {cardStatus !== "sent" ? (
                     <motion.div
                       variants={cardItemVariants}
                       style={{
@@ -9176,7 +9545,164 @@ function BrowseApiSection({
                         {selectedApi.infoNote ??
                           "Note: Key requires billing to use"}
                       </span>{" "}
-                    </motion.div>{" "}
+                    </motion.div>
+                      ) : null}{" "}
+                    {cardStatus === "sent" ? (
+                    <motion.div
+                      ref={greenRef}
+                      variants={cardItemVariants}
+                      style={{
+                        position: "absolute",
+                        left: 12,
+                        top: responseTop,
+                        width: 346,
+                        borderRadius: 8,
+                        border: "1px solid #78D9A0",
+                        backgroundColor: "#C5F0CF",
+                        padding: 8,
+                        boxSizing: "border-box",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                        color: "#008000",
+                      }}
+                    >
+                      {(() => {
+                        const ok =
+                          !cardResult?.error &&
+                          (cardResult?.status == null ||
+                            (cardResult.status >= 200 && cardResult.status < 300));
+                        const accent = ok ? "#008000" : "#E5484D";
+                        return (
+                          <>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                  <path
+                                    d="M10.8943 7.16304L7.72766 10.2005C7.63366 10.2907 7.50699 10.3413 7.37433 10.3413C7.24166 10.3413 7.11433 10.2907 7.02033 10.2005L5.43966 8.68176C5.24433 8.49424 5.24433 8.19024 5.43966 8.00272C5.63566 7.8152 5.95233 7.81648 6.14699 8.00272L7.37433 9.18224L10.187 6.48398C10.3823 6.29646 10.699 6.2971 10.8943 6.48398C11.0897 6.6715 11.0897 6.97552 10.8943 7.16304ZM8.16699 2.10254C3.36833 2.10254 1.66699 3.73582 1.66699 8.34256C1.66699 12.9493 3.36833 14.5826 8.16699 14.5826C12.9657 14.5826 14.667 12.9493 14.667 8.34256C14.667 3.73582 12.9657 2.10254 8.16699 2.10254Z"
+                                    fill={accent}
+                                    fillRule="evenodd"
+                                  />
+                                </svg>
+                                <span
+                                  style={{
+                                    fontFamily: "Geist, var(--font-geist-sans)",
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    letterSpacing: "-0.56px",
+                                    color: accent,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {cardResult?.error
+                                    ? "Request failed"
+                                    : ok
+                                      ? selectedApi.successLabel ??
+                                        "Request succeeded"
+                                      : "Request failed"}
+                                </span>
+                              </div>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  fontFamily: "Geist, var(--font-geist-sans)",
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  letterSpacing: "-0.48px",
+                                  color: accent,
+                                  whiteSpace: "nowrap",
+                                  marginLeft: "auto",
+                                }}
+                              >
+                                <span>{cardResult?.status ?? "—"}</span>
+                                <span style={{ fontWeight: 700 }}>•</span>
+                                <span>
+                                  {cardResult?.time != null
+                                    ? `${cardResult.time}ms`
+                                    : "—"}
+                                </span>
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                borderRadius: 6,
+                                backgroundColor: "#FFFFFF",
+                                padding: "8px",
+                                boxSizing: "border-box",
+                                margin: "0 -4px -4px -4px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontFamily: "Geist, var(--font-geist-sans)",
+                                  fontSize: 12,
+                                  fontWeight: 400,
+                                  letterSpacing: "-0.4px",
+                                  color: isDark ? "#D1D1D1" : "#5E5E5E",
+                                  whiteSpace: "pre-wrap",
+                                  wordBreak: "break-word",
+                                  display: cardExpanded
+                                    ? "block"
+                                    : "-webkit-box",
+                                  WebkitLineClamp: cardExpanded
+                                    ? undefined
+                                    : 3,
+                                  WebkitBoxOrient: "vertical",
+                                  maxHeight: cardExpanded ? 88 : undefined,
+                                  overflow: cardExpanded
+                                    ? "auto"
+                                    : "hidden",
+                                }}
+                              >
+                                {cardBodyPreview(cardResult?.body)}
+                              </div>
+                              {cardBodyPreview(cardResult?.body) ? (
+                                <div style={{ marginTop: 8 }}>
+                                  <span
+                                    onClick={() =>
+                                      setCardExpanded(!cardExpanded)
+                                    }
+                                    role="button"
+                                    style={{
+                                      display: "inline-block",
+                                      fontFamily:
+                                        "Geist, var(--font-geist-sans)",
+                                      fontSize: 12,
+                                      fontWeight: 400,
+                                      letterSpacing: "-0.4px",
+                                      color: isDark ? "#D0D0D0" : "#5E5E5E",
+                                      backgroundColor: isDark
+                                        ? "#212121"
+                                        : "#F7F7F7",
+                                      borderRadius: 4,
+                                      padding: "3px 8px",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    {cardExpanded ? "Collapse" : "Expand"}
+                                  </span>
+                                </div>
+                              ) : null}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </motion.div>
+                      ) : null}{" "}
                   </motion.div>{" "}
                 </div>{" "}
               </motion.div>{" "}

@@ -6,15 +6,33 @@
 - Local:         http://localhost:3000
 - Network:       http://192.168.100.29:3000
 - Environments: .env.local
-✓ Ready in 1464ms
+✓ Ready in 10.3s
 
- GET / 200 in 1021ms (next.js: 509ms, application-code: 512ms)
- POST /api/explain 500 in 3.1s (next.js: 491ms, application-code: 2.6s)
- POST /api/explain 500 in 3.6s (next.js: 1075ms, application-code: 2.5s)
- POST /api/explain 500 in 3.9s (next.js: 8ms, application-code: 3.9s)
- POST /api/explain 500 in 5.3s (next.js: 7ms, application-code: 5.3s)
- POST /api/explain 200 in 8.6s (next.js: 5ms, application-code: 8.6s)
- POST /api/explain 500 in 1897ms (next.js: 7ms, application-code: 1890ms)
- POST /api/explain 500 in 5.4s (next.js: 302ms, application-code: 5.1s)
- POST /api/explain 200 in 7.3s (next.js: 16ms, application-code: 7.3s)
- POST /api/explain 200 in 754ms (next.js: 8ms, application-code: 746ms)
+ GET / 200 in 1789ms (next.js: 1331ms, application-code: 459ms)
+ GET / 200 in 126ms (next.js: 16ms, application-code: 110ms)
+ POST /api/proxy 200 in 1115ms (next.js: 386ms, application-code: 729ms)
+ GET / 200 in 173ms (next.js: 19ms, application-code: 153ms)
+ POST /api/proxy 200 in 461ms (next.js: 9ms, application-code: 452ms)
+ GET / 200 in 257ms (next.js: 17ms, application-code: 240ms)
+ POST /api/proxy 200 in 458ms (next.js: 6ms, application-code: 452ms)
+ GET / 200 in 74ms (next.js: 19ms, application-code: 55ms)
+ GET / 200 in 51ms (next.js: 11ms, application-code: 40ms)
+ POST /api/proxy 200 in 657ms (next.js: 5ms, application-code: 652ms)
+ GET / 200 in 118ms (next.js: 28ms, application-code: 91ms)
+ POST /api/proxy 200 in 745ms (next.js: 5ms, application-code: 740ms)
+ POST /api/proxy 200 in 630ms (next.js: 5ms, application-code: 625ms)
+✓ Compiled in 6.1s
+✓ Compiled in 846ms
+ GET / 200 in 1917ms (next.js: 1654ms, application-code: 263ms)
+✓ Compiled in 588ms
+ GET / 200 in 1578ms (next.js: 932ms, application-code: 646ms)
+ GET / 200 in 384ms (next.js: 277ms, application-code: 107ms)
+✓ Compiled in 521ms
+ GET / 200 in 530ms (next.js: 399ms, application-code: 131ms)
+✓ Compiled in 7.5s
+ GET / 200 in 1699ms (next.js: 1219ms, application-code: 480ms)
+✓ Finished filesystem cache database compaction in 10.3s
+✓ Compiled in 209ms
+ GET / 200 in 222ms (next.js: 166ms, application-code: 56ms)
+✓ Compiled in 271ms
+ GET / 200 in 260ms (next.js: 195ms, application-code: 65ms)
