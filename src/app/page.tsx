@@ -312,6 +312,11 @@ export default function Home() {
           setResponse(data);
           setHeadersFilter("common");
         }
+        if (opts?.apiName && !opts?.suppressExplain) {
+          setResponseKey((k) => k + 1);
+          setResponse(data);
+          setHeadersFilter("common");
+        }
         const entry = {
           method: m,
           url: u,
@@ -388,6 +393,11 @@ export default function Home() {
           setResponse({ error: "Network error" });
           setHeadersFilter("common");
         }
+        if (opts?.apiName && !opts?.suppressExplain) {
+          setResponseKey((k) => k + 1);
+          setResponse({ error: "Network error" });
+          setHeadersFilter("common");
+        }
         if (popupTimerRef.current) {
           clearTimeout(popupTimerRef.current);
           popupTimerRef.current = null;
@@ -441,36 +451,54 @@ export default function Home() {
       streak,
     ],
   );
-  const openExplain = useCallback(async () => {
-    if (!explainCtx || !response) return;
-    setExplainPopupOpen(false);
-    setExplainPanelOpen(true);
-    setExplainLoading(true);
-    setExplainError(false);
-    setExplainData(null);
-    try {
-      const res = await fetch("/api/explain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: explainCtx.url,
-          apiName: explainCtx.apiName,
-          status: response.status ?? 0,
-          body: response.body ?? "",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
+  const openExplain = useCallback(
+    async (override?: { status?: number; body?: string }) => {
+      if (!explainCtx) return;
+      setExplainPopupOpen(false);
+      setExplainPanelOpen(true);
+      setExplainLoading(true);
+      setExplainError(false);
+      setExplainData(null);
+      try {
+        const res = await fetch("/api/explain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: explainCtx.url,
+            apiName: explainCtx.apiName,
+            status: override?.status ?? response?.status ?? 0,
+            body: override?.body ?? response?.body ?? "",
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setExplainError(true);
+          return;
+        }
+        setExplainData(data as ExplainPayload);
+      } catch {
         setExplainError(true);
-        return;
+      } finally {
+        setExplainLoading(false);
       }
-      setExplainData(data as ExplainPayload);
-    } catch {
-      setExplainError(true);
-    } finally {
-      setExplainLoading(false);
-    }
-  }, [explainCtx, response]);
+    },
+    [explainCtx, response],
+  );
+  const handleCardAnalyze = useCallback(
+    (result: { status?: number | null; time?: number | null; body?: unknown }) => {
+      const body =
+        typeof result?.body === "string"
+          ? result.body
+          : JSON.stringify(result?.body ?? "");
+      setResponse({
+        status: result?.status ?? undefined,
+        time: result?.time ?? undefined,
+        body,
+      });
+      openExplain({ status: result?.status ?? undefined, body });
+    },
+    [openExplain],
+  );
   const closeExplain = useCallback((event?: { preventDefault: () => void }) => {
     event?.preventDefault();
     setExplainPanelOpen(false);
@@ -658,6 +686,7 @@ export default function Home() {
               explainData={explainData}
               onOpenExplain={openExplain}
               onCloseExplain={closeExplain}
+              onAnalyze={handleCardAnalyze}
             />{" "}
           </motion.div>{" "}
         </div>{" "}
@@ -4253,6 +4282,7 @@ function MainContent({
   explainData,
   onOpenExplain,
   onCloseExplain,
+  onAnalyze,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -4302,6 +4332,11 @@ function MainContent({
   explainData: ExplainPayload | null;
   onOpenExplain: () => void;
   onCloseExplain: () => void;
+  onAnalyze?: (result: {
+    status?: number | null;
+    time?: number | null;
+    body?: unknown;
+  }) => void;
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
@@ -4464,6 +4499,7 @@ function MainContent({
                   isDark={isDark}
                   onSend={onSend}
                   onBack={() => setShowBrowseApi(false)}
+                  onAnalyze={onAnalyze}
                 />
               )}{" "}
               {!response && !loading && !showBrowseApi && (
@@ -7276,12 +7312,73 @@ function cardBodyPreview(body: unknown): string {
     return String(body);
   }
 }
+function jsonHighlight(body: unknown) {
+  let text = "";
+  if (typeof body === "string") {
+    try {
+      text = JSON.stringify(JSON.parse(body), null, 2);
+    } catch {
+      text = body;
+    }
+  } else if (body != null) {
+    try {
+      text = JSON.stringify(body, null, 2);
+    } catch {
+      text = String(body);
+    }
+  }
+  if (!text) return null;
+  const out: React.ReactNode[] = [];
+  let i = 0;
+  const n = text.length;
+  while (i < n) {
+    const ch = text[i];
+    let tok = "";
+    let color = "#5E5E5E";
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < n && text[j] !== '"') {
+        if (text[j] === "\\") j++;
+        j++;
+      }
+      j = Math.min(j + 1, n);
+      tok = text.slice(i, j);
+      let k = j;
+      while (k < n && /\s/.test(text[k])) k++;
+      color = text[k] === ":" ? "#1A75E1" : "#008000";
+    } else if (/[\d-]/.test(ch)) {
+      const m = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(text.slice(i));
+      tok = m && m.index === 0 ? m[0] : ch;
+      color = "#9D6900";
+    } else if (/[a-zA-Z]/.test(ch)) {
+      const m = /true|false|null/.exec(text.slice(i));
+      tok = m && m.index === 0 ? m[0] : ch;
+      color = "#9D6900";
+    } else if (/[{}[\],:]/.test(ch)) {
+      tok = ch;
+    } else {
+      let w = i;
+      while (w < n && !/["\d\-a-zA-Z{}[\],:]/.test(text[w])) w++;
+      out.push(<span key={out.length}>{text.slice(i, w)}</span>);
+      i = w;
+      continue;
+    }
+    out.push(
+      <span key={out.length} style={{ color }}>
+        {tok}
+      </span>,
+    );
+    i += tok.length;
+  }
+  return out;
+}
 function BrowseApiSection({
   compact,
   w1440,
   isDark,
   onSend,
   onBack,
+  onAnalyze,
 }: {
   compact?: boolean;
   w1440?: boolean;
@@ -7302,6 +7399,11 @@ function BrowseApiSection({
       }>
     | void;
   onBack: () => void;
+  onAnalyze?: (result: {
+    status?: number | null;
+    time?: number | null;
+    body?: unknown;
+  }) => void;
 }) {
   const apis: {
     name: string;
@@ -7578,6 +7680,9 @@ function BrowseApiSection({
     error?: string;
   } | null>(null);
   const [cardExpanded, setCardExpanded] = useState(false);
+  const [cardRetryFaded, setCardRetryFaded] = useState(false);
+  const [cardCopied, setCardCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [greenH, setGreenH] = useState(106);
   const greenRef = useRef<HTMLDivElement | null>(null);
   const selectApiForCard = (api: (typeof apis)[number]) => {
@@ -7607,6 +7712,18 @@ function BrowseApiSection({
     });
     setCardStatus("sent");
   };
+  const handleCardCopy = () => {
+    const text = cardBodyPreview(cardResult?.body);
+    if (!text) return;
+    navigator.clipboard
+      ?.writeText(text)
+      .then(() => {
+        setCardCopied(true);
+        if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = setTimeout(() => setCardCopied(false), 1200);
+      })
+      .catch(() => {});
+  };
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const authJustFocusedRef = useRef(false);
   const [showTopBlur, setShowTopBlur] = useState(false);
@@ -7629,10 +7746,12 @@ function BrowseApiSection({
         : detailBig
           ? 128
           : 116;
+  const effRequestHeight =
+    cardStatus === "sent" && cardExpanded ? 0 : cardRequestHeight;
   const responseTop =
     (selectedApi ? cardRequestTop : 0) +
-    (selectedApi ? cardRequestHeight : 0) +
-    16;
+    (selectedApi ? effRequestHeight : 0) +
+    (effRequestHeight === 0 ? 0 : 16);
   const cardIdleBodyHeight =
     selectedApi && selectedApi.name === "OpenWeather"
       ? 391
@@ -7649,7 +7768,7 @@ function BrowseApiSection({
             : 323;
   const cardBodyHeight =
     cardStatus === "sent"
-      ? cardRequestTop + cardRequestHeight + 16 + greenH + 12
+      ? responseTop + greenH + 12
       : cardIdleBodyHeight;
   const cardIdleModalHeight =
     selectedApi && selectedApi.name === "OpenWeather"
@@ -7669,7 +7788,8 @@ function BrowseApiSection({
             : 415;
   const cardModalHeight =
     cardStatus === "sent"
-      ? cardIdleModalHeight - cardIdleBodyHeight + cardBodyHeight
+      ? cardIdleModalHeight - cardIdleBodyHeight + cardBodyHeight +
+          (cardExpanded ? 122 : 0)
       : cardIdleModalHeight;
   const cardIdleModalMarginTop =
     selectedApi && selectedApi.name === "OpenWeather"
@@ -8601,10 +8721,14 @@ function BrowseApiSection({
             />{" "}
             <motion.div
               key="api-modal"
-              initial={{ opacity: 0, y: 24, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 24, scale: 0.96 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              transition={{
+                scale: { type: "spring", stiffness: 350, damping: 26, mass: 0.8 },
+                y: { type: "spring", stiffness: 350, damping: 26, mass: 0.8 },
+                opacity: { duration: 0.18, ease: "easeOut" },
+              }}
               style={{
                 position: "fixed",
                 left: "50%",
@@ -8899,7 +9023,7 @@ function BrowseApiSection({
                               textDecoration: "none",
                             }}
                           >
-                            Get a key
+                            Get a new key
                           </a>
                         ) : (
                           <span
@@ -8919,7 +9043,7 @@ function BrowseApiSection({
                               cursor: "pointer",
                             }}
                           >
-                            Get a key
+                            Get a new key
                           </span>
                         )}{" "}
                         <div
@@ -9031,6 +9155,11 @@ function BrowseApiSection({
                     ) : null}{" "}
                     <motion.div
                       variants={cardItemVariants}
+                      animate={{
+                        opacity: cardExpanded ? 0 : 1,
+                        y: 0,
+                        transition: { duration: 0.22, ease: "easeInOut" },
+                      }}
                       style={{
                         position: "absolute",
                         left: 12,
@@ -9044,20 +9173,15 @@ function BrowseApiSection({
                                 ? 155
                                 : 161,
                         width: 346,
-                        height:
-                          selectedApi.name === "OpenWeather"
-                            ? 170
-                            : selectedApi.auth2
-                              ? 170
-                              : detailBig
-                                ? 128
-                                : 116,
+                        height: cardRequestHeight,
                         borderRadius: 8,
                         border: isDark
                           ? "0.8px solid #312F2F"
                           : "0.8px solid #f2f2f2",
                         backgroundColor: isDark ? "#0F0F0F" : "#ffffff",
                         boxSizing: "border-box",
+                        overflow: "hidden",
+                        pointerEvents: cardExpanded ? "none" : "auto",
                       }}
                     >
                       {" "}
@@ -9161,7 +9285,8 @@ function BrowseApiSection({
                             border: isDark
                               ? "0.8px solid #312F2F"
                               : "0.8px solid #f2f2f2",
-                            backgroundColor: "#FAFAFA",
+                            backgroundColor:
+                              cardStatus === "sent" ? "#FAFAFA" : "#FFFFFF",
                             boxSizing: "border-box",
                             display: "flex",
                             alignItems: "center",
@@ -9171,8 +9296,6 @@ function BrowseApiSection({
                           {" "}
                           {cardStatus === "sent" ? (
                             <span
-                              onClick={() => setCardStatus("idle")}
-                              title="Click to edit key"
                               style={{
                                 fontFamily: "Geist, var(--font-geist-sans)",
                                 fontSize: detailBig ? 14 : 12,
@@ -9182,7 +9305,6 @@ function BrowseApiSection({
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 width: "100%",
-                                cursor: "text",
                               }}
                             >
                               {renderAuthLine(
@@ -9368,7 +9490,14 @@ function BrowseApiSection({
                             </span>
                           </div>
                           <div
-                            onClick={() => runCardRequest()}
+                            onClick={() => {
+                              if (cardRetryFaded) return;
+                              setCardRetryFaded(true);
+                              window.setTimeout(() => {
+                                setCardStatus("idle");
+                                setCardRetryFaded(false);
+                              }, 260);
+                            }}
                             role="button"
                             title="Retry"
                             style={{
@@ -9378,21 +9507,22 @@ function BrowseApiSection({
                               marginLeft: "auto",
                               height: 28,
                               boxSizing: "border-box",
-                              color: "#5A5AFF",
-                              cursor: "pointer",
+                              color: cardRetryFaded ? "#BFBFFF" : "#5A5AFF",
+                              cursor: cardRetryFaded ? "default" : "pointer",
+                              transition: "color 0.26s ease",
                             }}
                           >
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                               <path
                                 d="M2 8C2 9.18669 2.35189 10.3467 3.01118 11.3334C3.67047 12.3201 4.60754 13.0892 5.7039 13.5433C6.80026 13.9974 8.00666 14.1162 9.17054 13.8847C10.3344 13.6532 11.4035 13.0818 12.2426 12.2426C13.0818 11.4035 13.6532 10.3344 13.8847 9.17054C14.1162 8.00666 13.9974 6.80026 13.5433 5.7039C13.0892 4.60754 12.3201 3.67047 11.3334 3.01118C10.3467 2.35189 9.18669 2 8 2C7.16903 2.00313 6.34636 2.16556 5.57656 2.47851C4.80677 2.79145 4.10411 3.2491 3.50667 3.82667L2 5.33333"
-                                stroke="#5B5BFF"
+                                stroke={cardRetryFaded ? "#BFBFFF" : "#5B5BFF"}
                                 strokeWidth="1.5"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                               />
                               <path
                                 d="M2 2L2 5.33333L5.33333 5.33333"
-                                stroke="#5B5BFF"
+                                stroke={cardRetryFaded ? "#BFBFFF" : "#5B5BFF"}
                                 strokeWidth="1.5"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -9404,7 +9534,7 @@ function BrowseApiSection({
                                 fontSize: 12,
                                 letterSpacing: "-0.6px",
                                 fontWeight: 500,
-                                color: "#5A5AFF",
+                                color: cardRetryFaded ? "#BFBFFF" : "#5A5AFF",
                               }}
                             >
                               Retry
@@ -9558,7 +9688,7 @@ function BrowseApiSection({
                         width: 346,
                         borderRadius: 8,
                         border: "1px solid #78D9A0",
-                        backgroundColor: "#C5F0CF",
+                        backgroundColor: "#D6FFD6",
                         padding: 8,
                         boxSizing: "border-box",
                         display: "flex",
@@ -9619,22 +9749,31 @@ function BrowseApiSection({
                                   display: "flex",
                                   alignItems: "center",
                                   gap: 6,
-                                  fontFamily: "Geist, var(--font-geist-sans)",
+                                  marginLeft: "auto",
+                                }}
+                              >
+<div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  fontFamily:
+                                    "Geist, var(--font-geist-sans)",
                                   fontSize: 12,
                                   fontWeight: 500,
                                   letterSpacing: "-0.48px",
                                   color: accent,
                                   whiteSpace: "nowrap",
-                                  marginLeft: "auto",
                                 }}
                               >
                                 <span>{cardResult?.status ?? "—"}</span>
                                 <span style={{ fontWeight: 700 }}>•</span>
-                                <span>
-                                  {cardResult?.time != null
-                                    ? `${cardResult.time}ms`
-                                    : "—"}
-                                </span>
+<span>
+                                    {cardResult?.time != null
+                                      ? `${cardResult.time}ms`
+                                      : "—"}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                             <div
@@ -9647,6 +9786,7 @@ function BrowseApiSection({
                               }}
                             >
                               <div
+                                className="hide-scrollbar"
                                 style={{
                                   fontFamily: "Geist, var(--font-geist-sans)",
                                   fontSize: 12,
@@ -9662,23 +9802,30 @@ function BrowseApiSection({
                                     ? undefined
                                     : 3,
                                   WebkitBoxOrient: "vertical",
-                                  maxHeight: cardExpanded ? 88 : undefined,
+                                  maxHeight: cardExpanded ? 201 : undefined,
                                   overflow: cardExpanded
                                     ? "auto"
                                     : "hidden",
                                 }}
                               >
-                                {cardBodyPreview(cardResult?.body)}
+                                {jsonHighlight(cardResult?.body)}
                               </div>
                               {cardBodyPreview(cardResult?.body) ? (
-                                <div style={{ marginTop: 8 }}>
-                                  <span
-                                    onClick={() =>
-                                      setCardExpanded(!cardExpanded)
-                                    }
-                                    role="button"
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    marginTop: 8,
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={handleCardCopy}
                                     style={{
-                                      display: "inline-block",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 4,
                                       fontFamily:
                                         "Geist, var(--font-geist-sans)",
                                       fontSize: 12,
@@ -9688,13 +9835,77 @@ function BrowseApiSection({
                                       backgroundColor: isDark
                                         ? "#212121"
                                         : "#F7F7F7",
-                                      borderRadius: 4,
+                                      borderRadius: 6,
                                       padding: "3px 8px",
                                       cursor: "pointer",
+                                      border: "none",
+                                      whiteSpace: "nowrap",
+                                      height: 24,
+                                      boxSizing: "border-box",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    <svg
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 16 16"
+                                      fill="none"
+                                      style={{ flexShrink: 0 }}
+                                    >
+                                      <rect
+                                        x="5"
+                                        y="5"
+                                        width="9"
+                                        height="9"
+                                        rx="2"
+                                        stroke={
+                                          isDark ? "#D0D0D0" : "#5E5E5E"
+                                        }
+                                        strokeWidth="1.3"
+                                      />
+                                      <path
+                                        d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2"
+                                        stroke={
+                                          isDark ? "#D0D0D0" : "#5E5E5E"
+                                        }
+                                        strokeWidth="1.3"
+                                        strokeLinecap="round"
+                                      />
+                                    </svg>
+                                    <span>
+                                      {cardCopied ? "Copied" : "Copy"}
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setCardExpanded(!cardExpanded)
+                                    }
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                      fontFamily:
+                                        "Geist, var(--font-geist-sans)",
+                                      fontSize: 12,
+                                      fontWeight: 400,
+                                      letterSpacing: "-0.4px",
+                                      color: isDark ? "#D0D0D0" : "#5E5E5E",
+                                      backgroundColor: isDark
+                                        ? "#212121"
+                                        : "#F7F7F7",
+                                      borderRadius: 6,
+                                      padding: "3px 8px",
+                                      cursor: "pointer",
+                                      border: "none",
+                                      whiteSpace: "nowrap",
+                                      height: 24,
+                                      boxSizing: "border-box",
+                                      flexShrink: 0,
                                     }}
                                   >
                                     {cardExpanded ? "Collapse" : "Expand"}
-                                  </span>
+                                  </button>
                                 </div>
                               ) : null}
                             </div>
@@ -9705,6 +9916,143 @@ function BrowseApiSection({
                       ) : null}{" "}
                   </motion.div>{" "}
                 </div>{" "}
+                {cardStatus === "sent" && cardExpanded && onAnalyze ? (
+                <motion.div
+                  variants={cardItemVariants}
+                  style={{
+                    position: "absolute",
+                    left: 12,
+                    top: 76 + cardBodyHeight + 12,
+                    width: 370,
+                    height: 110,
+                    boxSizing: "border-box",
+                    borderRadius: 10,
+                    backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
+                    border: isDark
+                      ? "0.8px solid #2d2d2d"
+                      : "0.8px solid #f2f2f2",
+                    padding: 12,
+                  }}
+                >
+                  {" "}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        flexShrink: 0,
+                        overflow: "hidden",
+                        position: "relative",
+                      }}
+                    >
+                      <img
+                        src="/explain-avatar.png"
+                        alt=""
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display =
+                            "none";
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          height: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                        >
+                          <path
+                            d="M8 1.5L9.56 5.92L14 7.5L9.56 9.08L8 13.5L6.44 9.08L2 7.5L6.44 5.92L8 1.5Z"
+                            fill="#ffffff"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                    <RippleButton
+                      className="transition-colors hover:bg-[#4a4aff]"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: 28,
+                        width: 81,
+                        borderRadius: 6,
+                        backgroundColor: "#5A5AFF",
+                        color: "#ffffff",
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 12,
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                      }}
+                      onClick={() => {
+                        if (onAnalyze && cardResult) {
+                          onAnalyze({
+                            status: cardResult.status,
+                            time: cardResult.time,
+                            body: cardResult.body,
+                          });
+                        }
+                      }}
+                    >
+                      Analyze now
+                    </RippleButton>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      marginTop: 12,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        fontWeight: 500,
+                        letterSpacing: "-0.4px",
+                        color: isDark ? "#ffffff" : "#222222",
+                      }}
+                    >
+                      Want this explained?
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        letterSpacing: "-0.4px",
+                        color: "#939393",
+                      }}
+                    >
+                      Who it&rsquo;s for, what it does, and an idea to build
+                      with it.
+                    </span>
+                  </div>
+                </motion.div>
+                ) : null}{" "}
               </motion.div>{" "}
             </motion.div>{" "}
           </>

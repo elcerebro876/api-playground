@@ -38,3 +38,258 @@
  GET / 200 in 260ms (next.js: 195ms, application-code: 65ms)
 ✓ Compiled in 299ms
  GET / 200 in 250ms (next.js: 202ms, application-code: 48ms)
+ POST /api/proxy 200 in 1305ms (next.js: 430ms, application-code: 875ms)
+✓ Compiled in 1173ms
+ GET / 200 in 1607ms (next.js: 1305ms, application-code: 302ms)
+✓ Compiled in 272ms
+ GET / 200 in 603ms (next.js: 493ms, application-code: 110ms)
+✓ Compiled in 538ms
+ GET / 200 in 390ms (next.js: 307ms, application-code: 84ms)
+✓ Compiled in 465ms
+ GET / 200 in 322ms (next.js: 241ms, application-code: 81ms)
+✓ Compiled in 367ms
+ GET / 200 in 558ms (next.js: 424ms, application-code: 135ms)
+✓ Compiled in 471ms
+ GET / 200 in 757ms (next.js: 617ms, application-code: 139ms)
+✓ Compiled in 776ms
+ GET / 200 in 1115ms (next.js: 997ms, application-code: 118ms)
+ POST /api/proxy 200 in 1311ms (next.js: 299ms, application-code: 1011ms)
+ POST /api/proxy 200 in 615ms (next.js: 6ms, application-code: 609ms)
+ POST /api/proxy 200 in 633ms (next.js: 15ms, application-code: 619ms)
+ POST /api/proxy 200 in 916ms (next.js: 18ms, application-code: 898ms)
+✓ Compiled in 1317ms
+ GET / 200 in 559ms (next.js: 438ms, application-code: 120ms)
+✓ Compiled in 335ms
+ GET / 200 in 398ms (next.js: 307ms, application-code: 92ms)
+✓ Compiled in 512ms
+ GET / 200 in 478ms (next.js: 356ms, application-code: 122ms)
+✓ Compiled in 522ms
+ GET / 200 in 384ms (next.js: 286ms, application-code: 98ms)
+✓ Compiled in 375ms
+ GET / 200 in 781ms (next.js: 610ms, application-code: 171ms)
+✓ Compiled in 482ms
+ GET / 200 in 271ms (next.js: 210ms, application-code: 60ms)
+✓ Compiled in 451ms
+ GET / 200 in 361ms (next.js: 257ms, application-code: 104ms)
+✓ Compiled in 425ms
+ GET / 200 in 396ms (next.js: 299ms, application-code: 98ms)
+✓ Compiled in 517ms
+ GET / 200 in 382ms (next.js: 289ms, application-code: 93ms)
+✓ Compiled in 781ms
+ GET / 200 in 432ms (next.js: 331ms, application-code: 102ms)
+✓ Compiled in 500ms
+ GET / 200 in 230ms (next.js: 181ms, application-code: 49ms)
+✓ Compiled in 317ms
+ GET / 200 in 288ms (next.js: 225ms, application-code: 63ms)
+✓ Compiled in 342ms
+ GET / 200 in 341ms (next.js: 268ms, application-code: 73ms)
+✓ Compiled in 339ms
+ GET / 200 in 433ms (next.js: 320ms, application-code: 113ms)
+✓ Compiled in 442ms
+ GET / 200 in 434ms (next.js: 346ms, application-code: 89ms)
+✓ Compiled in 556ms
+ GET / 200 in 278ms (next.js: 205ms, application-code: 72ms)
+✓ Compiled in 551ms
+ GET / 200 in 425ms (next.js: 351ms, application-code: 75ms)
+ POST /api/proxy 200 in 1015ms (next.js: 136ms, application-code: 879ms)
+⨯ ./src/app/page.tsx:9796:29
+Expression expected
+  [90m9794 |[0m                               </div>
+  [90m9795 |[0m                             </div>
+[31m[1m>[0m [90m9796 |[0m                           </>
+  [90m     |[0m                             [31m[1m^[0m
+  [90m9797 |[0m                         );
+  [90m9798 |[0m                       })()}
+  [90m9799 |[0m                     </motion.div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+✓ Compiled in 2.1s
+ GET / 500 in 4.8s (next.js: 2.9s, application-code: 1885ms)
+⨯ ./src/app/page.tsx:9796:29
+Expression expected
+  [90m9794 |[0m                               </div>
+  [90m9795 |[0m                             </div>
+[31m[1m>[0m [90m9796 |[0m                           </>
+  [90m     |[0m                             [31m[1m^[0m
+  [90m9797 |[0m                         );
+  [90m9798 |[0m                       })()}
+  [90m9799 |[0m                     </motion.div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 44ms (next.js: 28ms, application-code: 16ms)
+⨯ ./src/app/page.tsx:9796:29
+Expression expected
+  [90m9794 |[0m                               </div>
+  [90m9795 |[0m                             </div>
+[31m[1m>[0m [90m9796 |[0m                           </>
+  [90m     |[0m                             [31m[1m^[0m
+  [90m9797 |[0m                         );
+  [90m9798 |[0m                       })()}
+  [90m9799 |[0m                     </motion.div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+⨯ ./src/app/page.tsx:9796:29
+Expression expected
+  [90m9794 |[0m                               </div>
+  [90m9795 |[0m                             </div>
+[31m[1m>[0m [90m9796 |[0m                           </>
+  [90m     |[0m                             [31m[1m^[0m
+  [90m9797 |[0m                         );
+  [90m9798 |[0m                       })()}
+  [90m9799 |[0m                     </motion.div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 57ms (next.js: 24ms, application-code: 33ms)
+ GET / 500 in 55ms (next.js: 38ms, application-code: 17ms)
+⨯ ./src/app/page.tsx:9796:29
+Expression expected
+  [90m9794 |[0m                               </div>
+  [90m9795 |[0m                             </div>
+[31m[1m>[0m [90m9796 |[0m                           </>
+  [90m     |[0m                             [31m[1m^[0m
+  [90m9797 |[0m                         );
+  [90m9798 |[0m                       })()}
+  [90m9799 |[0m                     </motion.div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+[browser] Uncaught Error: ./src/app/page.tsx:9796:29
+Expression expected
+  9794 |                               </div>
+  9795 |                             </div>
+> 9796 |                           </>
+       |                             ^
+  9797 |                         );
+  9798 |                       })()}
+  9799 |                     </motion.div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:9796:29)
+    at <unknown> (Error: (./src/app/page.tsx:9796:29)
+✓ Compiled in 340ms
+ GET / 200 in 967ms (next.js: 188ms, application-code: 779ms)
+ POST /api/proxy 200 in 744ms (next.js: 80ms, application-code: 664ms)
+ POST /api/proxy 200 in 558ms (next.js: 6ms, application-code: 552ms)
+✓ Compiled in 200ms
+ GET / 200 in 221ms (next.js: 172ms, application-code: 49ms)
+✓ Compiled in 270ms
+ GET / 200 in 396ms (next.js: 216ms, application-code: 180ms)
+✓ Compiled in 339ms
+ GET / 200 in 384ms (next.js: 297ms, application-code: 86ms)
+✓ Compiled in 479ms
+ GET / 200 in 433ms (next.js: 336ms, application-code: 97ms)
+✓ Compiled in 486ms
+ GET / 200 in 804ms (next.js: 717ms, application-code: 87ms)
+✓ Compiled in 367ms
+ GET / 200 in 391ms (next.js: 294ms, application-code: 97ms)
+ GET / 200 in 753ms (next.js: 12ms, application-code: 741ms)
+ POST /api/proxy 200 in 940ms (next.js: 249ms, application-code: 691ms)
+✓ Compiled in 294ms
+ GET / 200 in 264ms (next.js: 210ms, application-code: 54ms)
+✓ Compiled in 384ms
+ GET / 200 in 431ms (next.js: 341ms, application-code: 91ms)
+✓ Compiled in 343ms
+ GET / 200 in 257ms (next.js: 206ms, application-code: 51ms)
+✓ Compiled in 381ms
+ GET / 200 in 258ms (next.js: 205ms, application-code: 53ms)
+✓ Compiled in 396ms
+ GET / 200 in 243ms (next.js: 192ms, application-code: 51ms)
+✓ Compiled in 405ms
+ GET / 200 in 440ms (next.js: 347ms, application-code: 93ms)
+✓ Compiled in 1027ms
+ GET / 200 in 600ms (next.js: 495ms, application-code: 105ms)
+✓ Compiled in 833ms
+ GET / 200 in 974ms (next.js: 714ms, application-code: 260ms)
+✓ Compiled in 308ms
+ GET / 200 in 319ms (next.js: 245ms, application-code: 74ms)
+✓ Compiled in 209ms
+ GET / 200 in 415ms (next.js: 298ms, application-code: 117ms)
+✓ Compiled in 237ms
+ GET / 200 in 242ms (next.js: 195ms, application-code: 48ms)
+ POST /api/proxy 200 in 877ms (next.js: 56ms, application-code: 821ms)
+ POST /api/proxy 200 in 245ms (next.js: 5ms, application-code: 239ms)
+ POST /api/proxy 200 in 250ms (next.js: 7ms, application-code: 244ms)
+ POST /api/proxy 200 in 251ms (next.js: 6ms, application-code: 246ms)
+ POST /api/proxy 200 in 246ms (next.js: 5ms, application-code: 241ms)
+ POST /api/proxy 200 in 1200ms (next.js: 6ms, application-code: 1195ms)
+ POST /api/proxy 200 in 1041ms (next.js: 7ms, application-code: 1033ms)
+ GET / 200 in 304ms (next.js: 9ms, application-code: 294ms)
+ POST /api/proxy 200 in 650ms (next.js: 5ms, application-code: 644ms)
+✓ Compiled in 340ms
+ GET / 200 in 298ms (next.js: 221ms, application-code: 77ms)
+✓ Compiled in 233ms
+ GET / 200 in 440ms (next.js: 341ms, application-code: 99ms)
+ GET / 200 in 323ms (next.js: 10ms, application-code: 313ms)
+ POST /api/proxy 200 in 790ms (next.js: 60ms, application-code: 730ms)
+ POST /api/proxy 200 in 721ms (next.js: 6ms, application-code: 715ms)
+ POST /api/explain 500 in 14.6s (next.js: 582ms, application-code: 14.0s)
+ POST /api/explain 200 in 13.6s (next.js: 6ms, application-code: 13.6s)
+✓ Compiled in 903ms
+ GET / 200 in 1180ms (next.js: 1005ms, application-code: 175ms)
+✓ Compiled in 758ms
+ GET / 200 in 436ms (next.js: 351ms, application-code: 86ms)
