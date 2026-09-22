@@ -300,3 +300,5 @@ Import traces:
  POST /api/explain 200 in 1813ms (next.js: 422ms, application-code: 1391ms)
 ✓ Compiled in 1194ms
  GET / 200 in 1072ms (next.js: 956ms, application-code: 116ms)
+✓ Compiled in 378ms
+ GET / 200 in 280ms (next.js: 219ms, application-code: 61ms)
