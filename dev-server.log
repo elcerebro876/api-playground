@@ -307,3 +307,96 @@ Import traces:
  POST /api/explain 200 in 2.4s (next.js: 805ms, application-code: 1600ms)
  POST /api/proxy 200 in 618ms (next.js: 7ms, application-code: 611ms)
  POST /api/explain 200 in 812ms (next.js: 6ms, application-code: 806ms)
+✓ Compiled in 928ms
+ GET / 200 in 428ms (next.js: 341ms, application-code: 87ms)
+✓ Compiled in 362ms
+ GET / 200 in 404ms (next.js: 307ms, application-code: 96ms)
+✓ Compiled in 449ms
+✓ Compiled in 644ms
+ GET / 200 in 1501ms (next.js: 451ms, application-code: 1050ms)
+ GET / 200 in 446ms (next.js: 336ms, application-code: 110ms)
+✓ Compiled in 651ms
+ GET / 200 in 450ms (next.js: 352ms, application-code: 98ms)
+ GET / 200 in 312ms (next.js: 10ms, application-code: 302ms)
+ POST /api/proxy 200 in 857ms (next.js: 82ms, application-code: 775ms)
+ POST /api/explain 200 in 1704ms (next.js: 388ms, application-code: 1316ms)
+✓ Compiled in 403ms
+✓ Compiled in 369ms
+✓ Compiled in 0ms
+ GET / 200 in 1660ms (next.js: 968ms, application-code: 692ms)
+ GET / 200 in 412ms (next.js: 243ms, application-code: 169ms)
+✓ Compiled in 458ms
+ GET / 200 in 659ms (next.js: 510ms, application-code: 149ms)
+ GET / 200 in 64ms (next.js: 11ms, application-code: 53ms)
+ POST /api/proxy 200 in 880ms (next.js: 113ms, application-code: 768ms)
+✓ Compiled in 503ms
+ GET / 200 in 1176ms (next.js: 465ms, application-code: 712ms)
+✓ Compiled in 824ms
+ GET / 200 in 648ms (next.js: 516ms, application-code: 132ms)
+✓ Compiled in 597ms
+ GET / 200 in 536ms (next.js: 398ms, application-code: 137ms)
+✓ Compiled in 527ms
+ GET / 200 in 501ms (next.js: 380ms, application-code: 121ms)
+ GET / 200 in 1033ms (next.js: 810ms, application-code: 222ms)
+ GET / 200 in 73ms (next.js: 16ms, application-code: 57ms)
+✓ Compiled in 498ms
+✓ Compiled in 776ms
+ GET / 200 in 660ms (next.js: 336ms, application-code: 324ms)
+ GET / 200 in 526ms (next.js: 16ms, application-code: 510ms)
+ GET / 200 in 542ms (next.js: 37ms, application-code: 505ms)
+ GET / 200 in 538ms (next.js: 16ms, application-code: 522ms)
+ GET / 200 in 304ms (next.js: 24ms, application-code: 280ms)
+ GET / 200 in 270ms (next.js: 30ms, application-code: 240ms)
+ GET / 200 in 249ms (next.js: 18ms, application-code: 231ms)
+ GET / 200 in 240ms (next.js: 15ms, application-code: 224ms)
+ GET / 200 in 167ms (next.js: 16ms, application-code: 151ms)
+ GET / 200 in 86ms (next.js: 20ms, application-code: 66ms)
+[browser] ./src/app/page.tsx:10096:28
+Expected '</', got '{'
+  10094 |                 </motion.div>
+  10095 |                 ) : null}{" "}
+> 10096 |               </motion.div>{" "}
+        |                            ^
+  10097 |             </motion.div>{" "}
+  10098 |           </>
+  10099 |         )}{" "}
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component] 
+    at console.<anonymous> (https://eu-assets.i.posthog.com/static/1.434.0/posthog-recorder.js:1:117302)
+    at console.h [as error] (https://eu-assets.i.posthog.com/static/1.434.0/posthog-recorder.js:1:116864)
+    at handleErrors (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_client_0r5nbpw._.js:13951:21)
+    at processMessage (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_client_0r5nbpw._.js:14014:21)
+    at WebSocket.handleMessage (file://C:/Users/ADMIN/Playground API/api-playground/.next/dev/static/chunks/node_modules_next_dist_client_0r5nbpw._.js:13458:52) (https://eu-assets.i.posthog.com/static/1.434.0/posthog-recorder.js:1:117302)
+ GET / 200 in 296ms (next.js: 11ms, application-code: 286ms)
+ GET / 200 in 86ms (next.js: 10ms, application-code: 76ms)
+ POST /api/proxy 200 in 904ms (next.js: 157ms, application-code: 747ms)
+ POST /api/proxy 200 in 748ms (next.js: 6ms, application-code: 742ms)
+✓ Compiled in 416ms
+ GET / 200 in 272ms (next.js: 216ms, application-code: 57ms)
+✓ Compiled in 874ms
+ GET / 200 in 392ms (next.js: 290ms, application-code: 102ms)
+✓ Compiled in 525ms
+ GET / 200 in 257ms (next.js: 197ms, application-code: 60ms)
+✓ Compiled in 381ms
+ GET / 200 in 220ms (next.js: 173ms, application-code: 48ms)
+✓ Compiled in 426ms
+ GET / 200 in 257ms (next.js: 192ms, application-code: 65ms)
+✓ Compiled in 380ms
+ GET / 200 in 202ms (next.js: 156ms, application-code: 46ms)
+✓ Compiled in 354ms
+ GET / 200 in 207ms (next.js: 160ms, application-code: 48ms)
+ POST /api/proxy 200 in 856ms (next.js: 82ms, application-code: 774ms)
+ POST /api/proxy 200 in 645ms (next.js: 5ms, application-code: 640ms)
+✓ Compiled in 537ms
+ GET / 200 in 583ms (next.js: 512ms, application-code: 71ms)
+✓ Compiled in 545ms
+ GET / 200 in 864ms (next.js: 690ms, application-code: 174ms)

@@ -485,7 +485,12 @@ export default function Home() {
     [explainCtx, response],
   );
   const handleCardAnalyze = useCallback(
-    (result: { status?: number | null; time?: number | null; body?: unknown }) => {
+    (result: {
+      status?: number | null;
+      time?: number | null;
+      body?: unknown;
+      headers?: Record<string, string>;
+    }) => {
       const body =
         typeof result?.body === "string"
           ? result.body
@@ -494,10 +499,12 @@ export default function Home() {
         status: result?.status ?? undefined,
         time: result?.time ?? undefined,
         body,
+        headers: result?.headers,
       });
+      setHeadersFilter("common");
       openExplain({ status: result?.status ?? undefined, body });
     },
-    [openExplain],
+    [openExplain, setHeadersFilter],
   );
   const closeExplain = useCallback((event?: { preventDefault: () => void }) => {
     event?.preventDefault();
@@ -4336,6 +4343,7 @@ function MainContent({
     status?: number | null;
     time?: number | null;
     body?: unknown;
+    headers?: Record<string, string>;
   }) => void;
 }) {
   const isDark = activeTheme === "Dark";
@@ -7403,6 +7411,7 @@ function BrowseApiSection({
     status?: number | null;
     time?: number | null;
     body?: unknown;
+    headers?: Record<string, string>;
   }) => void;
 }) {
   const apis: {
@@ -7678,6 +7687,7 @@ function BrowseApiSection({
     time?: number | null;
     body?: unknown;
     error?: string;
+    headers?: Record<string, string>;
   } | null>(null);
   const [cardExpanded, setCardExpanded] = useState(false);
   const [cardRetryFaded, setCardRetryFaded] = useState(false);
@@ -7685,6 +7695,12 @@ function BrowseApiSection({
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [greenH, setGreenH] = useState(106);
   const greenRef = useRef<HTMLDivElement | null>(null);
+  const jsonBodyRef = useRef<HTMLDivElement | null>(null);
+  const transitionLockRef = useRef(false);
+  const collapsedJsonHRef = useRef(0);
+  const expandedJsonHRef = useRef(0);
+  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const measuredResultRef = useRef<typeof cardResult>(null);
   const selectApiForCard = (api: (typeof apis)[number]) => {
     setSelectedApi(api);
     setCardAuthValue("");
@@ -7709,6 +7725,7 @@ function BrowseApiSection({
       time: data?.time,
       body: data?.body,
       error: data?.error,
+      headers: data?.headers as Record<string, string> | undefined,
     });
     setCardStatus("sent");
   };
@@ -7814,8 +7831,14 @@ function BrowseApiSection({
     if (cardStatus !== "sent" || !el) return;
     let raf = 0;
     const ro = new ResizeObserver(() => {
+      if (transitionLockRef.current) return;
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
+        if (transitionLockRef.current) return;
+        if (!cardExpanded) {
+          collapsedJsonHRef.current =
+            jsonBodyRef.current?.offsetHeight ?? collapsedJsonHRef.current;
+        }
         setGreenH(Math.round(el.getBoundingClientRect().height) || 106);
       });
     });
@@ -7825,6 +7848,42 @@ function BrowseApiSection({
       ro.disconnect();
     };
   }, [cardStatus, cardResult, cardExpanded]);
+  useLayoutEffect(() => {
+    if (cardStatus !== "sent") return;
+    if (measuredResultRef.current !== cardResult) {
+      collapsedJsonHRef.current = 0;
+      expandedJsonHRef.current = 0;
+      transitionLockRef.current = false;
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+      measuredResultRef.current = cardResult;
+      setGreenH(106);
+      return;
+    }
+    const body = jsonBodyRef.current;
+    if (cardExpanded) {
+      if (collapsedJsonHRef.current <= 0) return;
+      expandedJsonHRef.current = Math.min(body?.scrollHeight ?? 0, 201);
+      if (expandedJsonHRef.current <= 0) return;
+      const delta = expandedJsonHRef.current - collapsedJsonHRef.current;
+      if (Math.abs(delta) < 2) return;
+      transitionLockRef.current = true;
+      setGreenH((prev) => prev + delta);
+    } else {
+      if (collapsedJsonHRef.current <= 0 || expandedJsonHRef.current <= 0) return;
+      const delta = collapsedJsonHRef.current - expandedJsonHRef.current;
+      if (Math.abs(delta) < 2) return;
+      transitionLockRef.current = true;
+      setGreenH((prev) => prev + delta);
+    }
+    if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+    collapseTimerRef.current = setTimeout(() => {
+      transitionLockRef.current = false;
+    }, 320);
+    return () => {
+      if (collapseTimerRef.current) clearTimeout(collapseTimerRef.current);
+      transitionLockRef.current = false;
+    };
+  }, [cardExpanded, cardStatus, cardResult]);
   const filters = [
     "Everything",
     "Payment",
@@ -8738,6 +8797,8 @@ function BrowseApiSection({
                 marginLeft: -197,
                 marginTop: cardModalMarginTop,
                 zIndex: 80,
+                transition:
+                  "height 0.28s cubic-bezier(0.4, 0, 0.2, 1), margin-top 0.28s cubic-bezier(0.4, 0, 0.2, 1)",
                 backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
                 borderRadius: 12,
                 boxShadow: isDark
@@ -9172,6 +9233,7 @@ function BrowseApiSection({
                               : detailBig
                                 ? 155
                                 : 161,
+                        transition: "top 0.28s cubic-bezier(0.4, 0, 0.2, 1)",
                         width: 346,
                         height: cardRequestHeight,
                         borderRadius: 8,
@@ -9678,24 +9740,34 @@ function BrowseApiSection({
                       </span>{" "}
                     </motion.div>
                       ) : null}{" "}
+                    <AnimatePresence initial={false}>
                     {cardStatus === "sent" ? (
                     <motion.div
+                      key="ip-cards-green"
                       ref={greenRef}
                       variants={cardItemVariants}
+                      exit={{
+                        opacity: 0,
+                        y: 10,
+                        transition: { duration: 0.22, ease: "easeInOut" as const },
+                      }}
                       style={{
                         position: "absolute",
                         left: 12,
                         top: responseTop,
+                        transition: "top 0.28s cubic-bezier(0.4, 0, 0.2, 1)",
                         width: 346,
                         borderRadius: 8,
-                        border: "1px solid #78D9A0",
-                        backgroundColor: "#D6FFD6",
+                        border: isDark
+                          ? "0.8px solid #005200"
+                          : "1px solid #78D9A0",
+                        backgroundColor: isDark ? "#003400" : "#D6FFD6",
                         padding: 8,
                         boxSizing: "border-box",
                         display: "flex",
                         flexDirection: "column",
                         gap: 6,
-                        color: "#008000",
+                        color: isDark ? "#4CFE4C" : "#008000",
                       }}
                     >
                       {(() => {
@@ -9703,7 +9775,11 @@ function BrowseApiSection({
                           !cardResult?.error &&
                           (cardResult?.status == null ||
                             (cardResult.status >= 200 && cardResult.status < 300));
-                        const accent = ok ? "#008000" : "#E5484D";
+                        const accent = ok
+                          ? isDark
+                            ? "#4CFE4C"
+                            : "#008000"
+                          : "#E5484D";
                         return (
                           <>
                             <div
@@ -9780,13 +9856,14 @@ function BrowseApiSection({
                             <div
                               style={{
                                 borderRadius: 6,
-                                backgroundColor: "#FFFFFF",
+                                backgroundColor: isDark ? "#0F0F0F" : "#FFFFFF",
                                 padding: "8px",
                                 boxSizing: "border-box",
                                 margin: "0 -4px -4px -4px",
                               }}
                             >
                               <div
+                                ref={jsonBodyRef}
                                 className="hide-scrollbar"
                                 style={{
                                   fontFamily: "Geist, var(--font-geist-sans)",
@@ -9803,10 +9880,12 @@ function BrowseApiSection({
                                     ? undefined
                                     : 3,
                                   WebkitBoxOrient: "vertical",
-                                  maxHeight: cardExpanded ? 201 : undefined,
+                                  maxHeight: cardExpanded ? 201 : 60,
                                   overflow: cardExpanded
                                     ? "auto"
                                     : "hidden",
+                                  transition:
+                                    "max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease",
                                 }}
                               >
                                 {jsonHighlight(cardResult?.body)}
@@ -9832,9 +9911,9 @@ function BrowseApiSection({
                                       fontSize: 12,
                                       fontWeight: 400,
                                       letterSpacing: "-0.4px",
-                                      color: isDark ? "#D0D0D0" : "#5E5E5E",
+                                      color: isDark ? "#D1D1D1" : "#5E5E5E",
                                       backgroundColor: isDark
-                                        ? "#212121"
+                                        ? "#1F1F1F"
                                         : "#F7F7F7",
                                       borderRadius: 6,
                                       padding: "3px 8px",
@@ -9891,9 +9970,9 @@ function BrowseApiSection({
                                       fontSize: 12,
                                       fontWeight: 400,
                                       letterSpacing: "-0.4px",
-                                      color: isDark ? "#D0D0D0" : "#5E5E5E",
+                                      color: isDark ? "#D1D1D1" : "#5E5E5E",
                                       backgroundColor: isDark
-                                        ? "#212121"
+                                        ? "#1F1F1F"
                                         : "#F7F7F7",
                                       borderRadius: 6,
                                       padding: "3px 8px",
@@ -9914,12 +9993,20 @@ function BrowseApiSection({
                         );
                       })()}
                     </motion.div>
-                      ) : null}{" "}
+                      ) : null}
+                    </AnimatePresence>{" "}
                   </motion.div>{" "}
                 </div>{" "}
+                <AnimatePresence initial={false}>
                 {cardStatus === "sent" && cardExpanded && onAnalyze ? (
                 <motion.div
+                  key="ip-cards-analyze"
                   variants={cardItemVariants}
+                  exit={{
+                    opacity: 0,
+                    y: 10,
+                    transition: { duration: 0.22, ease: "easeInOut" as const },
+                  }}
                   style={{
                     position: "absolute",
                     left: 12,
@@ -10014,6 +10101,7 @@ function BrowseApiSection({
                             status: cardResult.status,
                             time: cardResult.time,
                             body: cardResult.body,
+                            headers: cardResult.headers,
                           });
                         }
                       }}
@@ -10053,7 +10141,9 @@ function BrowseApiSection({
                     </span>
                   </div>
                 </motion.div>
-                ) : null}{" "}
+                ) : null}
+                </AnimatePresence>
+                {" "}
               </motion.div>{" "}
             </motion.div>{" "}
           </>
