@@ -9285,8 +9285,11 @@ function BrowseApiSection({
                             border: isDark
                               ? "0.8px solid #312F2F"
                               : "0.8px solid #f2f2f2",
-                            backgroundColor:
-                              cardStatus === "sent" ? "#FAFAFA" : "#FFFFFF",
+                            backgroundColor: isDark
+                              ? "#212121"
+                              : cardStatus === "sent"
+                                ? "#FAFAFA"
+                                : "#FFFFFF",
                             boxSizing: "border-box",
                             display: "flex",
                             alignItems: "center",

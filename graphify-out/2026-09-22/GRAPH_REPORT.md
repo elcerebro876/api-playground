@@ -1,16 +1,16 @@
-# Graph Report - api-playground  (2026-09-22)
+# Graph Report - api-playground  (2026-09-18)
 
 ## Corpus Check
-- 22 files · ~53,115 words
+- 22 files · ~50,569 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 171 nodes · 207 edges · 16 communities (12 shown, 4 thin omitted)
+- 165 nodes · 194 edges · 16 communities (12 shown, 4 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `4914aa49`
+- Built from commit: `eebdd223`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -37,11 +37,11 @@
 3. `Home()` - 7 edges
 4. `include` - 7 edges
 5. `scripts` - 5 edges
-6. `BrowseApiSection()` - 5 edges
-7. `isPrivateIpv4()` - 4 edges
-8. `assertSafeTarget()` - 4 edges
-9. `renderAuthLine()` - 4 edges
-10. `getSupabase()` - 4 edges
+6. `isPrivateIpv4()` - 4 edges
+7. `assertSafeTarget()` - 4 edges
+8. `getSupabase()` - 4 edges
+9. `lib` - 4 edges
+10. `PostHogInit()` - 3 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Home()` --calls--> `trackToolUsed()`  [EXTRACTED]
@@ -62,7 +62,7 @@
 
 ### Community 0 - "page.tsx"
 Cohesion: 0.07
-Nodes (26): BrowseApiSection(), buildCardRequest(), cardBodyPreview(), cardContentVariants, cardItemVariants, cardTextSpring, commonKeys, demoRequests (+18 more)
+Nodes (19): cardContentVariants, cardItemVariants, cardTextSpring, commonKeys, demoRequests, headersPanelTransition, Home(), methodBadgeColors (+11 more)
 
 ### Community 1 - "devDependencies"
 Cohesion: 0.11
@@ -113,15 +113,15 @@ Nodes (12): POST(), requestSignature(), ExplainPayload, generateExplanation(), i
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `devDependencies` connect `devDependencies` to `package.json`?**
-  _High betweenness centrality (0.040) - this node is a cross-community bridge._
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
 - **Why does `dependencies` connect `dependencies` to `package.json`?**
-  _High betweenness centrality (0.033) - this node is a cross-community bridge._
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Why does `compilerOptions` connect `compilerOptions` to `include`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
+  _High betweenness centrality (0.024) - this node is a cross-community bridge._
 - **What connects `eslintConfig`, `nextConfig`, `name` to the rest of the system?**
   _76 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `page.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.06968641114982578 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0746031746031746 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**
   _Cohesion score 0.10526315789473684 - nodes in this community are weakly interconnected._
 - **Should `compilerOptions` be split into smaller, more focused modules?**

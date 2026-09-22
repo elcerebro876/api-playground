@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "src/app/page.tsx": {
-    "mtime": 1790073694.3493633,
-    "ast_hash": "ce92a3cfeb82ab2776c21bb89ff26212",
+    "mtime": 1789749337.9095497,
+    "ast_hash": "f422b14604bbb4f0cf10a6672be5b62a",
     "semantic_hash": ""
   },
   "src/components/LoadingState.tsx": {
@@ -262,11 +262,6 @@
   "src/lib/explain-gateway.ts": {
     "mtime": 1789758406.6180782,
     "ast_hash": "82a24345081dadd316685ee27ce987f1",
-    "semantic_hash": ""
-  },
-  "public/Retry Logo.svg": {
-    "mtime": 1789931123.2384202,
-    "ast_hash": "7f6a14d49630c37831da5ba9cab5f97f",
     "semantic_hash": ""
   }
 }

@@ -298,3 +298,5 @@ Import traces:
  POST /api/proxy 200 in 678ms (next.js: 5ms, application-code: 672ms)
  POST /api/proxy 200 in 718ms (next.js: 7ms, application-code: 712ms)
  POST /api/explain 200 in 1813ms (next.js: 422ms, application-code: 1391ms)
+✓ Compiled in 1194ms
+ GET / 200 in 1072ms (next.js: 956ms, application-code: 116ms)
