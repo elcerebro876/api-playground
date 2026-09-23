@@ -503,3 +503,127 @@ Import traces:
  POST /api/explain 200 in 1891ms (next.js: 494ms, application-code: 1397ms)
 ✓ Compiled in 456ms
  GET / 200 in 634ms (next.js: 517ms, application-code: 117ms)
+ GET / 200 in 1649ms (next.js: 88ms, application-code: 1561ms)
+ POST /api/proxy 200 in 1410ms (next.js: 554ms, application-code: 856ms)
+✓ Compiled in 1506ms
+ GET / 200 in 1375ms (next.js: 1234ms, application-code: 141ms)
+✓ Compiled in 342ms
+ GET / 200 in 376ms (next.js: 285ms, application-code: 91ms)
+✓ Compiled in 1829ms
+⨯ ./src/app/page.tsx:10288:27
+Expected '</', got '}'
+  [90m10286 |[0m                           </>
+  [90m10287 |[0m                         );
+[31m[1m>[0m [90m10288 |[0m                       })()}
+  [90m      |[0m                           [31m[1m^[0m
+  [90m10289 |[0m                     </motion.div>
+  [90m10290 |[0m                       ) : [36mnull[0m}
+  [90m10291 |[0m                     </[33mAnimatePresence[0m>{[32m" "[0m}
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 159ms (next.js: 105ms, application-code: 54ms)
+⨯ ./src/app/page.tsx:10288:27
+Expected '</', got '}'
+  [90m10286 |[0m                           </>
+  [90m10287 |[0m                         );
+[31m[1m>[0m [90m10288 |[0m                       })()}
+  [90m      |[0m                           [31m[1m^[0m
+  [90m10289 |[0m                     </motion.div>
+  [90m10290 |[0m                       ) : [36mnull[0m}
+  [90m10291 |[0m                     </[33mAnimatePresence[0m>{[32m" "[0m}
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 119ms (next.js: 67ms, application-code: 52ms)
+⨯ ./src/app/page.tsx:10288:27
+Expected '</', got '}'
+  [90m10286 |[0m                           </>
+  [90m10287 |[0m                         );
+[31m[1m>[0m [90m10288 |[0m                       })()}
+  [90m      |[0m                           [31m[1m^[0m
+  [90m10289 |[0m                     </motion.div>
+  [90m10290 |[0m                       ) : [36mnull[0m}
+  [90m10291 |[0m                     </[33mAnimatePresence[0m>{[32m" "[0m}
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+⨯ ./src/app/page.tsx:10288:27
+Expected '</', got '}'
+  [90m10286 |[0m                           </>
+  [90m10287 |[0m                         );
+[31m[1m>[0m [90m10288 |[0m                       })()}
+  [90m      |[0m                           [31m[1m^[0m
+  [90m10289 |[0m                     </motion.div>
+  [90m10290 |[0m                       ) : [36mnull[0m}
+  [90m10291 |[0m                     </[33mAnimatePresence[0m>{[32m" "[0m}
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+ GET / 500 in 140ms (next.js: 64ms, application-code: 75ms)
+ GET / 500 in 134ms (next.js: 97ms, application-code: 37ms)
+✓ Compiled in 1116ms
+[browser] Uncaught Error: ./src/app/page.tsx:10288:27
+Expected '</', got '}'
+  10286 |                           </>
+  10287 |                         );
+> 10288 |                       })()}
+        |                           ^
+  10289 |                     </motion.div>
+  10290 |                       ) : null}
+  10291 |                     </AnimatePresence>{" "}
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/page.tsx [Client Component Browser]
+    ./src/app/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/page.tsx [Client Component SSR]
+    ./src/app/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/page.tsx:10288:27)
+    at <unknown> (Error: (./src/app/page.tsx:10288:27)

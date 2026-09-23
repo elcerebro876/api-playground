@@ -7832,8 +7832,22 @@ function BrowseApiSection({
         : detailBig
           ? 128
           : 116;
+  const cardFailed = !!(
+    cardResult &&
+    (cardResult.error ||
+      (cardResult.status != null && cardResult.status >= 400))
+  );
+  const keyRelated =
+    !!cardResult &&
+    cardFailed &&
+    (cardResult.status === 401 ||
+      cardResult.status === 403 ||
+      (!!cardResult.error &&
+        /key|auth|token|credential/i.test(cardResult.error)));
   const effRequestHeight =
-    cardStatus === "sent" && cardExpanded ? 0 : cardRequestHeight;
+    cardStatus === "sent" && cardExpanded && !cardFailed
+      ? 0
+      : cardRequestHeight;
   const responseTop =
     (selectedApi ? cardRequestTop : 0) +
     (selectedApi ? effRequestHeight : 0) +
@@ -9931,19 +9945,126 @@ function BrowseApiSection({
                         transition: "top 0.28s cubic-bezier(0.4, 0, 0.2, 1)",
                         width: 346,
                         borderRadius: 8,
-                        border: isDark
-                          ? "0.8px solid #005200"
-                          : "1px solid #78D9A0",
-                        backgroundColor: isDark ? "#003400" : "#D6FFD6",
-                        padding: 8,
                         boxSizing: "border-box",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 6,
-                        color: isDark ? "#4CFE4C" : "#008000",
+                        ...(cardFailed
+                          ? {
+                              height: 72,
+                              backgroundColor: isDark ? "#3A1A1A" : "#FEEDED",
+                            }
+                          : {
+                              border: isDark
+                                ? "0.8px solid #005200"
+                                : "1px solid #78D9A0",
+                              backgroundColor: isDark ? "#003400" : "#D6FFD6",
+                              padding: 8,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 6,
+                              color: isDark ? "#4CFE4C" : "#008000",
+                            }),
                       }}
                     >
-                      {(() => {
+                      {cardFailed ? (
+                        <>
+                          <div
+                            style={{
+                              position: "absolute",
+                              left: 8,
+                              top: 8,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 16 16"
+                              fill="none"
+                            >
+                              <path
+                                d="M7.08494 2.2354C7.99146 1.73268 9.14459 2.06298 9.65118 2.96139L14.497 11.3715C14.6037 11.6225 14.6503 11.8266 14.6637 12.0387C14.6903 12.5341 14.517 13.0157 14.1771 13.3863C13.8371 13.7556 13.3772 13.9736 12.8773 14L3.11894 14C2.91231 13.9874 2.70568 13.9405 2.51238 13.8679C1.54588 13.4781 1.07929 12.3815 1.47255 11.4309L6.35173 2.95545C6.51837 2.65752 6.77166 2.40055 7.08494 2.2354ZM7.99812 10.1817C7.67817 10.1817 7.41155 10.446 7.41155 10.7637C7.41155 11.0802 7.67817 11.3451 7.99812 11.3451C8.31807 11.3451 8.57802 11.0802 8.57802 10.7565C8.57802 10.44 8.31807 10.1817 7.99812 10.1817ZM7.99812 6.06026C7.67817 6.06026 7.41155 6.31724 7.41155 6.63498L7.41155 8.50382C7.41155 8.82091 7.67817 9.08581 7.99812 9.08581C8.31807 9.08581 8.57802 8.82091 8.57802 8.50382L8.57802 6.63498C8.57802 6.31724 8.31807 6.06026 7.99812 6.06026Z"
+                                fill={isDark ? "#FF6B6B" : "#FF1616"}
+                              />
+                            </svg>
+                            <span
+                              style={{
+                                fontFamily: "Geist, var(--font-geist-sans)",
+                                fontSize: 12,
+                                fontWeight: 500,
+                                letterSpacing: "-0.6px",
+                                lineHeight: "16px",
+                                color: isDark ? "#FF6B6B" : "#FF1616",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {keyRelated
+                                ? "That key didn't work"
+                                : "Something went wrong"}
+                            </span>
+                          </div>
+                          {keyRelated && selectedApi.getAKeyUrl ? (
+                            <a
+                              href={selectedApi.getAKeyUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                position: "absolute",
+                                right: 8,
+                                top: 8,
+                                fontFamily: "Geist, var(--font-geist-sans)",
+                                fontSize: 12,
+                                fontWeight: 500,
+                                letterSpacing: "-0.6px",
+                                lineHeight: "16px",
+                                color: isDark ? "#FF8A8A" : "#930000",
+                                cursor: "pointer",
+                                textDecoration: "none",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Get a key
+                            </a>
+                          ) : null}
+                          <div
+                            style={{
+                              position: "absolute",
+                              left: 4,
+                              top: 32,
+                              width: 338,
+                              minHeight: 36,
+                              boxSizing: "border-box",
+                              padding: "8px",
+                              borderRadius: 6,
+                              display: "flex",
+                              alignItems: "center",
+                              backgroundColor: isDark ? "#4A2222" : "#FFD6D6",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontFamily: "Geist, var(--font-geist-sans)",
+                                fontSize: 12,
+                                fontWeight: 400,
+                                letterSpacing: "-0.48px",
+                                lineHeight: "20px",
+                                color: isDark ? "#FF6B6B" : "#FF1616",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {keyRelated
+                                ? "Double check it is pasted correctly, or get a fresh one."
+                                : cardResult?.error ||
+                                  (cardResult?.status != null
+                                    ? `Request failed with status ${cardResult.status}`
+                                    : "The request could not be completed.")}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                      (() => {
                         const ok =
                           !cardResult?.error &&
                           (cardResult?.status == null ||
@@ -10164,14 +10285,15 @@ function BrowseApiSection({
                             </div>
                           </>
                         );
-                      })()}
+                      })()
+                      )}
                     </motion.div>
                       ) : null}
                     </AnimatePresence>{" "}
                   </motion.div>{" "}
                 </div>{" "}
                 <AnimatePresence initial={false}>
-                {cardStatus === "sent" && cardExpanded && onAnalyze ? (
+                {cardStatus === "sent" && cardExpanded && onAnalyze && !cardFailed ? (
                 <motion.div
                   key="ip-cards-analyze"
                   variants={cardItemVariants}
