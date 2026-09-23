@@ -9990,10 +9990,10 @@ function BrowseApiSection({
                             <span
                               style={{
                                 fontFamily: "Geist, var(--font-geist-sans)",
-                                fontSize: 12,
+                                fontSize: 14,
                                 fontWeight: 500,
-                                letterSpacing: "-0.6px",
-                                lineHeight: "16px",
+                                letterSpacing: "-0.7px",
+                                lineHeight: "18px",
                                 color: isDark ? "#FF6B6B" : "#FF1616",
                                 whiteSpace: "nowrap",
                               }}
@@ -10013,10 +10013,10 @@ function BrowseApiSection({
                                 right: 8,
                                 top: 8,
                                 fontFamily: "Geist, var(--font-geist-sans)",
-                                fontSize: 12,
+                                fontSize: 14,
                                 fontWeight: 500,
-                                letterSpacing: "-0.6px",
-                                lineHeight: "16px",
+                                letterSpacing: "-0.7px",
+                                lineHeight: "18px",
                                 color: isDark ? "#FF8A8A" : "#930000",
                                 cursor: "pointer",
                                 textDecoration: "none",
@@ -10044,9 +10044,9 @@ function BrowseApiSection({
                             <span
                               style={{
                                 fontFamily: "Geist, var(--font-geist-sans)",
-                                fontSize: 12,
+                                fontSize: 14,
                                 fontWeight: 400,
-                                letterSpacing: "-0.48px",
+                                letterSpacing: "-0.56px",
                                 lineHeight: "20px",
                                 color: isDark ? "#FF6B6B" : "#FF1616",
                                 whiteSpace: "nowrap",
