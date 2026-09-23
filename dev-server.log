@@ -637,3 +637,4 @@ Import traces:
  GET / 200 in 238ms (next.js: 190ms, application-code: 47ms)
 ✓ Compiled in 214ms
  GET / 200 in 224ms (next.js: 173ms, application-code: 51ms)
+ POST /api/proxy 200 in 929ms (next.js: 96ms, application-code: 833ms)
