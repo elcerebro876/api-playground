@@ -18,7 +18,7 @@ import {
 } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
-import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, type HistoryEntry } from "@/lib/storage";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, type HistoryEntry } from "@/lib/storage";
 import type { ExplainPayload } from "@/lib/explain";
 import { trackToolUsed } from "@/lib/posthog";
 const cardTextSpring = {
@@ -139,6 +139,9 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [discoveryHistory, setDiscoveryHistory] = useState<HistoryEntry[]>([]);
+  const [sessionCardTests, setSessionCardTests] = useState<
+    Record<string, { key: string; entry: HistoryEntry }>
+  >({});
   const [apisTested, setApisTested] = useState(0);
   const [streak, setStreak] = useState(1);
   const [responseKey, setResponseKey] = useState(0);
@@ -175,7 +178,6 @@ export default function Home() {
   const [explainError, setExplainError] = useState(false);
   const [explainData, setExplainData] = useState<ExplainPayload | null>(null);
   const firstNoAuthPopupShown = useRef(false);
-  const [explainDismissed, setExplainDismissed] = useState(false);
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explorerHovered, setExplorerHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -196,11 +198,7 @@ export default function Home() {
     };
   }, []);
   useEffect(() => {
-    const frame = requestAnimationFrame(() =>
-      setExplainDismissed(loadExplainDismissed()),
-    );
     return () => {
-      cancelAnimationFrame(frame);
       if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
     };
   }, []);
@@ -227,6 +225,7 @@ export default function Home() {
       setDiscoveryHistory(data.discoveryHistory);
       setApisTested(data.apisTestedCount);
       setStreak(updated.streak);
+      setSessionCardTests((prev) => ({ ...prev, ...loadCardTests() }));
     });
     return () => cancelAnimationFrame(frame);
   }, []);
@@ -267,6 +266,25 @@ export default function Home() {
       setExplainCtx(null);
     }
     setExplainPopupOpen(false);
+  };
+  const handleCardTested = (
+    apiName: string,
+    snapshot: HistoryEntry,
+    key: string,
+  ) => {
+    setSessionCardTests((prev) => {
+      const next = { ...prev, [apiName]: { key, entry: snapshot } };
+      saveCardTests(next);
+      return next;
+    });
+  };
+  const handleViewLastResponse = (apiName: string) => {
+    const rec = sessionCardTests[apiName];
+    if (!rec) return;
+    const idx = discoveryHistory.findIndex(
+      (it) => it.apiName === apiName && it.url === rec.entry.url,
+    );
+    handleDiscoverySelect(rec.entry, idx);
   };
   const sendRequest = useCallback(
     async (opts?: {
@@ -684,7 +702,7 @@ export default function Home() {
               w1440={is1440}
               explainCtx={explainCtx}
               explainPopupOpen={explainPopupOpen}
-              bannerRevealed={explainDismissed}
+              
               onExplainPopupSkip={() => setExplainPopupOpen(false)}
               onExplainPopupAnalyze={() => openExplain()}
               explainPanelOpen={explainPanelOpen}
@@ -694,6 +712,9 @@ export default function Home() {
               onOpenExplain={openExplain}
               onCloseExplain={closeExplain}
               onAnalyze={handleCardAnalyze}
+              sessionCardTests={sessionCardTests}
+              onCardTested={handleCardTested}
+              onViewLastResponse={handleViewLastResponse}
             />{" "}
           </motion.div>{" "}
         </div>{" "}
@@ -861,7 +882,6 @@ export default function Home() {
               <RippleButton
                 onClick={() => {
                   saveExplainDismissed(true);
-                  setExplainDismissed(true);
                   setExplainPopupOpen(false);
                   openExplain();
                 }}
@@ -922,7 +942,6 @@ export default function Home() {
             <RippleButton
               onClick={() => {
                 saveExplainDismissed(true);
-                setExplainDismissed(true);
                 setExplainPopupOpen(false);
               }}
               className={`transition-colors ${activeTheme === "Dark" ? "hover:bg-[#242424]" : "hover:bg-gray-50"}`}
@@ -4280,7 +4299,6 @@ function MainContent({
   w1440,
   explainCtx,
   explainPopupOpen,
-  bannerRevealed,
   onExplainPopupSkip,
   onExplainPopupAnalyze,
   explainPanelOpen,
@@ -4290,6 +4308,9 @@ function MainContent({
   onOpenExplain,
   onCloseExplain,
   onAnalyze,
+  sessionCardTests,
+  onCardTested,
+  onViewLastResponse,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -4330,7 +4351,6 @@ function MainContent({
   onHistorySelect: (item: HistoryEntry, index: number) => void;
   explainCtx: { apiName: string; url: string } | null;
   explainPopupOpen: boolean;
-  bannerRevealed: boolean;
   onExplainPopupSkip: () => void;
   onExplainPopupAnalyze: () => void;
   explainPanelOpen: boolean;
@@ -4345,6 +4365,9 @@ function MainContent({
     body?: unknown;
     headers?: Record<string, string>;
   }) => void;
+  sessionCardTests: Record<string, { key: string; entry: HistoryEntry }>;
+  onCardTested: (apiName: string, snapshot: HistoryEntry, key: string) => void;
+  onViewLastResponse: (apiName: string) => void;
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
@@ -4508,6 +4531,9 @@ function MainContent({
                   onSend={onSend}
                   onBack={() => setShowBrowseApi(false)}
                   onAnalyze={onAnalyze}
+                  sessionCardTests={sessionCardTests}
+                  onCardTested={onCardTested}
+                  onViewLastResponse={onViewLastResponse}
                 />
               )}{" "}
               {!response && !loading && !showBrowseApi && (
@@ -6284,7 +6310,6 @@ function MainContent({
             >
               {" "}
               {explainCtx &&
-              bannerRevealed &&
               !response?.error &&
               response?.status != null &&
               response.status >= 200 &&
@@ -7387,6 +7412,9 @@ function BrowseApiSection({
   onSend,
   onBack,
   onAnalyze,
+  sessionCardTests,
+  onCardTested,
+  onViewLastResponse,
 }: {
   compact?: boolean;
   w1440?: boolean;
@@ -7413,6 +7441,9 @@ function BrowseApiSection({
     body?: unknown;
     headers?: Record<string, string>;
   }) => void;
+  sessionCardTests: Record<string, { key: string; entry: HistoryEntry }>;
+  onCardTested: (apiName: string, snapshot: HistoryEntry, key: string) => void;
+  onViewLastResponse: (apiName: string) => void;
 }) {
   const apis: {
     name: string;
@@ -7679,6 +7710,7 @@ function BrowseApiSection({
     null,
   );
   const [cardAuthValue, setCardAuthValue] = useState("");
+  const [cardRepeat, setCardRepeat] = useState(false);
   const [cardStatus, setCardStatus] = useState<"idle" | "sending" | "sent">(
     "idle",
   );
@@ -7703,13 +7735,22 @@ function BrowseApiSection({
   const measuredResultRef = useRef<typeof cardResult>(null);
   const selectApiForCard = (api: (typeof apis)[number]) => {
     setSelectedApi(api);
-    setCardAuthValue("");
+    const rec = sessionCardTests[api.name];
+    setCardRepeat(!!rec);
+    setCardAuthValue(rec ? rec.key : "");
     setCardStatus("idle");
     setCardResult(null);
     setCardExpanded(false);
   };
   const runCardRequest = async () => {
     if (!selectedApi) return;
+    if (cardRepeat) {
+      const name = selectedApi.name;
+      setSelectedApi(null);
+      setCardRepeat(false);
+      onViewLastResponse(name);
+      return;
+    }
     setCardStatus("sending");
     const key = cardAuthValue?.trim() ? cardAuthValue : "";
     const { url, headers } = buildCardRequest(selectedApi, key);
@@ -7728,6 +7769,29 @@ function BrowseApiSection({
       headers: data?.headers as Record<string, string> | undefined,
     });
     setCardStatus("sent");
+    if (
+      data &&
+      typeof data?.status === "number" &&
+      data.status >= 200 &&
+      data.status < 300 &&
+      !data?.error
+    ) {
+      onCardTested(
+        selectedApi.name,
+        {
+          method: "GET",
+          url: selectedApi.url ?? "",
+          timestamp: Date.now(),
+          status: data.status,
+          time: data.time,
+          headers: Object.keys(headers).length ? headers : undefined,
+          responseBody: data.body as string | undefined,
+          responseHeaders: data.headers as Record<string, string> | undefined,
+          apiName: selectedApi.name,
+        },
+        key,
+      );
+    }
   };
   const handleCardCopy = () => {
     const text = cardBodyPreview(cardResult?.body);
@@ -7746,15 +7810,20 @@ function BrowseApiSection({
   const [showTopBlur, setShowTopBlur] = useState(false);
   const [showBottomBlur, setShowBottomBlur] = useState(false);
   const detailBig = !compact;
-  const cardRequestTop =
-    cardStatus === "sent"
+  const idleRequestTop =
+    selectedApi &&
+    (selectedApi.name === "OpenWeather" || selectedApi.name === "Paystack")
+      ? 175
+      : detailBig
+        ? 155
+        : 161;
+  const repeatCardTop = 99;
+  const cardRequestTop = cardRepeat
+    ? repeatCardTop
+    : cardStatus === "sent"
       ? 73
-      : selectedApi &&
-          (selectedApi.name === "OpenWeather" || selectedApi.name === "Paystack")
-        ? 175
-        : detailBig
-          ? 155
-          : 161;
+      : idleRequestTop;
+  const repeatDelta = cardRepeat ? idleRequestTop - repeatCardTop : 0;
   const cardRequestHeight =
     selectedApi && selectedApi.name === "OpenWeather"
       ? 170
@@ -7786,7 +7855,7 @@ function BrowseApiSection({
   const cardBodyHeight =
     cardStatus === "sent"
       ? responseTop + greenH + 12
-      : cardIdleBodyHeight;
+      : cardIdleBodyHeight - repeatDelta;
   const cardIdleModalHeight =
     selectedApi && selectedApi.name === "OpenWeather"
       ? detailBig
@@ -7807,7 +7876,7 @@ function BrowseApiSection({
     cardStatus === "sent"
       ? cardIdleModalHeight - cardIdleBodyHeight + cardBodyHeight +
           (cardExpanded ? 122 : 0)
-      : cardIdleModalHeight;
+      : cardIdleModalHeight - repeatDelta;
   const cardIdleModalMarginTop =
     selectedApi && selectedApi.name === "OpenWeather"
       ? detailBig
@@ -7825,7 +7894,11 @@ function BrowseApiSection({
             ? -208.5
             : -207.5;
   const cardModalMarginTop =
-    cardStatus === "sent" ? -cardModalHeight / 2 : cardIdleModalMarginTop;
+    cardStatus === "sent"
+      ? -cardModalHeight / 2
+      : cardRepeat
+        ? -(cardIdleModalHeight - repeatDelta) / 2
+        : cardIdleModalMarginTop;
   useEffect(() => {
     const el = greenRef.current;
     if (cardStatus !== "sent" || !el) return;
@@ -8978,38 +9051,143 @@ function BrowseApiSection({
                     }}
                   >
                     {" "}
-                    <motion.span
-                      variants={cardItemVariants}
-                      style={{
-                        position: "absolute",
-                        left: 12,
-                        top: 12,
-                        fontFamily: "Geist, var(--font-geist-sans)",
-                        fontSize: 16,
-                        fontWeight: 500,
-                        letterSpacing: "-0.8px",
-                        color: isDark ? "#FFFFFF" : "#585858",
-                      }}
-                    >
-                      Test an endpoint
-                    </motion.span>{" "}
-                    <motion.span
-                      variants={cardItemVariants}
-                      style={{
-                        position: "absolute",
-                        left: 12,
-                        top: 37,
-                        right: 12,
-                        fontFamily: "Geist, var(--font-geist-sans)",
-                        fontSize: 14,
-                        letterSpacing: "-0.48px",
-                        color: isDark ? "#F7F7F7" : "#939393",
-                        lineHeight: "20px",
-                      }}
-                    >
-                      {selectedApi.desc}
-                    </motion.span>{" "}
-                    {cardStatus !== "sent" && selectedApi.keyDesc ? (
+                    {cardRepeat ? (
+                      <motion.div
+                        variants={cardItemVariants}
+                        style={{
+                          position: "absolute",
+                          left: 12,
+                          top: 12,
+                          width: 346,
+                          height: 84,
+                        }}
+                      >
+                        {" "}
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            top: 2,
+                            display: "block",
+                          }}
+                        >
+                          <path
+                            d="M2.5 10C2.5 11.4834 2.93987 12.9334 3.76398 14.1668C4.58809 15.4001 5.75943 16.3614 7.12987 16.9291C8.50032 17.4968 10.0083 17.6453 11.4632 17.3559C12.918 17.0665 14.2544 16.3522 15.3033 15.3033C16.3522 14.2544 17.0665 12.918 17.3559 11.4632C17.6453 10.0083 17.4968 8.50032 16.9291 7.12988C16.3614 5.75943 15.4001 4.58809 14.1668 3.76398C12.9334 2.93987 11.4834 2.5 10 2.5C8.96129 2.50391 7.93295 2.70695 6.97071 3.09813C6.00846 3.48931 5.13014 4.06138 4.38333 4.78333L2.5 6.66667"
+                            stroke={isDark ? "#FFFFFF" : "#585858"}
+                            strokeWidth="1.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M2.5 2.5L2.5 6.66667L6.66667 6.66667"
+                            stroke={isDark ? "#FFFFFF" : "#585858"}
+                            strokeWidth="1.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M10 5.8335L10 10.0002L13.3333 11.6668"
+                            stroke={isDark ? "#FFFFFF" : "#585858"}
+                            strokeWidth="1.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>{" "}
+                        <span
+                          style={{
+                            position: "absolute",
+                            left: 28,
+                            top: 0,
+                            right: 0,
+                            fontFamily: "Geist, var(--font-geist-sans)",
+                            fontSize: 16,
+                            fontWeight: 500,
+                            letterSpacing: "-0.8px",
+                            color: isDark ? "#FFFFFF" : "#585858",
+                            lineHeight: "21px",
+                          }}
+                        >
+                          You already tested this one.
+                        </span>{" "}
+                        <span
+                          style={{
+                            position: "absolute",
+                            left: 28,
+                            top: 25,
+                            right: 0,
+                            fontFamily: "Geist, var(--font-geist-sans)",
+                            fontSize: 14,
+                            letterSpacing: "-0.56px",
+                            color: isDark ? "#F7F7F7" : "#939393",
+                            lineHeight: "20px",
+                          }}
+                        >
+                          Find it under Discovery logs, or send again below
+                        </span>{" "}
+                        <span
+                          onClick={() => {
+                            setSelectedApi(null);
+                            setCardRepeat(false);
+                            onViewLastResponse(selectedApi?.name ?? "");
+                          }}
+                          style={{
+                            position: "absolute",
+                            left: 28,
+                            top: 53,
+                            right: 0,
+                            fontFamily: "Geist, var(--font-geist-sans)",
+                            fontSize: 14,
+                            fontWeight: 500,
+                            letterSpacing: "-0.56px",
+                            lineHeight: "18px",
+                            color: "#5B5BFF",
+                            cursor: "pointer",
+                          }}
+                        >
+                          View last response
+                        </span>
+                      </motion.div>
+                    ) : (
+                      <>
+                        {" "}
+                        <motion.span
+                          variants={cardItemVariants}
+                          style={{
+                            position: "absolute",
+                            left: 12,
+                            top: 12,
+                            fontFamily: "Geist, var(--font-geist-sans)",
+                            fontSize: 16,
+                            fontWeight: 500,
+                            letterSpacing: "-0.8px",
+                            color: isDark ? "#FFFFFF" : "#585858",
+                          }}
+                        >
+                          Test an endpoint
+                        </motion.span>{" "}
+                        <motion.span
+                          variants={cardItemVariants}
+                          style={{
+                            position: "absolute",
+                            left: 12,
+                            top: 37,
+                            right: 12,
+                            fontFamily: "Geist, var(--font-geist-sans)",
+                            fontSize: 14,
+                            letterSpacing: "-0.48px",
+                            color: isDark ? "#F7F7F7" : "#939393",
+                            lineHeight: "20px",
+                          }}
+                        >
+                          {selectedApi.desc}
+                        </motion.span>{" "}
+                      </>
+                    )}{" "}
+                    {cardStatus !== "sent" && !cardRepeat && selectedApi.keyDesc ? (
                       <motion.div
                         variants={cardItemVariants}
                         style={{
@@ -9150,7 +9328,7 @@ function BrowseApiSection({
                           </span>{" "}
                         </div>{" "}
                       </motion.div>
-                    ) : cardStatus !== "sent" ? (
+                    ) : cardStatus !== "sent" && !cardRepeat ? (
                       <motion.div
                         variants={cardItemVariants}
                         style={{
@@ -9224,15 +9402,7 @@ function BrowseApiSection({
                       style={{
                         position: "absolute",
                         left: 12,
-                        top:
-                          cardStatus === "sent"
-                            ? 73
-                            : selectedApi.name === "OpenWeather" ||
-                                selectedApi.name === "Paystack"
-                              ? 175
-                              : detailBig
-                                ? 155
-                                : 161,
+                        top: cardRequestTop,
                         transition: "top 0.28s cubic-bezier(0.4, 0, 0.2, 1)",
                         width: 346,
                         height: cardRequestHeight,
@@ -9347,7 +9517,7 @@ function BrowseApiSection({
                             border: isDark
                               ? "0.8px solid #312F2F"
                               : "0.8px solid #f2f2f2",
-                            backgroundColor: cardStatus === "sent"
+                            backgroundColor: cardStatus === "sent" || cardRepeat
                               ? (isDark ? "#070707" : "#FAFAFA")
                               : (isDark ? "#212121" : "#FFFFFF"),
                             boxSizing: "border-box",
@@ -9357,7 +9527,7 @@ function BrowseApiSection({
                           }}
                         >
                           {" "}
-                          {cardStatus === "sent" ? (
+                          {cardStatus === "sent" || cardRepeat ? (
                             <span
                               style={{
                                 fontFamily: "Geist, var(--font-geist-sans)",
@@ -9652,7 +9822,10 @@ function BrowseApiSection({
                             color: "#ffffff",
                           }}
                         >
-                          {cardStatus === "sending" ? "Sending" : "Send"}
+                          {cardStatus === "sending" ? "Sending"
+                          : cardRepeat
+                            ? "Send again"
+                            : "Send"}
                         </span>{" "}
                         {cardStatus !== "sending" ? (
                         <svg

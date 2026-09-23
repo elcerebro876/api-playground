@@ -75,6 +75,39 @@ export function saveExplainDismissed(dismissed: boolean): void {
   } catch { /* storage unavailable — silent fallback */ }
 }
 
+export type CardTestRecord = {
+  key: string;
+  entry: HistoryEntry;
+};
+export type CardTestMap = Record<string, CardTestRecord>;
+
+const CARD_TESTS_KEY = "api-playground-card-tests";
+
+export function loadCardTests(): CardTestMap {
+  try {
+    const raw = window.localStorage.getItem(CARD_TESTS_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== "object" || Array.isArray(p)) return {};
+    const map: CardTestMap = {};
+    for (const [name, rec] of Object.entries(
+      p as Record<string, Partial<CardTestRecord>>,
+    )) {
+      if (!rec || typeof rec.key !== "string" || !rec.entry) continue;
+      map[name] = { key: rec.key, entry: rec.entry as HistoryEntry };
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+export function saveCardTests(map: CardTestMap): void {
+  try {
+    window.localStorage.setItem(CARD_TESTS_KEY, JSON.stringify(map));
+  } catch { /* storage unavailable — silent fallback */ }
+}
+
 export function applyStreakOnLoad(data: StoredData, now: Date = new Date()): StoredData {
   const today = now.toDateString();
   const yesterday = new Date(now.getTime() - 86400000).toDateString();
