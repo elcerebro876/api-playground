@@ -7474,6 +7474,7 @@ function BrowseApiSection({
       name: "Stripe",
       desc: "Create a test payment or inspect your balance",
       keyDesc: "Requires a secret test key from your stripe dashboard",
+      cardKeyDesc: "Requires a secret test key from your dashboard",
       color: "#635BFF",
       letter: "S",
       category: "Payment",
@@ -7489,6 +7490,7 @@ function BrowseApiSection({
       name: "Paystack",
       desc: "initialize transactions for your next product",
       keyDesc: "Requires a secret test key from your Paystack dashboard",
+      cardKeyDesc: "Requires a secret test key from your dashboard",
       color: "#72D46B",
       letter: "P",
       category: "Payment",
@@ -8334,7 +8336,7 @@ function BrowseApiSection({
                     height:
                       api.tag === "No auth"
                         ? compact || w1440
-                          ? 207
+                          ? 203
                           : 210
                         : (api.height ?? 205),
                     transition: "background-color 0.15s ease",
@@ -8503,7 +8505,7 @@ function BrowseApiSection({
                         <span
                           style={{
                             fontFamily: "Geist, var(--font-geist-sans)",
-                            fontSize: 14,
+                            fontSize: compact || w1440 ? 12 : 14,
                             fontWeight: 500,
                             color: isDark
                               ? "#50FF50"
@@ -8524,7 +8526,7 @@ function BrowseApiSection({
                           display: "flex",
                           alignItems: "center",
                           gap: 4,
-                          marginTop: 12,
+                          marginTop: compact || w1440 ? 8 : 12,
                           cursor: "pointer",
                         }}
                         onClick={() => {
@@ -8629,9 +8631,6 @@ function BrowseApiSection({
                             const m = text.match(
                               /(platform\.openai\.com|openweathermap\.org|console\.anthropic\.com)/,
                             );
-                            const break1440 =
-                              w1440 &&
-                              (api.name === "Stripe" || api.name === "Clerk");
                             if (!m)
                               return (
                                 <span
@@ -8642,7 +8641,6 @@ function BrowseApiSection({
                                       compact || w1440 ? "-0.48px" : "-0.56px",
                                     color: "#DC7800",
                                     lineHeight: "20px",
-                                    maxWidth: break1440 ? 170 : undefined,
                                   }}
                                 >
                                   {text}
@@ -8660,7 +8658,6 @@ function BrowseApiSection({
                                     compact || w1440 ? "-0.48px" : "-0.56px",
                                   color: "#DC7800",
                                   lineHeight: "20px",
-                                  maxWidth: break1440 ? 170 : undefined,
                                 }}
                               >
                                 {before}

@@ -1,0 +1,28 @@
+
+> api-playground@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.11 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.100.120:3000
+- Environments: .env.local
+✓ Ready in 7.8s
+
+ GET / 200 in 2.3s (next.js: 1366ms, application-code: 889ms)
+ GET / 200 in 92ms (next.js: 12ms, application-code: 81ms)
+✓ Compiled in 5.2s
+ GET / 200 in 999ms (next.js: 754ms, application-code: 245ms)
+✓ Compiled in 1006ms
+ GET / 200 in 475ms (next.js: 366ms, application-code: 109ms)
+✓ Compiled in 350ms
+ GET / 200 in 342ms (next.js: 264ms, application-code: 78ms)
+✓ Compiled in 1457ms
+ GET / 200 in 291ms (next.js: 192ms, application-code: 100ms)
+ GET / 200 in 2.4s (next.js: 306ms, application-code: 2.1s)
+ GET /lab/1683176e2fff933ebaf19bc56f89279664fe8f01.webp 404 in 1366ms (next.js: 1006ms, application-code: 360ms)
+ GET /lab/20e1b5a5575dfb7875d6b40016e07ae21b9937bc.webp 404 in 146ms (next.js: 27ms, application-code: 119ms)
+ GET /lab/1683176e2fff933ebaf19bc56f89279664fe8f01.webp 404 in 104ms (next.js: 24ms, application-code: 80ms)
+ GET /works/Playground/Playground-mobile.png 404 in 99ms (next.js: 17ms, application-code: 82ms)
+ GET /lab/9ecb35cd9f4604bab6ba216fa3d6942e987e8561.png 404 in 94ms (next.js: 17ms, application-code: 77ms)
+ GET /lab/20e1b5a5575dfb7875d6b40016e07ae21b9937bc.webp 404 in 263ms (next.js: 46ms, application-code: 217ms)
+[?25h
