@@ -1,6 +1,9 @@
 import { callAIJson } from "@/lib/ai";
+import { authHintForUrl, type AuthHint } from "@/lib/api-auth";
 
 export const DIAGNOSIS_MAX_USES = 5;
+
+export type DiagnosisConfidence = "high" | "medium" | "low";
 
 export type DiagnosisFix = {
   from: string;
@@ -17,6 +20,9 @@ export type DiagnosisResult = {
   identifiable: boolean;
   title?: string;
   message?: string;
+  // Short quote from the response that justifies the diagnosis, if provided.
+  evidence?: string;
+  confidence?: DiagnosisConfidence;
   headerFix?: DiagnosisFix | null;
   valueFix?: DiagnosisValueFix | null;
 };
@@ -178,8 +184,10 @@ export async function generateDiagnosis(
           .join("\n")
       : "(none)";
 
+  const hint = authHintForUrl(input.url);
+
   const prompt = [
-    "You diagnose why a single HTTP request failed.",
+    "You diagnose why a single HTTP request failed, so the user can fix it.",
     "",
     "REQUEST:",
     `Method: ${input.method}`,
@@ -193,16 +201,35 @@ export async function generateDiagnosis(
     responseHeaderLines,
     "Response body:",
     input.responseBody || "(empty body)",
+    ...(hint
+      ? [
+          "",
+          "KNOWN AUTH CONVENTION FOR THIS HOST (authoritative - prefer this over generic assumptions):",
+          hint.note,
+        ]
+      : []),
     "",
-    "Decide whether there is an IDENTIFIABLE, concrete cause for this failure that is grounded in the request above - for example the API expects a different auth scheme or header key, a required header is missing, the wrong parameter or content type is used, or the URL path does not exist.",
+    "HOW TO DECIDE:",
+    "1. Read the status and response body, and quote the vendor's own words as evidence.",
+    "2. Decide whether this is a REQUEST-side fault that is concrete and grounded in the request above.",
+    "3. Classify the request-side fault: wrong auth scheme, wrong header name, wrong header value, key belongs somewhere else (e.g. a query parameter), a required header is missing, wrong content type, or wrong path/method.",
     "",
-    'If an identifiable cause exists, return STRICT JSON with exactly these fields: {"identifiable": true, "title": "<short title, max 6 words>", "message": "<one sentence, under ~28 words, naming the exact wrong field>", "headerFix": {"from": "<WrongHeader>", "to": "<CorrectHeader>", "stripScheme": true}, "valueFix": {"key": "<HeaderName>", "stripScheme": true}}. Populate at most one of headerFix or valueFix (or set both to null).',
-    "headerFix must be set ONLY when the same secret value the user already sent should be moved verbatim from the request header \"from\" to the request header \"to\" (set stripScheme true when the value must drop a leading \"Bearer \"/\"Basic \" style scheme word, false when the value must keep it).",
-    'If no such concrete, actionable cause exists (ambiguous or empty error message, the failure cannot be pinned to a request-side fault), return STRICT JSON with exactly: {"identifiable": false}.',
-    "headerFix must NOT repeat the same header name in both from and to (compare case-insensitively): it is only for moving a value to a DIFFERENT header.",
-    'When the failure is caused by an invalid, expired, wrong, or missing VALUE inside a correctly-named header that the user DID send (e.g. a 401 with message like "Invalid API key"), the cause is identifiable: set title and message, set headerFix to null, and set valueFix: {"key": "<ThatHeaderName>", "stripScheme": true} where the value inside that header must be REPLACED by the user (set stripScheme true when the current value carries a leading "Bearer "/"Basic " scheme word, so the user pastes the raw secret without it).',
-    'valueFix.key must be one of the auth headers actually present in the request AND correctly named for that API (authorization, x-api-key, api-key, token, cookie, or similar), where ONLY the secret value inside it is faulty. valueFix means: the header name is right, but the value is invalid/expired/wrong and must be replaced. Never use valueFix when the header the API expects is DIFFERENT from what the user sent - if the wrong header name was used, set headerFix instead (move the value to the correct header); if the header is missing entirely, do not set valueFix at all.',
-    "Never invent causes. Return JSON only.",
+    "OUTPUT RULES:",
+    'Return STRICT JSON: {"identifiable": <bool>, "title": "<max 6 words>", "message": "<one sentence, under ~28 words, naming the exact field and the fix>", "evidence": "<short quote from the response that justifies this>", "confidence": "high"|"medium"|"low", "headerFix": {"from": "<WrongHeader>", "to": "<CorrectHeader>", "stripScheme": <bool>} | null, "valueFix": {"key": "<HeaderName>", "stripScheme": <bool>} | null}.',
+    "When identifiable is false, return exactly {\"identifiable\": false} with no other fields.",
+    "headerFix: set ONLY when the same secret the user already sent must move VERBATIM to a DIFFERENT header. `from` and `to` must differ (case-insensitive). Set stripScheme true when the value must drop a leading scheme word such as \"Bearer \" or \"Basic \".",
+    'valueFix: set ONLY when the header name is already correct for this API, the user DID send it, and the secret VALUE inside it is wrong/expired. key must be one of the auth headers actually present in the request. Set stripScheme true when the current value carries a leading scheme word.',
+    "Emit at most one of headerFix/valueFix. If the fix is neither a header rename nor a header-value replacement (for example the key belongs in a query parameter, a header is missing entirely, or the fault is elsewhere), set BOTH to null and state the exact fix in `message`.",
+    "Use confidence \"high\" only when the response evidence clearly supports the fault; use \"low\" when you are unsure.",
+    "Never invent a cause. If no concrete request-side fault is supported by the evidence, return {\"identifiable\": false}.",
+    "",
+    "EXAMPLES:",
+    'Request: GET https://api.weather.example/data?city=London  |  Authorization: Bearer ****\\nResponse: 401 {"message":"Invalid API key"}\\nKnown: this API expects the key in the `appid` query parameter.\\n=> {"identifiable":true,"title":"Key in wrong place","message":"This API expects your key in the `appid` query parameter, not an Authorization header.","evidence":"Invalid API key","confidence":"high","headerFix":null,"valueFix":null}',
+    'Request: GET https://api.example.com/v1/me  |  Authorization: Bearer ****\\nResponse: 401 {"error":"Missing x-api-key header"}\\nKnown: this API expects the key in the `x-api-key` header.\\n=> {"identifiable":true,"title":"Wrong auth header","message":"Send your key in the `x-api-key` header instead of `Authorization`.","evidence":"Missing x-api-key header","confidence":"high","headerFix":{"from":"Authorization","to":"x-api-key","stripScheme":true},"valueFix":null}',
+    'Request: GET https://api.example.com/v1/me  |  x-api-key: ****\\nResponse: 403 {"error":"Invalid or expired API key"}\\nKnown: this API expects the key in the `x-api-key` header.\\n=> {"identifiable":true,"title":"Invalid API key","message":"Your `x-api-key` value is invalid or expired; replace it with a valid key.","evidence":"Invalid or expired API key","confidence":"high","headerFix":null,"valueFix":{"key":"x-api-key","stripScheme":false}}',
+    'Request: GET https://api.example.com/v1/items  |  Authorization: Bearer ****\\nResponse: 503 {"error":"upstream unavailable"}\\n=> {"identifiable":false}',
+    "",
+    "Return JSON only.",
   ].join("\n");
 
   const text = await callAIJson(prompt, {
@@ -284,11 +311,65 @@ export async function generateDiagnosis(
     hasHeader
       ? { key: vf.key.trim(), stripScheme: vf.stripScheme }
       : null;
-  return {
+  const rawConfidence = parsed.confidence;
+  const confidence: DiagnosisConfidence | undefined =
+    rawConfidence === "high" || rawConfidence === "medium" || rawConfidence === "low"
+      ? rawConfidence
+      : undefined;
+  const evidence =
+    typeof parsed.evidence === "string" && parsed.evidence.trim()
+      ? parsed.evidence.trim().slice(0, 300)
+      : undefined;
+  return applyAuthGuards(hint, {
     identifiable: true,
     title: parsed.title.trim(),
     message: parsed.message.trim(),
+    evidence,
+    confidence,
     headerFix,
     valueFix,
-  };
+  });
+}
+
+// Rule-based checks applied after the model answers. They cannot add a fix the
+// schema cannot express, but they can remove a fix that contradicts a known
+// convention or is under-confident, so the user is never handed a one-click
+// action that is known to be wrong.
+function applyAuthGuards(
+  hint: AuthHint | null,
+  result: DiagnosisResult,
+): DiagnosisResult {
+  if (!result.identifiable) return result;
+
+  let headerFix = result.headerFix ?? null;
+  let valueFix = result.valueFix ?? null;
+  let message = result.message ?? "";
+
+  const queryParam =
+    hint && hint.expected.kind === "query" ? hint.expected.params[0] : undefined;
+
+  // Under-confident fixes are not actionable enough to offer as one-click.
+  if (result.confidence === "low" && (headerFix || valueFix)) {
+    headerFix = null;
+    valueFix = null;
+  }
+
+  // Public endpoints take no credentials.
+  if (hint?.expected.kind === "none" && (headerFix || valueFix)) {
+    headerFix = null;
+    valueFix = null;
+  }
+
+  // The schema only expresses header renames and header-value replacements. When
+  // the host puts the key in a query parameter, any header-based fix is wrong,
+  // so drop it and make sure the message names the parameter.
+  if (queryParam && (headerFix || valueFix)) {
+    headerFix = null;
+    valueFix = null;
+    if (!message.toLowerCase().includes(queryParam.toLowerCase())) {
+      message = `This API expects the key in the \`${queryParam}\` query parameter, not in a request header.`;
+    }
+  }
+
+  return { ...result, message, headerFix, valueFix };
 }
