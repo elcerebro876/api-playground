@@ -3,8 +3,8 @@
   "1": "devDependencies",
   "2": "compilerOptions",
   "3": "dependencies",
-  "4": "include",
-  "5": "package.json",
+  "4": "ai.ts",
+  "5": "diagnose.ts",
   "6": "LoadingState.tsx",
   "7": "layout.tsx",
   "8": "README.md",
@@ -13,6 +13,7 @@
   "11": "next.config.ts",
   "12": "postcss.config.mjs",
   "13": "route.js",
-  "14": "route.ts",
-  "15": "CLAUDE.md"
+  "14": "explain/route.ts",
+  "15": "CLAUDE.md",
+  "16": "include"
 }

@@ -81,6 +81,24 @@ export type CardTestRecord = {
 };
 export type CardTestMap = Record<string, CardTestRecord>;
 
+const DIAGNOSIS_USES_KEY = "api-playground-diagnosis-uses";
+
+export function loadDiagnosisUses(): number {
+  try {
+    const raw = window.localStorage.getItem(DIAGNOSIS_USES_KEY);
+    if (!raw) return 0;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch { /* storage unavailable — silent fallback */ }
+  return 0;
+}
+
+export function saveDiagnosisUses(count: number): void {
+  try {
+    window.localStorage.setItem(DIAGNOSIS_USES_KEY, String(count));
+  } catch { /* storage unavailable — silent fallback */ }
+}
+
 const CARD_TESTS_KEY = "api-playground-card-tests";
 
 export function loadCardTests(): CardTestMap {

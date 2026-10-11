@@ -1,5 +1,6 @@
 import { getSupabase, type ExplainRecord } from "@/lib/supabase";
-import { generateExplanation, isGeminiConfigured } from "@/lib/explain";
+import { generateExplanation } from "@/lib/explain";
+import { isAIConfigured } from "@/lib/ai";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 // Cheap deterministic signature of the request so cached explanations are not
@@ -16,7 +17,7 @@ function requestSignature(responseBody: string): string {
 
 export async function POST(request: Request) {
   const ip = clientIp(request);
-  const rl = rateLimit(`explain:${ip}`);
+  const rl = await rateLimit(`explain:${ip}`);
   if (!rl.ok) {
     return Response.json(
       { error: "Too many requests, try again later" },
@@ -77,11 +78,11 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!isGeminiConfigured()) {
+  if (!isAIConfigured()) {
     return Response.json(
       {
         error:
-          "AI explanation is not configured yet. Add GEMINI_API_KEY and a Supabase project to enable it.",
+          "AI explanation is not configured yet. Add CEREBRAS_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY to enable it.",
       },
       { status: 503 },
     );

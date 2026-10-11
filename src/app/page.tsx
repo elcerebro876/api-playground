@@ -18,8 +18,9 @@ import {
 } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
-import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, type HistoryEntry } from "@/lib/storage";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, type HistoryEntry } from "@/lib/storage";
 import type { ExplainPayload } from "@/lib/explain";
+import { DIAGNOSIS_MAX_USES, maskHeaders, maskHeaderValue, maskUrlSecrets, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed } from "@/lib/posthog";
 const cardTextSpring = {
   type: "spring" as const,
@@ -177,6 +178,48 @@ export default function Home() {
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainError, setExplainError] = useState(false);
   const [explainData, setExplainData] = useState<ExplainPayload | null>(null);
+  const diagUsesRef = useRef(0);
+  const diagTokenRef = useRef(0);
+  const diagAvailableRef = useRef<boolean | null>(null);
+  const diagReqRef = useRef<{
+    m: string;
+    u: string;
+    h: Record<string, string>;
+    data: {
+      status?: number;
+      body?: string;
+      headers?: Record<string, string>;
+    };
+  } | null>(null);
+  const [lastExplorerReq, setLastExplorerReq] = useState<{
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+  } | null>(null);
+  const [diagState, setDiagState] = useState<
+    "idle" | "loading" | "result" | "fallback"
+  >("idle");
+  const [diag, setDiag] = useState<DiagnosisResult | null>(null);
+  useEffect(() => {
+    diagUsesRef.current = loadDiagnosisUses();
+    let alive = true;
+    fetch("/api/diagnose", { method: "GET" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (alive) diagAvailableRef.current = Boolean(j?.configured);
+      })
+      .catch(() => {
+        if (alive) diagAvailableRef.current = false;
+      })
+      .finally(() => {
+        if (alive && diagAvailableRef.current === null) {
+          diagAvailableRef.current = false;
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const firstNoAuthPopupShown = useRef(false);
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [explorerHovered, setExplorerHovered] = useState(false);
@@ -286,6 +329,69 @@ export default function Home() {
     );
     handleDiscoverySelect(rec.entry, idx);
   };
+  const runDiagnosis = useCallback(
+    (
+      m: string,
+      u: string,
+      h: Record<string, string>,
+      data: {
+        status?: number;
+        body?: string;
+        headers?: Record<string, string>;
+      },
+    ) => {
+    diagReqRef.current = { m, u, h, data };
+    if (
+      diagUsesRef.current >= DIAGNOSIS_MAX_USES ||
+      diagAvailableRef.current !== true
+    ) {
+      setDiag(null);
+      setDiagState("fallback");
+      return;
+    }
+    const token = diagTokenRef.current;
+    setDiag(null);
+    setDiagState("loading");
+    void (async () => {
+      try {
+        const res = await fetch("/api/diagnose", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            method: m,
+            url: maskUrlSecrets(u),
+            requestHeaders: maskHeaders(h),
+            status: typeof data?.status === "number" ? data.status : null,
+            responseHeaders: data?.headers ?? null,
+            responseBody: typeof data?.body === "string" ? data.body : "",
+          }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const j: DiagnosisResult = await res.json();
+        if (token !== diagTokenRef.current) return;
+        diagUsesRef.current += 1;
+        saveDiagnosisUses(diagUsesRef.current);
+        if (j && j.identifiable && j.title && j.message) {
+          setDiag(j);
+          setDiagState("result");
+        } else {
+          setDiag(null);
+          setDiagState("fallback");
+        }
+      } catch {
+        if (token !== diagTokenRef.current) return;
+        setDiag(null);
+        setDiagState("fallback");
+      }
+    })();
+    },
+    [],
+  );
+  const retryDiagnosis = useCallback(() => {
+    const r = diagReqRef.current;
+    if (r) runDiagnosis(r.m, r.u, r.h, r.data);
+  }, [runDiagnosis]);
+
   const sendRequest = useCallback(
     async (opts?: {
       method?: string;
@@ -312,6 +418,12 @@ export default function Home() {
         if (headerKey && headerValue) h[headerKey] = headerValue;
         if (headerBearer) h["Authorization"] = `Bearer ${headerBearer}`;
       }
+      diagTokenRef.current += 1;
+      setDiagState("idle");
+      setDiag(null);
+      if (!opts?.apiName) {
+        setLastExplorerReq({ method: m, url: u, headers: { ...h } });
+      }
       try {
         trackToolUsed({ method: m, url: u });
         const res = await fetch("/api/proxy", {
@@ -329,11 +441,23 @@ export default function Home() {
           setResponseKey((k) => k + 1);
           setResponse(data);
           setHeadersFilter("common");
+          const failed =
+            data.error ||
+            (typeof data.status === "number" && data.status >= 400);
+          if (failed) {
+            runDiagnosis(m, u, h, data);
+          }
         }
         if (opts?.apiName && !opts?.suppressExplain) {
           setResponseKey((k) => k + 1);
           setResponse(data);
           setHeadersFilter("common");
+          const failed =
+            data.error ||
+            (typeof data.status === "number" && data.status >= 400);
+          if (failed) {
+            runDiagnosis(m, u, h, data);
+          }
         }
         const entry = {
           method: m,
@@ -467,6 +591,7 @@ export default function Home() {
       discoveryHistory,
       apisTested,
       streak,
+      runDiagnosis,
     ],
   );
   const openExplain = useCallback(
@@ -692,6 +817,7 @@ export default function Home() {
                 setHeaderBearer("");
                 setHeaderValue("");
               }}
+              onEditRequest={() => setResponse(null)}
               responseKey={responseKey}
               headersFilter={headersFilter}
               setHeadersFilter={setHeadersFilter}
@@ -715,6 +841,10 @@ export default function Home() {
               sessionCardTests={sessionCardTests}
               onCardTested={handleCardTested}
               onViewLastResponse={handleViewLastResponse}
+              diagState={diagState}
+              diag={diag}
+              lastRequest={lastExplorerReq}
+              onRetryDiagnosis={retryDiagnosis}
             />{" "}
           </motion.div>{" "}
         </div>{" "}
@@ -2562,7 +2692,7 @@ function MobilePrimary({
       )}{" "}
       <AnimatePresence>
         {" "}
-        {showCheatSheet && (
+        {showCheatSheet && !loading && !response && (
           <>
             {" "}
             <motion.div
@@ -4273,6 +4403,257 @@ const methodDots: Record<string, string> = {
   PATCH: "#ff25ff",
   DELETE: "#ff4e4e",
 };
+function fallbackHintText(
+  response: {
+    status?: number;
+    ok?: boolean;
+    error?: string;
+    body?: string;
+  } | null,
+): string {
+  if (!response) return "The API rejected the request";
+  if (response.error) return "Could not reach the server";
+  const body = String(response.body ?? "").slice(0, 2000).toLowerCase();
+  if (/<!doctype html|<html|<head|nginx|cloudflare/i.test(body)) {
+    return "This hit the server, not an API";
+  }
+  if (typeof response.status === "number") {
+    if (response.status === 429) return "Rate limited by the API";
+    if (response.status === 401 || response.status === 403) {
+      return "Auth rejected by the API";
+    }
+  }
+  return "The API rejected the request";
+}
+
+type StagedFix = {
+  mode: "move" | "rewrite";
+  from: string;
+  to: string;
+  stripScheme: boolean;
+  originalValue: string;
+  stagedKey: string;
+  stagedValue: string;
+  fixValue: string;
+  flaggedShown: boolean;
+  fixEditing: boolean;
+};
+
+function StagedFixEditor({
+  stagedFix,
+  onValueChange,
+  onApply,
+  onFix,
+  isDark,
+}: {
+  stagedFix: StagedFix;
+  onValueChange: (value: string) => void;
+  onApply: () => void;
+  onFix: () => void;
+  isDark: boolean;
+}) {
+  return (
+    <div
+      style={{
+        width: 467,
+        maxWidth: "calc(100% - 32px)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <div
+        style={{
+          borderRadius: 6,
+          backgroundColor: isDark ? "#161616" : "#FCFCFC",
+          border: isDark ? "0.8px solid #2d2d2d" : "0.8px solid #f2f2f2",
+          padding: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        <div className="flex items-center" style={{ gap: 8 }}>
+          <span
+            style={{
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 12,
+              fontWeight: 500,
+              letterSpacing: "-0.48px",
+              color: isDark ? "#9e9e9e" : "#585858",
+            }}
+          >
+            Headers
+          </span>
+          {stagedFix.flaggedShown && !stagedFix.fixEditing && (
+            <span
+              style={{
+                marginLeft: "auto",
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 12,
+                letterSpacing: "-0.48px",
+                color: isDark ? "#ff6b6b" : "#FF1616",
+                whiteSpace: "nowrap",
+              }}
+            >
+              1 flagged
+            </span>
+          )}
+        </div>
+        {stagedFix.flaggedShown && (
+          <div
+            style={{
+              borderRadius: 8,
+              backgroundColor: isDark ? "#0c0c0c" : "#FAFAFA",
+              border: stagedFix.fixEditing
+                ? isDark
+                  ? "1px solid #2d2d2d"
+                  : "1px solid #f2f2f2"
+                : isDark
+                  ? "1px solid #ff6b6b"
+                  : "1px solid #FF1616",
+              padding: "12px",
+              height: 44,
+              boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            {stagedFix.fixEditing ? (
+              <input
+                type="text"
+                autoFocus
+                value={stagedFix.fixValue}
+                onChange={(e) => onValueChange(e.target.value)}
+                placeholder="enter the correct key"
+                className="placeholder:text-[#6e6d6d]"
+                style={{
+                  width: "100%",
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 14,
+                  letterSpacing: "-0.56px",
+                  color: isDark ? "#d1d1d1" : "#5a5a5a",
+                  border: "none",
+                  outline: "none",
+                  background: "transparent",
+                }}
+              />
+            ) : (
+              <>
+                <span
+                  style={{
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 14,
+                    letterSpacing: "-0.56px",
+                    color: isDark ? "#9e9e9e" : "#5a5a5a",
+                    textDecoration: "line-through",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {stagedFix.originalValue}
+                </span>
+                <span
+                  style={{
+                    marginLeft: "auto",
+                    flexShrink: 0,
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 12,
+                    letterSpacing: "-0.48px",
+                    color: isDark ? "#ff6b6b" : "#FF1616",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                  onClick={onFix}
+                >
+                  Fix
+                </span>
+              </>
+            )}
+          </div>
+        )}
+        <div
+          style={{
+            borderRadius: 8,
+            backgroundColor: isDark ? "#0c0c0c" : "#FAFAFA",
+            border: isDark ? "1px solid #2d2d2d" : "1px solid #f2f2f2",
+            padding: "12px",
+          }}
+        >
+          <div className="flex items-center" style={{ gap: 8 }}>
+            <span
+              style={{
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 12,
+                fontWeight: 500,
+                letterSpacing: "-0.48px",
+                color: "#5b5bff",
+              }}
+            >
+              {stagedFix.stagedKey}
+            </span>
+            <span
+              style={{
+                marginLeft: "auto",
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 12,
+                fontWeight: 500,
+                letterSpacing: "-0.48px",
+                color: "#5b5bff",
+              }}
+            >
+              expected
+            </span>
+          </div>
+          {stagedFix.stagedValue ? (
+            <span
+              style={{
+                marginTop: 4,
+                display: "block",
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 14,
+                letterSpacing: "-0.56px",
+                color: isDark ? "#d1d1d1" : "#5a5a5a",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {stagedFix.stagedValue}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <div
+        className="flex items-center"
+        style={{ justifyContent: "flex-end" }}
+      >
+        <RippleButton
+          className="transition-colors hover:bg-[#4a4aff]"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: 28,
+            padding: "0 10px",
+            borderRadius: 6,
+            backgroundColor: "#5A5AFF",
+            color: "#ffffff",
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 12,
+            whiteSpace: "nowrap",
+          }}
+          onClick={onApply}
+        >
+          Apply and retry
+        </RippleButton>
+      </div>
+    </div>
+  );
+}
+
 function MainContent({
   activeTheme,
   method,
@@ -4289,6 +4670,7 @@ function MainContent({
   loading,
   onSend,
   onClearResponse,
+  onEditRequest,
   responseKey,
   headersFilter,
   setHeadersFilter,
@@ -4311,6 +4693,10 @@ function MainContent({
   sessionCardTests,
   onCardTested,
   onViewLastResponse,
+  diagState,
+  diag,
+  lastRequest,
+  onRetryDiagnosis,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -4343,6 +4729,7 @@ function MainContent({
     suppressExplain?: boolean;
   }) => void;
   onClearResponse: () => void;
+  onEditRequest: () => void;
   responseKey: number;
   headersFilter: string;
   setHeadersFilter: (v: string) => void;
@@ -4368,10 +4755,110 @@ function MainContent({
   sessionCardTests: Record<string, { key: string; entry: HistoryEntry }>;
   onCardTested: (apiName: string, snapshot: HistoryEntry, key: string) => void;
   onViewLastResponse: (apiName: string) => void;
+  diagState: "idle" | "loading" | "result" | "fallback";
+  diag: DiagnosisResult | null;
+  lastRequest: {
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+  } | null;
+  onRetryDiagnosis: () => void;
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
   const [showBrowseApi, setShowBrowseApi] = useState(false);
+  const [stagedFix, setStagedFix] = useState<StagedFix | null>(null);
+  const [fixingNow, setFixingNow] = useState(false);
+  const fixTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (fixTimerRef.current) clearTimeout(fixTimerRef.current);
+    };
+  }, []);
+  const openStagedFix = () => {
+    if (!diag) return;
+    const mf = diag.headerFix;
+    const vf = diag.valueFix;
+    if (!mf && !vf) return;
+    const from = mf ? mf.from : vf ? vf.key : "";
+    const to = mf ? mf.to : vf ? vf.key : "";
+    const stripScheme = mf
+      ? mf.stripScheme
+      : vf
+        ? vf.stripScheme
+        : false;
+    const headers = lastRequest?.headers;
+    const findHeaderValue = (name: string) => {
+      if (!headers || !name) return "";
+      if (headers[name] !== undefined) return headers[name];
+      const lower = name.toLowerCase();
+      const hit = Object.entries(headers).find(
+        ([k]) => k.toLowerCase() === lower,
+      );
+      return hit ? hit[1] : "";
+    };
+    const originalValue = findHeaderValue(from);
+    const stripped = stripScheme
+      ? originalValue
+          .replace(/^(Bearer|Basic|Token|ApiKey|Digest)\s+/i, "")
+          .trim()
+      : originalValue;
+    setStagedFix({
+      mode: mf ? "move" : "rewrite",
+      from,
+      to,
+      stripScheme,
+      originalValue: maskHeaderValue(originalValue),
+      stagedKey: to,
+      stagedValue: stripped,
+      fixValue: "",
+      flaggedShown: true,
+      fixEditing: false,
+    });
+  };
+  const applyStagedFix = () => {
+    if (!stagedFix) return;
+    const fix = stagedFix;
+    const nextValue = fix.fixValue || fix.stagedValue;
+    if (fix.mode === "rewrite") {
+      if (fix.stagedKey.toLowerCase() === "authorization") {
+        setHeaderBearer(nextValue);
+        setHeaderKey("");
+        setHeaderValue("");
+      } else {
+        setHeaderKey(fix.stagedKey);
+        setHeaderValue(nextValue);
+      }
+    } else {
+      setHeaderKey(fix.stagedKey);
+      setHeaderValue(nextValue);
+      if (fix.from.toLowerCase() === "authorization") {
+        setHeaderBearer("");
+      }
+    }
+    setStagedFix(null);
+    setHeaderExpanded(false);
+    onSend({
+      method: lastRequest?.method || method,
+      url: lastRequest?.url || url,
+    });
+  };
+  const handleFixClick = () => {
+    if (!diag || (!diag.headerFix && !diag.valueFix) || fixingNow) return;
+    if (fixTimerRef.current) clearTimeout(fixTimerRef.current);
+    setFixingNow(true);
+    fixTimerRef.current = setTimeout(() => {
+      setFixingNow(false);
+      openStagedFix();
+    }, 700);
+  };
+  const startFixing = () => {
+    if (!stagedFix) return;
+    setStagedFix((s) => (s ? { ...s, fixEditing: true } : s));
+  };
+  const onStagedValueChange = (value: string) => {
+    setStagedFix((s) => (s ? { ...s, fixValue: value } : s));
+  };
   const isDiscovery = explainCtx !== null;
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const todayKey = new Date().toDateString();
@@ -4463,16 +4950,39 @@ function MainContent({
   const [resultHeight, setResultHeight] = useState<number | "auto">("auto");
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      if (headerExpanded && !dismissedCheatSheet) setShowCheatSheet(true);
-      if (!headerExpanded) setShowCheatSheet(false);
+      setShowCheatSheet(
+        headerExpanded &&
+          !dismissedCheatSheet &&
+          !loading &&
+          !response &&
+          !showBrowseApi,
+      );
     });
     return () => cancelAnimationFrame(frame);
-  }, [headerExpanded, dismissedCheatSheet]);
+  }, [headerExpanded, dismissedCheatSheet, loading, response, showBrowseApi]);
   useLayoutEffect(() => {
-    if (resultContentRef.current) {
-      setResultHeight(resultContentRef.current.scrollHeight);
-    }
-  }, [headersFilter, response, headersCollapsed]);
+    const el = resultContentRef.current;
+    if (!el) return;
+    const measure = () => setResultHeight(el.scrollHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [headersFilter, response, headersCollapsed, diagState]);
+  const resultScrollRef = useRef<HTMLDivElement | null>(null);
+  const [showResultBlur, setShowResultBlur] = useState(false);
+  const handleResultScroll = () => {
+    const el = resultScrollRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    setShowResultBlur(max > 0 && el.scrollTop < max - 2);
+  };
+  useLayoutEffect(() => {
+    const el = resultScrollRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    setShowResultBlur(max > 0 && el.scrollTop < max - 2);
+  }, [response, resultHeight]);
   const pillUrlRef = useRef<HTMLSpanElement>(null);
   const [urlWrapped, setUrlWrapped] = useState(false);
   useLayoutEffect(() => {
@@ -4906,10 +5416,11 @@ function MainContent({
                                   </div>{" "}
                                 </div>{" "}
                               </div>{" "}
-                              <div
-                                className="flex"
-                                style={{ gap: 16, padding: "0 12px 12px" }}
-                              >
+                                <>
+                                  <div
+                                    className="flex"
+                                    style={{ gap: 16, padding: "0 12px 12px" }}
+                                  >
                                 {" "}
                                 <div
                                   className="flex flex-col"
@@ -4932,18 +5443,20 @@ function MainContent({
                                     }}
                                   >
                                     {" "}
-                                    <span
-                                      style={{
-                                        fontFamily:
-                                          "Geist, var(--font-geist-sans)",
-                                        fontSize: 12,
-                                        letterSpacing: "-0.48px",
-                                        color: isDark ? "#8c8c8c" : "#5b5b5b",
-                                      }}
-                                    >
-                                      {" "}
-                                      Authorization{" "}
-                                    </span>{" "}
+<span
+                                        style={{
+                                          fontFamily:
+                                            "Geist, var(--font-geist-sans)",
+                                          fontSize: 12,
+                                          letterSpacing: "-0.48px",
+                                          color: isDark
+                                            ? "#8c8c8c"
+                                            : "#5b5b5b",
+                                        }}
+                                      >
+                                        {" "}
+                                        Authorization{" "}
+                                      </span>{" "}
                                   </div>{" "}
                                   <div
                                     style={{
@@ -5080,6 +5593,7 @@ function MainContent({
                                   </div>{" "}
                                 </div>{" "}
                               </div>{" "}
+                                </>
                             </div>{" "}
                           </motion.div>{" "}
                           <motion.div
@@ -5090,11 +5604,14 @@ function MainContent({
                             transition={{ delay: 0.05, duration: 0.15 }}
                           >
                             {" "}
-                            <div
-                              className="absolute cursor-pointer"
-                              style={{ right: 45, top: 137 }}
-                              onClick={() => setHeaderExpanded(false)}
-                            >
+<div
+                                className="absolute cursor-pointer"
+                                style={{ right: 45, top: 137 }}
+                                onClick={() => {
+                                  if (stagedFix) setStagedFix(null);
+                                  setHeaderExpanded(false);
+                                }}
+                              >
                               {" "}
                               <svg
                                 width="18"
@@ -5435,7 +5952,48 @@ function MainContent({
                 </svg>{" "}
               </div>
             )}{" "}
+            {!isDiscovery && (
+              <div
+                style={{
+                  position: "absolute",
+                  left: 24,
+                  top: 24,
+                  width: 32,
+                  height: 32,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 8,
+                  backgroundColor: isDark ? "#161616" : "#ffffff",
+                  cursor: "pointer",
+                  zIndex: 3,
+                }}
+                title="Back to playground"
+                onClick={() => {
+                  setShowBrowseApi(false);
+                  onClearResponse();
+                }}
+              >
+                {" "}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  style={{ flexShrink: 0 }}
+                >
+                  {" "}
+                  <path
+                    d="M8.77563 7.75953L8.77665 7.99559C8.77665 8.97668 8.71919 9.87112 8.63265 10.4542L8.55683 10.8168C8.51465 11.0088 8.45919 11.2275 8.40138 11.3391C8.18974 11.7474 7.77593 12 7.33303 12L7.29448 12C7.00576 11.9905 6.39922 11.7371 6.39922 11.7283C5.42323 11.3188 3.54031 10.0829 2.67067 9.20174L2.41795 8.93721C2.35178 8.86551 2.27743 8.78066 2.23127 8.71452C2.07709 8.51037 2 8.25776 2 8.00514C2 7.72315 2.08654 7.46099 2.25018 7.24656L2.50982 6.96635L2.56799 6.90655C3.35707 6.05104 5.41741 4.6521 6.49522 4.22398L6.65794 4.16161C6.85376 4.09143 7.12812 4.00771 7.29448 4C7.50611 4 7.70829 4.0492 7.90102 4.14614C8.14174 4.28199 8.33374 4.49642 8.43992 4.74904C8.50756 4.92381 8.61374 5.44887 8.61374 5.45842C8.71108 5.98783 8.76752 6.82321 8.77563 7.75953ZM14 8.00029C14 8.55913 13.5513 9.01223 12.9978 9.01223L10.5317 8.79413C10.0975 8.79413 9.74551 8.4387 9.74551 8.00029C9.74551 7.56115 10.0975 7.20646 10.5317 7.20646L12.9978 6.98836C13.5513 6.98836 14 7.44145 14 8.00029Z"
+                    fill={isDark ? "#F7F7F7" : "#5a5a5a"}
+                    fillRule="nonzero"
+                  />{" "}
+                </svg>{" "}
+              </div>
+            )}{" "}
             <div
+              ref={resultScrollRef}
+              onScroll={handleResultScroll}
               className="hide-scrollbar"
               style={{
                 position: "absolute",
@@ -5656,7 +6214,7 @@ function MainContent({
                 }}
               >
                 {" "}
-                <div ref={resultContentRef}>
+                <div ref={resultContentRef} style={{ paddingBottom: 16 }}>
                   {" "}
                   {!response ? (
                     <div style={{ padding: 16 }}>
@@ -5702,7 +6260,15 @@ function MainContent({
                                 display: "inline-flex",
                                 alignItems: "center",
                                 borderRadius: 6,
-                                backgroundColor: "#caffca",
+                                backgroundColor:
+                                  (response.status ?? 0) >= 200 &&
+                                  (response.status ?? 0) < 300
+                                    ? isDark
+                                      ? "#173517"
+                                      : "#caffca"
+                                    : isDark
+                                      ? "#2b1414"
+                                      : "#ffeeee",
                                 padding: "4px 8px",
                                 fontFamily: "Geist, var(--font-geist-sans)",
                                 fontSize: 14,
@@ -5710,12 +6276,38 @@ function MainContent({
                                 color:
                                   (response.status ?? 0) >= 200 &&
                                   (response.status ?? 0) < 300
-                                    ? "#008000"
-                                    : "#dc143c",
+                                    ? isDark
+                                      ? "#52c41a"
+                                      : "#008000"
+                                    : isDark
+                                      ? "#ff6b6b"
+                                      : "#FF1616",
                               }}
                             >
                               {response.status}
                             </span>{" "}
+                            {diagState !== "idle" && (
+                              <span
+                                style={{
+                                  flexShrink: 0,
+                                  maxWidth: "45%",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  fontFamily: "Geist, var(--font-geist-sans)",
+                                  fontSize: 14,
+                                  fontWeight: 500,
+                                  color: isDark ? "#9e9e9e" : "#585858",
+                                }}
+                              >
+                                {(lastRequest?.method || method).toUpperCase()}{" "}
+                                request.{" "}
+                                {(lastRequest?.url || url).replace(
+                                  /^https?:\/\//i,
+                                  "",
+                                )}
+                              </span>
+                            )}{" "}
                             <span
                               style={{
                                 fontFamily: "Geist, var(--font-geist-sans)",
@@ -6234,6 +6826,462 @@ function MainContent({
                           />{" "}
                         </motion.div>
                       )}{" "}
+                      {diagState !== "idle" && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{
+                            type: "spring",
+                            stiffness: 350,
+                            damping: 26,
+                            delay: 0.35,
+                          }}
+                          style={{
+                            margin: "4px 12px 0",
+                            borderRadius: 8,
+                            backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
+                            border: isDark
+                              ? "0.8px solid #2d2d2d"
+                              : "0.8px solid #f2f2f2",
+                          }}
+                        >
+                          {" "}
+                          {diagState === "loading" ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "16px",
+                              }}
+                            >
+                              {" "}
+                              {[0, 1, 2].map((i) => (
+                                <motion.span
+                                  key={i}
+                                  style={{
+                                    display: "inline-block",
+                                    width: 5,
+                                    height: 5,
+                                    borderRadius: "50%",
+                                    backgroundColor: "#939393",
+                                  }}
+                                  animate={{ opacity: [0.2, 1, 0.2] }}
+                                  transition={{
+                                    duration: 1,
+                                    repeat: Infinity,
+                                    delay: i * 0.2,
+                                  }}
+                                />
+                              ))}{" "}
+                              <span
+                                style={{
+                                  fontFamily:
+                                    "Geist, var(--font-geist-sans)",
+                                  fontSize: 14,
+                                  color: "#939393",
+                                }}
+                              >
+                                Looking at what went wrong
+                              </span>{" "}
+                            </div>
+                          ) : diagState === "result" ? (
+                            <>
+                              {" "}
+                              {(() => {
+                                const fix = diag?.headerFix;
+                                const authEntry =
+                                  !fix &&
+                                  lastRequest?.headers &&
+                                  Object.entries(lastRequest.headers).find(
+                                    ([k]) =>
+                                      /authorization|cookie|x-(api[-_ ]?key|auth|token|key)|api[-_ ]?key|token|secret|session/i.test(
+                                        k.toLowerCase(),
+                                      ),
+                                  );
+                                const prevLabel = fix
+                                  ? fix.from
+                                  : authEntry
+                                    ? authEntry[0]
+                                    : "";
+                                const prevValue = fix
+                                  ? lastRequest?.headers?.[fix.from] ?? ""
+                                  : authEntry
+                                    ? maskHeaderValue(authEntry[1])
+                                    : "";
+                                if (!prevLabel) return null;
+                                return (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 8,
+                                      padding: "16px 16px 0",
+                                    }}
+                                  >
+                                    {" "}
+                                    <span
+                                      style={{
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        color: isDark
+                                          ? "#9e9e9e"
+                                          : "#585858",
+                                      }}
+                                    >
+                                      {prevLabel}
+                                    </span>{" "}
+                                    {prevValue ? (
+                                      <span
+                                        style={{
+                                          borderRadius: 6,
+                                          backgroundColor: isDark
+                                            ? "#2b1414"
+                                            : "#FFD6D6",
+                                          padding: "3px 6px",
+                                          fontFamily:
+                                            "Geist, var(--font-geist-sans)",
+                                          fontSize: 12,
+                                          fontWeight: 400,
+                                          color: isDark
+                                            ? "#ff6b6b"
+                                            : "#FF1616",
+                                          overflowWrap: "anywhere",
+                                        }}
+                                      >
+                                        {prevValue}
+                                      </span>
+                                    ) : null}{" "}
+                                  </div>
+                                );
+                              })()}{" "}
+                              <div
+style={{
+                                    margin: "8px 4px 4px",
+                                    borderRadius: 6,
+                                    backgroundColor: isDark
+                                      ? "#161616"
+                                      : "#FAFAFA",
+                                  border: isDark
+                                    ? "0.8px solid #2d2d2d"
+                                    : "0.8px solid #f2f2f2",
+                                  padding: 12,
+                                }}
+                              >
+                                {" "}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                  }}
+                                >
+                                  {" "}
+                                  <svg
+                                    width="18"
+                                    height="18"
+                                    viewBox="0 0 18 18"
+                                    fill="none"
+                                    style={{ flexShrink: 0 }}
+                                  >
+                                    {" "}
+                                    <path
+                                      d="M13.5 13.5C13.7 12.5 14.2 11.8 15 11C16 10.1 16.5 8.8 16.5 7.5C16.5 5.9087 15.8679 4.38258 14.7426 3.25736C13.6174 2.13214 12.0913 1.5 10.5 1.5C8.9087 1.5 7.38258 2.13214 6.25736 3.25736C5.13214 4.38258 4.5 5.9087 4.5 7.5C4.5 8.5 4.7 9.7 6 11C6.7 11.7 7.3 12.5 7.5 13.5"
+                                      stroke="#5A5AFF"
+                                      strokeWidth="1.4"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />{" "}
+                                    <path
+                                      d="M6.75 13.5L12.75 13.5"
+                                      stroke="#5A5AFF"
+                                      strokeWidth="1.4"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />{" "}
+                                    <path
+                                      d="M7.5 16.5L11.5 16.5"
+                                      stroke="#5A5AFF"
+                                      strokeWidth="1.4"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />{" "}
+                                  </svg>{" "}
+                                  <span
+                                    style={{
+                                      fontFamily:
+                                        "Geist, var(--font-geist-sans)",
+                                      fontSize: 14,
+                                      fontWeight: 500,
+                                      color: isDark ? "#9e9e9e" : "#585858",
+                                    }}
+                                  >
+                                    {diag?.title}
+                                  </span>{" "}
+                                </div>{" "}
+                                <div
+                                  style={{
+                                    marginTop: 4,
+                                    paddingLeft: 26,
+                                    fontFamily:
+                                      "Geist, var(--font-geist-sans)",
+                                    fontSize: 14,
+                                    fontWeight: 400,
+                                    lineHeight: "20px",
+                                    color: "#939393",
+                                  }}
+                                >
+                                  {diag?.message}
+                                </div>{" "}
+                                <div
+                                  style={{
+                                    marginTop: 8,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                  }}
+                                >
+                                  {" "}
+                                  {(diag?.headerFix || diag?.valueFix) && (
+                                    <RippleButton
+                                      className={
+                                        fixingNow || stagedFix
+                                          ? ""
+                                          : "transition-colors hover:bg-[#4a4aff]"
+                                      }
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        height: 28,
+                                        padding: "0 8px",
+                                        borderRadius: 6,
+                                        backgroundColor:
+                                          fixingNow || stagedFix
+                                            ? "#C2C2FF"
+                                            : "#5A5AFF",
+                                        color:
+                                          fixingNow || stagedFix
+                                            ? "#5A5AFF"
+                                            : "#ffffff",
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        whiteSpace: "nowrap",
+                                      }}
+                                      onClick={handleFixClick}
+                                    >
+                                      {fixingNow || stagedFix
+                                        ? diag?.headerFix
+                                          ? "fixing header"
+                                          : "fixing key"
+                                        : diag?.headerFix
+                                          ? "Fix the header"
+                                          : "Fix the key"}
+                                    </RippleButton>
+                                  )}{" "}
+                                </div>{" "}
+                              </div>{" "}
+                            </>
+                          ) : (
+                              <>
+                                {" "}
+                                {(() => {
+                                  const authEntry =
+                                    lastRequest?.headers &&
+                                    Object.entries(lastRequest.headers).find(
+                                      ([k]) =>
+                                        /authorization|cookie|x-(api[-_ ]?key|auth|token|key)|api[-_ ]?key|token|secret|session/i.test(
+                                          k.toLowerCase(),
+                                        ),
+                                    );
+                                  const authValue = authEntry
+                                    ? maskHeaderValue(authEntry[1])
+                                    : "";
+                                  return (
+                                    <div
+                                      style={{
+                                        padding: "16px 16px 0",
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 8,
+                                        }}
+                                      >
+                                        {" "}
+                                        <span
+                                          style={{
+                                            fontFamily:
+                                              "Geist, var(--font-geist-sans)",
+                                            fontSize: 14,
+                                            fontWeight: 500,
+                                            color: isDark
+                                              ? "#9e9e9e"
+                                              : "#585858",
+                                          }}
+                                        >
+                                          {fallbackHintText(response)}
+                                        </span>{" "}
+                                        {authValue ? (
+                                          <span
+                                            style={{
+                                              borderRadius: 6,
+backgroundColor: isDark
+                                                  ? "#2b1414"
+                                                  : "#FFD6D6",
+                                                padding: "3px 6px",
+                                                fontFamily:
+                                                  "Geist, var(--font-geist-sans)",
+                                                fontSize: 12,
+                                                fontWeight: 400,
+                                                color: isDark
+                                                  ? "#ff6b6b"
+                                                  : "#FF1616",
+                                                whiteSpace: "nowrap",
+                                            }}
+                                          >
+                                            {authValue}
+                                          </span>
+                                        ) : null}{" "}
+                                      </div>{" "}
+                                    </div>
+                                  );
+                                })()}{" "}
+                                <div
+                                  style={{
+                                    margin: "8px 4px 4px",
+                                    borderRadius: 6,
+                                    backgroundColor: isDark
+                                      ? "#161616"
+                                      : "#FAFAFA",
+                                    border: isDark
+                                      ? "0.8px solid #2d2d2d"
+                                      : "0.8px solid #f2f2f2",
+                                    padding: 12,
+                                  }}
+                                >
+                                  {" "}
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 8,
+                                    }}
+                                  >
+                                    {" "}
+                                    <svg
+                                      width="18"
+                                      height="18"
+                                      viewBox="0 0 18 18"
+                                      fill="none"
+                                      style={{ flexShrink: 0 }}
+                                    >
+                                      {" "}
+                                      <path
+                                        d="M12.6004 8.39958C13.2004 7.72458 13.5004 6.89958 13.5004 5.99958C13.4989 5.18793 13.2779 4.3918 12.8609 3.6955C12.4438 2.9992 11.8462 2.42867 11.1313 2.04433C10.4164 1.65998 9.61091 1.47614 8.80007 1.51227C7.98922 1.54841 7.20325 1.80317 6.52539 2.24958"
+                                        stroke={isDark ? "#9e9e9e" : "#585858"}
+                                        strokeWidth="1.4"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />{" "}
+                                      <path
+                                        d="M1.5 1.5L16.5 16.5"
+                                        stroke={isDark ? "#9e9e9e" : "#585858"}
+                                        strokeWidth="1.4"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />{" "}
+                                      <path
+                                        d="M4.72529 4.72461C4.45895 5.38877 4.40242 6.11858 4.56333 6.81583C4.72423 7.51308 5.09484 8.14432 5.62529 8.62461C6.15029 9.14961 6.60029 9.74961 6.75029 10.4996"
+                                        stroke={isDark ? "#9e9e9e" : "#585858"}
+                                        strokeWidth="1.4"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />{" "}
+                                      <path
+                                        d="M6.75 13.5L11.25 13.5"
+                                        stroke={isDark ? "#9e9e9e" : "#585858"}
+                                        strokeWidth="1.4"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />{" "}
+                                      <path
+                                        d="M7.5 16.5L10.5 16.5"
+                                        stroke={isDark ? "#9e9e9e" : "#585858"}
+                                        strokeWidth="1.4"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />{" "}
+                                    </svg>{" "}
+                                    <span
+                                      style={{
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        color: isDark
+                                          ? "#9e9e9e"
+                                          : "#585858",
+                                      }}
+                                    >
+                                      Coaching unavailable
+                                    </span>{" "}
+                                  </div>{" "}
+                                  <div
+                                    style={{
+                                      marginTop: 4,
+                                      paddingLeft: 26,
+                                      fontFamily:
+                                        "Geist, var(--font-geist-sans)",
+                                      fontSize: 14,
+                                      fontWeight: 400,
+                                      lineHeight: "20px",
+                                      color: "#939393",
+                                    }}
+                                  >
+                                    Couldn&rsquo;t reach the AI just now. Try
+                                    again in a moment.
+                                  </div>{" "}
+                                  <div
+                                    style={{
+                                      marginTop: 8,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 8,
+                                    }}
+                                  >
+                                    {" "}
+                                    <RippleButton
+                                      className="transition-colors hover:bg-[#4a4aff]"
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        height: 28,
+                                        padding: "0 8px",
+                                        borderRadius: 6,
+                                        backgroundColor: "#5A5AFF",
+                                        color: "#ffffff",
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        whiteSpace: "nowrap",
+                                      }}
+                                      onClick={onRetryDiagnosis}
+                                    >
+                                      Try again
+                                    </RippleButton>{" "}
+                                  </div>{" "}
+                                </div>{" "}
+                              </>
+                            )}{" "}
+                        </motion.div>
+                      )}{" "}
                     </>
                   )}{" "}
                 </div>{" "}
@@ -6292,6 +7340,36 @@ function MainContent({
               </div>
               )}{" "}
             </div>{" "}
+            <AnimatePresence>
+              {" "}
+              {showResultBlur && (
+                <motion.div
+                  key="result-scroll-fade"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  style={{
+                    position: "absolute",
+                    bottom: 76,
+                    left: 0,
+                    right: 0,
+                    height: 32,
+                    zIndex: 10,
+                    pointerEvents: "none",
+                    background: isDark
+                      ? "linear-gradient(to top, rgba(27, 27, 27, 0.85), rgba(27, 27, 27, 0))"
+                      : "linear-gradient(to top, rgba(245, 245, 245, 0.85), rgba(245, 245, 245, 0))",
+                    backdropFilter: "blur(8px)",
+                    WebkitBackdropFilter: "blur(8px)",
+                    maskImage:
+                      "linear-gradient(to top, black 20%, transparent 100%)",
+                    WebkitMaskImage:
+                      "linear-gradient(to top, black 20%, transparent 100%)",
+                  }}
+                />
+              )}{" "}
+            </AnimatePresence>{" "}
             <div
               style={{
                 position: "absolute",
@@ -6303,13 +7381,51 @@ function MainContent({
                 display: "flex",
                 justifyContent: "center",
                 background: "transparent",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
                 borderTop: "none",
               }}
             >
-              {" "}
-              {explainCtx &&
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: 76,
+                  zIndex: -1,
+                  pointerEvents: "none",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                }}
+              />{" "}
+              {stagedFix ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 10,
+                    width: "100%",
+                  }}
+                >
+                  <UrlInputBar
+                    glass
+                    activeTheme={activeTheme}
+                    method={method}
+                    setMethod={setMethod}
+                    url={url}
+                    setUrl={setUrl}
+                    loading={loading}
+                    onSend={onSend}
+                  />
+                  <StagedFixEditor
+                    stagedFix={stagedFix}
+                    isDark={isDark}
+                    onValueChange={onStagedValueChange}
+                    onApply={applyStagedFix}
+                    onFix={startFixing}
+                  />
+                </div>
+              ) : explainCtx &&
               !response?.error &&
               response?.status != null &&
               response.status >= 200 &&
@@ -6430,7 +7546,7 @@ function MainContent({
         )}{" "}
         <AnimatePresence>
           {" "}
-          {showCheatSheet && (
+          {showCheatSheet && !loading && !response && !showBrowseApi && (
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}

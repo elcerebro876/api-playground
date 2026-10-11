@@ -1,5 +1,11 @@
-npm notice
-npm notice New major version of npm available! 11.0.0 -> 12.1.0
-npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.1.0
-npm notice To update run: npm install -g npm@12.1.0
-npm notice
+⨯ Failed to load env from .env.local Error: EBUSY: resource busy or locked, open 'C:\Users\ADMIN\Playground API\api-playground\.env.local'
+    at ignore-listed frames {
+  errno: -4082,
+  code: 'EBUSY',
+  syscall: 'open',
+  path: 'C:\\Users\\ADMIN\\Playground API\\api-playground\\.env.local'
+}
+[diagnose] failed OpenRouter nope/nope:free error 400: {"error":{"message":"nope/nope:free is not a valid model ID","code":400},"user_id":"user_3E9U8iYyRi1Dn5YXlPJOQF3qDqL"} | Cerebras gpt-oss-120b returned empty text | Cerebras qwen-3.8-27b returned empty text | Gemini gemini-no-such-model error 404: {
+  "error": {
+    "code": 404,
+    "message": "models/gemini-no-such-model is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list o
