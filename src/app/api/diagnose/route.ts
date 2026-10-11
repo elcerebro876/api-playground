@@ -1,12 +1,43 @@
 import {
+  buildDiagnosisInput,
+  diagnosisCacheKey,
   generateDiagnosis,
-  maskHeaders,
-  maskSensitiveStrings,
-  maskUrlSecrets,
-  type DiagnosisInput,
+  type DiagnosisResult,
 } from "@/lib/diagnose";
 import { isAIConfigured } from "@/lib/ai";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+
+// In-memory diagnosis cache. Per-instance and cleared on cold start/deploy,
+// which is fine: it exists to make a user's repeat of the SAME failing request
+// resolve instantly (and skip the AI call) instead of re-running the chain.
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 200;
+
+type CacheEntry = { value: DiagnosisResult; expires: number };
+const diagnosisCache = new Map<string, CacheEntry>();
+
+function cacheGet(key: string): DiagnosisResult | null {
+  const entry = diagnosisCache.get(key);
+  if (!entry) return null;
+  if (entry.expires <= Date.now()) {
+    diagnosisCache.delete(key);
+    return null;
+  }
+  // Refresh recency (Map preserves insertion order for LRU eviction).
+  diagnosisCache.delete(key);
+  diagnosisCache.set(key, entry);
+  return entry.value;
+}
+
+function cacheSet(key: string, value: DiagnosisResult): void {
+  diagnosisCache.delete(key);
+  diagnosisCache.set(key, { value, expires: Date.now() + CACHE_TTL_MS });
+  while (diagnosisCache.size > CACHE_MAX_ENTRIES) {
+    const oldest = diagnosisCache.keys().next().value;
+    if (oldest === undefined) break;
+    diagnosisCache.delete(oldest);
+  }
+}
 
 export async function GET() {
   return Response.json({ configured: isAIConfigured() });
@@ -36,9 +67,9 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const method = (payload.method ?? "GET").trim().toUpperCase().slice(0, 10);
-  const url = (payload.url ?? "").trim().slice(0, 500);
-  if (!url) {
+  // Defense in depth: re-mask on the server even though the client already masks.
+  const input = buildDiagnosisInput(payload);
+  if (!input.url) {
     return Response.json({ error: "Missing url" }, { status: 400 });
   }
 
@@ -52,18 +83,15 @@ export async function POST(request: Request) {
     );
   }
 
-  // Defense in depth: re-mask on the server even though the client already masks.
-  const input: DiagnosisInput = {
-    method,
-    url: maskUrlSecrets(url),
-    requestHeaders: maskHeaders(payload.requestHeaders ?? {}),
-    status: typeof payload.status === "number" ? payload.status : null,
-    responseHeaders: maskHeaders(payload.responseHeaders ?? {}),
-    responseBody: maskSensitiveStrings((payload.responseBody ?? "").slice(0, 6000)),
-  };
+  const cacheKey = diagnosisCacheKey(input);
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    return Response.json(cached);
+  }
 
   try {
     const result = await generateDiagnosis(input);
+    if (result.identifiable) cacheSet(cacheKey, result);
     return Response.json(result);
   } catch (e) {
     console.error("[diagnose] failed", (e as Error)?.message);

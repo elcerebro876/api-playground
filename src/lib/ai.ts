@@ -1,16 +1,19 @@
 // Shared AI provider layer for the Explorer section's AI features (Explain and
 // Diagnose).
 //
-// Attempt order:
-//   1. OpenRouter (OPENROUTER_API_KEY), rotating through a small list of free
-//      (:free) models so a throttled upstream pool doesn't kill inference.
-//      Defaults to OPENROUTER_MODELS; a single OPENROUTER_MODEL is honored as
-//      a one-model alias.
-//   2. Cerebras (CEREBRAS_API_KEY) direct, rotating through CEREBRAS_MODELS in
-//      priority order (429/5xx fail fast, at most 2 timeouts).
-//   3. Google Gemini (GEMINI_API_KEY) as the final fallback tier, rotating
-//      through GEMINI_MODELS in priority order (429/5xx fail fast, at most 2
-//      timeouts).
+// Attempt order (fastest/most reliable first):
+//   1. Cerebras (CEREBRAS_API_KEY) direct, rotating through CEREBRAS_MODELS in
+//      priority order (429/5xx fail fast, at most 1 timeout).
+//   2. Google Gemini (GEMINI_API_KEY), rotating through GEMINI_MODELS in
+//      priority order (429/5xx fail fast, at most 1 timeout).
+//   3. OpenRouter (OPENROUTER_API_KEY), rotating through a small list of free
+//      (:free) models. Defaults to OPENROUTER_MODELS; a single OPENROUTER_MODEL
+//      is honored as a one-model alias.
+//
+// The whole chain runs under a shared wall-clock budget
+// (AIJsonOptions.deadlineMs, default 20s): each attempt is clamped to the
+// remaining time and the chain stops once it is exhausted, so a slow provider
+// can't stall the request for the sum of every provider's timeout.
 //
 // A lightweight per-provider circuit breaker stops hammering a provider whose
 // quota/upstream is exhausted: after AI_BREAKER_THRESHOLD (default 3)
@@ -97,11 +100,32 @@ function cerebrasModels(): string[] {
 export type AIJsonOptions = {
   temperature?: number;
   timeoutMs?: number;
+  // Overall wall-clock budget for the whole provider chain (ms). Each provider
+  // attempt is clamped to the remaining budget, and once it is exhausted the
+  // chain stops and rejects, so the caller can fall back in seconds instead of
+  // waiting for every provider's full timeout to expire in sequence.
+  deadlineMs?: number;
   // When provided, a provider's reply counts as a failure (and the chain moves
   // to the next provider) if it does not satisfy this predicate. Used to fail
   // over on unusable output (e.g. non-JSON) rather than only transport errors.
   validate?: (text: string) => boolean;
 };
+
+// Per-attempt timeout passed to each provider call, plus the absolute deadline
+// shared across the whole chain.
+type ResolvedCallOpts = {
+  temperature: number;
+  timeoutMs: number;
+  deadline: number;
+};
+
+// A single timed-out attempt is enough to abandon a provider for this request:
+// retrying the next model can double the wait without improving the odds much.
+const MAX_TIMEOUTS_PER_PROVIDER = 1;
+
+// Cerebras can spend a few seconds warming up, but the old 25s floor let one
+// stalled provider consume the entire cross-provider budget on its own.
+const CEREBRAS_MIN_TIMEOUT_MS = 8_000;
 
 type BreakerState = { failures: number; openUntil: number };
 
@@ -147,7 +171,7 @@ function breakerRecordSuccess(provider: string) {
 
 async function callGeminiJson(
   prompt: string,
-  opts: { temperature: number; timeoutMs: number },
+  opts: ResolvedCallOpts,
 ): Promise<string> {
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) return Promise.reject(new Error("GEMINI_API_KEY not configured"));
@@ -157,8 +181,16 @@ async function callGeminiJson(
   let timeoutsSeen = 0;
 
   for (const model of models) {
+    const remaining = opts.deadline - Date.now();
+    if (remaining <= 0) {
+      attemptErrors.push("Gemini skipped: time budget exhausted");
+      break;
+    }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
+    const timer = setTimeout(
+      () => controller.abort(),
+      Math.min(opts.timeoutMs, remaining),
+    );
     try {
       const res = await fetch(
         `${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
@@ -195,7 +227,7 @@ async function callGeminiJson(
       if (err?.name === "AbortError") {
         timeoutsSeen += 1;
         attemptErrors.push(`Gemini ${model} timed out`);
-        if (timeoutsSeen >= 2) {
+        if (timeoutsSeen >= MAX_TIMEOUTS_PER_PROVIDER) {
           return Promise.reject(new Error(attemptErrors.join(" | ")));
         }
         continue;
@@ -245,7 +277,7 @@ function extractOpenRouterText(data: unknown): string {
 
 async function callOpenRouterJson(
   prompt: string,
-  opts: { temperature: number; timeoutMs: number },
+  opts: ResolvedCallOpts,
 ): Promise<string> {
   const key = process.env.OPENROUTER_API_KEY?.trim();
   if (!key) {
@@ -257,8 +289,16 @@ async function callOpenRouterJson(
   let timeoutsSeen = 0;
 
   for (const model of models) {
+    const remaining = opts.deadline - Date.now();
+    if (remaining <= 0) {
+      attemptErrors.push("OpenRouter skipped: time budget exhausted");
+      break;
+    }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
+    const timer = setTimeout(
+      () => controller.abort(),
+      Math.min(opts.timeoutMs, remaining),
+    );
     try {
       const res = await fetch(OPENROUTER_ENDPOINT, {
         method: "POST",
@@ -295,7 +335,7 @@ async function callOpenRouterJson(
       if (err?.name === "AbortError") {
         timeoutsSeen += 1;
         attemptErrors.push(`OpenRouter ${model} timed out`);
-        if (timeoutsSeen >= 2) {
+        if (timeoutsSeen >= MAX_TIMEOUTS_PER_PROVIDER) {
           return Promise.reject(new Error(attemptErrors.join(" | ")));
         }
         continue;
@@ -316,7 +356,7 @@ async function callOpenRouterJson(
 
 async function callCerebrasJson(
   prompt: string,
-  opts: { temperature: number; timeoutMs: number },
+  opts: ResolvedCallOpts,
 ): Promise<string> {
   const key = process.env.CEREBRAS_API_KEY?.trim();
   if (!key) {
@@ -326,11 +366,19 @@ async function callCerebrasJson(
   const models = cerebrasModels();
   const attemptErrors: string[] = [];
   let timeoutsSeen = 0;
-  // Cerebras returns small outputs but can spend seconds warm; give each
-  // attempt a bit more room than the shared 15s default.
-  const attemptTimeout = Math.max(opts.timeoutMs, 25_000);
 
   for (const model of models) {
+    const remaining = opts.deadline - Date.now();
+    if (remaining <= 0) {
+      attemptErrors.push("Cerebras skipped: time budget exhausted");
+      break;
+    }
+    // Give each attempt a bit more room than the shared default (Cerebras can
+    // spend seconds warm), but never exceed the remaining cross-provider budget.
+    const attemptTimeout = Math.min(
+      Math.max(opts.timeoutMs, CEREBRAS_MIN_TIMEOUT_MS),
+      remaining,
+    );
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), attemptTimeout);
     try {
@@ -368,7 +416,7 @@ async function callCerebrasJson(
       if (err?.name === "AbortError") {
         timeoutsSeen += 1;
         attemptErrors.push(`Cerebras ${model} timed out`);
-        if (timeoutsSeen >= 2) {
+        if (timeoutsSeen >= MAX_TIMEOUTS_PER_PROVIDER) {
           return Promise.reject(new Error(attemptErrors.join(" | ")));
         }
         continue;
@@ -393,6 +441,9 @@ export async function callAIJson(
 ): Promise<string> {
   const temperature = options.temperature ?? 0.2;
   const timeoutMs = options.timeoutMs ?? 15000;
+  const deadlineMs = options.deadlineMs ?? 20000;
+  const deadline = Date.now() + deadlineMs;
+  const callOpts: ResolvedCallOpts = { temperature, timeoutMs, deadline };
   const errors: string[] = [];
   const skipped: string[] = [];
 
@@ -404,27 +455,9 @@ export async function callAIJson(
   const isValid = (text: string): boolean =>
     typeof validate !== "function" || Boolean(validate(text));
 
-  if (openRouter && breakerAllows("openrouter")) {
-    try {
-      const text = await callOpenRouterJson(prompt, { temperature, timeoutMs });
-      if (!isValid(text)) {
-        breakerRecordFailure("openrouter");
-        errors.push("OpenRouter returned output that failed validation");
-      } else {
-        breakerRecordSuccess("openrouter");
-        return text;
-      }
-    } catch (e) {
-      breakerRecordFailure("openrouter");
-      errors.push((e as Error).message);
-    }
-  } else if (openRouter) {
-    skipped.push("OpenRouter (circuit open)");
-  }
-
   if (cerebras && breakerAllows("cerebras")) {
     try {
-      const text = await callCerebrasJson(prompt, { temperature, timeoutMs });
+      const text = await callCerebrasJson(prompt, callOpts);
       if (!isValid(text)) {
         breakerRecordFailure("cerebras");
         errors.push("Cerebras returned output that failed validation");
@@ -442,7 +475,7 @@ export async function callAIJson(
 
   if (gemini && breakerAllows("gemini")) {
     try {
-      const text = await callGeminiJson(prompt, { temperature, timeoutMs });
+      const text = await callGeminiJson(prompt, callOpts);
       if (!isValid(text)) {
         breakerRecordFailure("gemini");
         errors.push("Gemini returned output that failed validation");
@@ -456,6 +489,24 @@ export async function callAIJson(
     }
   } else if (gemini) {
     skipped.push("Gemini (circuit open)");
+  }
+
+  if (openRouter && breakerAllows("openrouter")) {
+    try {
+      const text = await callOpenRouterJson(prompt, callOpts);
+      if (!isValid(text)) {
+        breakerRecordFailure("openrouter");
+        errors.push("OpenRouter returned output that failed validation");
+      } else {
+        breakerRecordSuccess("openrouter");
+        return text;
+      }
+    } catch (e) {
+      breakerRecordFailure("openrouter");
+      errors.push((e as Error).message);
+    }
+  } else if (openRouter) {
+    skipped.push("OpenRouter (circuit open)");
   }
 
   if (!cerebras && !gemini && !openRouter) {

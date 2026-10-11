@@ -84,6 +84,83 @@ export type DiagnosisInput = {
   responseBody?: string;
 };
 
+// Raw (possibly secret-bearing) request shape accepted from the client. It is
+// masked into a DiagnosisInput before anything is sent to the model.
+export type DiagnosisInputRaw = {
+  method?: string;
+  url?: string;
+  requestHeaders?: Record<string, string> | null;
+  status?: number | null;
+  responseHeaders?: Record<string, string> | null;
+  responseBody?: string;
+};
+
+// Cap on the response body fed to the model. Latency scales with input tokens,
+// and the diagnosis only needs the leading error payload.
+export const DIAGNOSIS_BODY_LIMIT = 2000;
+
+// Single source of truth for masking. Both the browser (to build the request it
+// sends and its cache key) and the API route (defense in depth) call this, so
+// the two sides always compute an identical DiagnosisInput - and therefore an
+// identical cache key.
+export function buildDiagnosisInput(raw: DiagnosisInputRaw): DiagnosisInput {
+  const method = (raw.method ?? "GET").trim().toUpperCase().slice(0, 10);
+  const url = (raw.url ?? "").trim().slice(0, 500);
+  return {
+    method,
+    url: maskUrlSecrets(url),
+    requestHeaders: maskHeaders(raw.requestHeaders ?? {}),
+    status: typeof raw.status === "number" ? raw.status : null,
+    responseHeaders: maskHeaders(raw.responseHeaders ?? {}),
+    responseBody: maskSensitiveStrings(
+      (raw.responseBody ?? "").slice(0, DIAGNOSIS_BODY_LIMIT),
+    ),
+  };
+}
+
+// cyrb53-style non-cryptographic hash: deterministic and safe to run in both
+// the browser and Node (no crypto dependency).
+function hashString(str: string): string {
+  let h1 = 0xdeadbeef ^ str.length;
+  let h2 = 0x41c6ce57 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (
+    (h2 >>> 0).toString(16).padStart(8, "0") +
+    (h1 >>> 0).toString(16).padStart(8, "0")
+  );
+}
+
+// Stable key for an identical failure. Header keys are lowercased and sorted so
+// ordering/casing never splits the cache; values are already masked, so two
+// different secrets for the same shape share one entry (the fix references the
+// header name, and the concrete expected value is derived client-side).
+export function diagnosisCacheKey(input: DiagnosisInput): string {
+  const headers = Object.entries(input.requestHeaders)
+    .map(([k, v]) => `${k.toLowerCase()}:${v}`)
+    .sort();
+  const respHeaders = Object.entries(input.responseHeaders ?? {})
+    .map(([k, v]) => `${k.toLowerCase()}:${v}`)
+    .sort();
+  return hashString(
+    [
+      input.method,
+      input.url,
+      String(input.status ?? ""),
+      headers.join("|"),
+      respHeaders.join("|"),
+      input.responseBody ?? "",
+    ].join("\n"),
+  );
+}
+
 export async function generateDiagnosis(
   input: DiagnosisInput,
 ): Promise<DiagnosisResult> {
@@ -115,7 +192,7 @@ export async function generateDiagnosis(
     "Response headers:",
     responseHeaderLines,
     "Response body:",
-    (input.responseBody ?? "").slice(0, 6000) || "(empty body)",
+    input.responseBody || "(empty body)",
     "",
     "Decide whether there is an IDENTIFIABLE, concrete cause for this failure that is grounded in the request above - for example the API expects a different auth scheme or header key, a required header is missing, the wrong parameter or content type is used, or the URL path does not exist.",
     "",
@@ -130,7 +207,8 @@ export async function generateDiagnosis(
 
   const text = await callAIJson(prompt, {
     temperature: 0.1,
-    timeoutMs: 15000,
+    timeoutMs: 8000,
+    deadlineMs: 20000,
     validate: (t) => {
       let parsed: unknown;
       try {

@@ -1,3 +1,5 @@
+import type { DiagnosisResult } from "@/lib/diagnose";
+
 const STORAGE_KEY = "api-playground-data";
 
 export interface HistoryEntry {
@@ -136,4 +138,54 @@ export function applyStreakOnLoad(data: StoredData, now: Date = new Date()): Sto
     last = today;
   }
   return { ...data, streak: s, lastVisitDate: last };
+}
+
+const DIAGNOSIS_CACHE_KEY = "api-playground-diagnosis-cache";
+const DIAGNOSIS_CACHE_TTL_MS = 10 * 60 * 1000;
+const DIAGNOSIS_CACHE_MAX = 100;
+
+type DiagnosisCacheStore = Record<
+  string,
+  { value: DiagnosisResult; expires: number }
+>;
+
+function readDiagnosisCache(): DiagnosisCacheStore {
+  try {
+    const raw = window.localStorage.getItem(DIAGNOSIS_CACHE_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== "object" || Array.isArray(p)) return {};
+    return p as DiagnosisCacheStore;
+  } catch {
+    return {};
+  }
+}
+
+export function loadDiagnosisCache(key: string): DiagnosisResult | null {
+  const entry = readDiagnosisCache()[key];
+  if (
+    !entry ||
+    !entry.value ||
+    typeof entry.expires !== "number" ||
+    entry.expires <= Date.now()
+  ) {
+    return null;
+  }
+  return entry.value;
+}
+
+export function saveDiagnosisCache(key: string, value: DiagnosisResult): void {
+  try {
+    const store = readDiagnosisCache();
+    store[key] = { value, expires: Date.now() + DIAGNOSIS_CACHE_TTL_MS };
+    const now = Date.now();
+    // Drop expired entries, then keep only the newest by expiry.
+    const live = Object.keys(store)
+      .filter((k) => store[k]?.expires > now)
+      .sort((a, b) => store[a].expires - store[b].expires);
+    const keep = live.slice(-DIAGNOSIS_CACHE_MAX);
+    const next: DiagnosisCacheStore = {};
+    for (const k of keep) next[k] = store[k];
+    window.localStorage.setItem(DIAGNOSIS_CACHE_KEY, JSON.stringify(next));
+  } catch { /* storage unavailable — silent fallback */ }
 }

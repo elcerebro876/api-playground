@@ -18,9 +18,9 @@ import {
 } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
-import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, type HistoryEntry } from "@/lib/storage";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, type HistoryEntry } from "@/lib/storage";
 import type { ExplainPayload } from "@/lib/explain";
-import { DIAGNOSIS_MAX_USES, maskHeaders, maskHeaderValue, maskUrlSecrets, type DiagnosisResult } from "@/lib/diagnose";
+import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, maskHeaderValue, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed } from "@/lib/posthog";
 const cardTextSpring = {
   type: "spring" as const,
@@ -341,6 +341,25 @@ export default function Home() {
       },
     ) => {
     diagReqRef.current = { m, u, h, data };
+    const input = buildDiagnosisInput({
+      method: m,
+      url: u,
+      requestHeaders: h,
+      status: typeof data?.status === "number" ? data.status : null,
+      responseHeaders: data?.headers ?? null,
+      responseBody: typeof data?.body === "string" ? data.body : "",
+    });
+    const cacheKey = diagnosisCacheKey(input);
+
+    // A cached diagnosis is free (no AI call), so it is served even after the
+    // per-user usage cap is reached.
+    const cached = loadDiagnosisCache(cacheKey);
+    if (cached && cached.identifiable && cached.title && cached.message) {
+      setDiag(cached);
+      setDiagState("result");
+      return;
+    }
+
     if (
       diagUsesRef.current >= DIAGNOSIS_MAX_USES ||
       diagAvailableRef.current !== true
@@ -353,18 +372,14 @@ export default function Home() {
     setDiag(null);
     setDiagState("loading");
     void (async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 22000);
       try {
         const res = await fetch("/api/diagnose", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            method: m,
-            url: maskUrlSecrets(u),
-            requestHeaders: maskHeaders(h),
-            status: typeof data?.status === "number" ? data.status : null,
-            responseHeaders: data?.headers ?? null,
-            responseBody: typeof data?.body === "string" ? data.body : "",
-          }),
+          signal: controller.signal,
+          body: JSON.stringify(input),
         });
         if (!res.ok) throw new Error(String(res.status));
         const j: DiagnosisResult = await res.json();
@@ -374,6 +389,7 @@ export default function Home() {
         if (j && j.identifiable && j.title && j.message) {
           setDiag(j);
           setDiagState("result");
+          saveDiagnosisCache(cacheKey, j);
         } else {
           setDiag(null);
           setDiagState("fallback");
@@ -382,6 +398,8 @@ export default function Home() {
         if (token !== diagTokenRef.current) return;
         setDiag(null);
         setDiagState("fallback");
+      } finally {
+        clearTimeout(timer);
       }
     })();
     },
