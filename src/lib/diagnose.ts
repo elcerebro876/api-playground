@@ -1,5 +1,6 @@
 import { callAIJson } from "@/lib/ai";
 import { authHintForUrl, type AuthHint } from "@/lib/api-auth";
+import { isAllowedMethod } from "@/lib/http-methods";
 
 export const DIAGNOSIS_MAX_USES = 5;
 
@@ -25,6 +26,7 @@ export type DiagnosisResult = {
   confidence?: DiagnosisConfidence;
   headerFix?: DiagnosisFix | null;
   valueFix?: DiagnosisValueFix | null;
+  methodFix?: string | null;
 };
 
 const SCHEME_RE = /^(Bearer|Basic|Token|ApiKey|API[-_ ]?Key|Digest)\s+/i;
@@ -215,11 +217,12 @@ export async function generateDiagnosis(
     "3. Classify the request-side fault: wrong auth scheme, wrong header name, wrong header value, key belongs somewhere else (e.g. a query parameter), a required header is missing, wrong content type, or wrong path/method.",
     "",
     "OUTPUT RULES:",
-    'Return STRICT JSON: {"identifiable": <bool>, "title": "<max 6 words>", "message": "<one sentence, under ~28 words, naming the exact field and the fix>", "evidence": "<short quote from the response that justifies this>", "confidence": "high"|"medium"|"low", "headerFix": {"from": "<WrongHeader>", "to": "<CorrectHeader>", "stripScheme": <bool>} | null, "valueFix": {"key": "<HeaderName>", "stripScheme": <bool>} | null}.',
+    'Return STRICT JSON: {"identifiable": <bool>, "title": "<max 6 words>", "message": "<one sentence, under ~28 words, naming the exact field and the fix>", "evidence": "<short quote from the response that justifies this>", "confidence": "high"|"medium"|"low", "headerFix": {"from": "<WrongHeader>", "to": "<CorrectHeader>", "stripScheme": <bool>} | null, "valueFix": {"key": "<HeaderName>", "stripScheme": <bool>} | null, "methodFix": "<METHOD>" | null}.',
     "When identifiable is false, return exactly {\"identifiable\": false} with no other fields.",
     "headerFix: set ONLY when the same secret the user already sent must move VERBATIM to a DIFFERENT header. `from` and `to` must differ (case-insensitive). Set stripScheme true when the value must drop a leading scheme word such as \"Bearer \" or \"Basic \".",
     'valueFix: set ONLY when the header name is already correct for this API, the user DID send it, and the secret VALUE inside it is wrong/expired. key must be one of the auth headers actually present in the request. Set stripScheme true when the current value carries a leading scheme word.',
-    "Emit at most one of headerFix/valueFix. If the fix is neither a header rename nor a header-value replacement (for example the key belongs in a query parameter, a header is missing entirely, or the fault is elsewhere), set BOTH to null and state the exact fix in `message`.",
+    'methodFix: set ONLY when the request used the wrong HTTP method (status 405, or otherwise evident) AND the correct method is evidenced by the response (an `Allow` response header or the response text naming a method). Value must be exactly one of GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS and must differ from the request method. Never guess a target method without evidence.',
+    "Emit at most one of headerFix/valueFix/methodFix. If the fix is neither a header rename, a header-value replacement, nor a method switch (for example the key belongs in a query parameter, a header is missing entirely, or the fault is elsewhere), set all of them to null and state the exact fix in `message`.",
     "Use confidence \"high\" only when the response evidence clearly supports the fault; use \"low\" when you are unsure.",
     "GROUNDING: only state what a host requires when a KNOWN AUTH CONVENTION is given above. If no convention is given, do not assert what the API expects (for example, never claim an endpoint does not require authentication, nor that it uses a particular scheme or parameter); diagnose strictly from the status and response evidence, and if the fault would depend on knowing the host's convention, use confidence \"low\".",
     "When no KNOWN AUTH CONVENTION is given, never name a specific scheme or header in `message` (do not write things like \"a valid Bearer token\"); refer to the credential generically, for example \"the value you sent\".",
@@ -228,7 +231,8 @@ export async function generateDiagnosis(
     "EXAMPLES:",
     'Request: GET https://api.weather.example/data?city=London  |  Authorization: Bearer ****\\nResponse: 401 {"message":"Invalid API key"}\\nKnown: this API expects the key in the `appid` query parameter.\\n=> {"identifiable":true,"title":"Key in wrong place","message":"This API expects your key in the `appid` query parameter, not an Authorization header.","evidence":"Invalid API key","confidence":"high","headerFix":null,"valueFix":null}',
     'Request: GET https://api.example.com/v1/me  |  Authorization: Bearer ****\\nResponse: 401 {"error":"Missing x-api-key header"}\\nKnown: this API expects the key in the `x-api-key` header.\\n=> {"identifiable":true,"title":"Wrong auth header","message":"Send your key in the `x-api-key` header instead of `Authorization`.","evidence":"Missing x-api-key header","confidence":"high","headerFix":{"from":"Authorization","to":"x-api-key","stripScheme":true},"valueFix":null}',
-    'Request: GET https://api.example.com/v1/me  |  x-api-key: ****\\nResponse: 403 {"error":"Invalid or expired API key"}\\nKnown: this API expects the key in the `x-api-key` header.\\n=> {"identifiable":true,"title":"Invalid API key","message":"Your `x-api-key` value is invalid or expired; replace it with a valid key.","evidence":"Invalid or expired API key","confidence":"high","headerFix":null,"valueFix":{"key":"x-api-key","stripScheme":false}}',
+    'Request: GET https://api.example.com/v1/me  |  x-api-key: ****\\nResponse: 403 {"error":"Invalid or expired API key"}\\nKnown: this API expects the key in the `x-api-key` header.\\n=> {"identifiable":true,"title":"Invalid API key","message":"Your `x-api-key` value is invalid or expired; replace it with a valid key.","evidence":"Invalid or expired API key","confidence":"high","headerFix":null,"valueFix":{"key":"x-api-key","stripScheme":false},"methodFix":null}',
+    'Request: GET https://api.example.com/v1/items\\nResponse: 405 {"error":"Method Not Allowed"}\\nResponse header: Allow: POST\\n=> {"identifiable":true,"title":"Wrong Method","message":"This endpoint doesn\'t accept GET; the Allow header lists POST only.","evidence":"Allow: POST","confidence":"high","headerFix":null,"valueFix":null,"methodFix":"POST"}',
     'Request: GET https://api.example.com/v1/items  |  Authorization: Bearer ****\\nResponse: 503 {"error":"upstream unavailable"}\\n=> {"identifiable":false}',
     "",
     "Return JSON only.",
@@ -313,6 +317,13 @@ export async function generateDiagnosis(
     hasHeader
       ? { key: vf.key.trim(), stripScheme: vf.stripScheme }
       : null;
+  const mf = parsed.methodFix;
+  const methodFix =
+    typeof mf === "string" &&
+    mf.trim().toUpperCase() !== input.method.trim().toUpperCase() &&
+    isAllowedMethod(mf)
+      ? mf.trim().toUpperCase()
+      : null;
   const rawConfidence = parsed.confidence;
   const confidence: DiagnosisConfidence | undefined =
     rawConfidence === "high" || rawConfidence === "medium" || rawConfidence === "low"
@@ -332,8 +343,9 @@ export async function generateDiagnosis(
       confidence,
       headerFix,
       valueFix,
+      methodFix,
     },
-    input.responseBody ?? "",
+    input,
   );
 }
 
@@ -344,12 +356,13 @@ export async function generateDiagnosis(
 function applyAuthGuards(
   hint: AuthHint | null,
   result: DiagnosisResult,
-  body: string,
+  input: DiagnosisInput,
 ): DiagnosisResult {
   if (!result.identifiable) return result;
 
   let headerFix = result.headerFix ?? null;
   let valueFix = result.valueFix ?? null;
+  let methodFix = result.methodFix ?? null;
   let message = result.message ?? "";
   let confidence = result.confidence;
 
@@ -357,9 +370,25 @@ function applyAuthGuards(
     hint && hint.expected.kind === "query" ? hint.expected.params[0] : undefined;
 
   // Under-confident fixes are not actionable enough to offer as one-click.
-  if (result.confidence === "low" && (headerFix || valueFix)) {
+  if (result.confidence === "low" && (headerFix || valueFix || methodFix)) {
     headerFix = null;
     valueFix = null;
+    methodFix = null;
+  }
+
+  // A method switch is only offered when the response itself proves the fault
+  // (405) and names the correct method (Allow header or response text). Without
+  // that evidence the button would be guessing the target method.
+  if (methodFix && input.status !== 405) {
+    methodFix = null;
+  }
+  const allowHeader = (
+    (input.responseHeaders && input.responseHeaders["allow"]) ||
+    ""
+  ).toLowerCase();
+  const body = String(input.responseBody ?? "").toLowerCase();
+  if (methodFix && !allowHeader.includes(methodFix.toLowerCase()) && !body.includes(methodFix.toLowerCase())) {
+    methodFix = null;
   }
 
   // Public endpoints take no credentials.
@@ -393,5 +422,14 @@ function applyAuthGuards(
     if (confidence === "high") confidence = "medium";
   }
 
-  return { ...result, message, confidence, headerFix, valueFix };
+  // The schema only ever expresses one fix per diagnosis; enforce it on the
+  // way out so the card never shows two competing one-click actions.
+  if (methodFix) {
+    headerFix = null;
+    valueFix = null;
+  } else if (headerFix || valueFix) {
+    methodFix = null;
+  }
+
+  return { ...result, message, confidence, headerFix, valueFix, methodFix };
 }

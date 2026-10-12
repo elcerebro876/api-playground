@@ -7069,6 +7069,27 @@ style={{
                                   >
                                     {diag?.title}
                                   </span>{" "}
+                                  {typeof response?.status === "number" && (
+                                    <span
+                                      style={{
+                                        borderRadius: 6,
+                                        backgroundColor: isDark
+                                          ? "#2b1414"
+                                          : "#FFD6D6",
+                                        padding: "3px 6px",
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        fontWeight: 400,
+                                        color: isDark
+                                          ? "#ff6b6b"
+                                          : "#FF1616",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {response.status}
+                                    </span>
+                                  )}{" "}
                                 </div>{" "}
                                 <div
                                   style={{
@@ -7093,7 +7114,7 @@ style={{
                                   }}
                                 >
                                   {" "}
-                                  {(diag?.headerFix || diag?.valueFix) && (
+                                  {(diag?.headerFix || diag?.valueFix) && !diag?.methodFix && (
                                     <RippleButton
                                       className={
                                         fixingNow || stagedFix
@@ -7129,6 +7150,43 @@ style={{
                                         : diag?.headerFix
                                           ? "Fix the header"
                                           : "Fix the key"}
+                                    </RippleButton>
+                                  )}{" "}
+                                  {diag?.methodFix && (
+                                    <RippleButton
+                                      className="transition-colors hover:bg-[#4a4aff]"
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        height: 28,
+                                        padding: "0 8px",
+                                        borderRadius: 6,
+                                        backgroundColor:
+                                          fixingNow || stagedFix
+                                            ? "#C2C2FF"
+                                            : "#5A5AFF",
+                                        color:
+                                          fixingNow || stagedFix
+                                            ? "#5A5AFF"
+                                            : "#ffffff",
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        whiteSpace: "nowrap",
+                                      }}
+                                      onClick={() => {
+                                        setMethod(diag?.methodFix ?? "GET");
+                                        setStagedFix(null);
+                                        setHeaderExpanded(false);
+                                        onSend({
+                                          method:
+                                            diag?.methodFix ?? "GET",
+                                          url: lastRequest?.url || url,
+                                        });
+                                      }}
+                                    >
+                                      Switch to {diag?.methodFix}
                                     </RippleButton>
                                   )}{" "}
                                 </div>{" "}

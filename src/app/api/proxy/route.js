@@ -1,15 +1,8 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import * as httpMethods from "../../../lib/http-methods";
 
-const ALLOWED_METHODS = new Set([
-  "GET",
-  "POST",
-  "PUT",
-  "PATCH",
-  "DELETE",
-  "HEAD",
-  "OPTIONS",
-]);
+const ALLOWED_METHODS = new Set(httpMethods.ALLOWED_METHODS);
 const TIMEOUT_MS = 20000;
 const MAX_REDIRECTS = 5;
 const MAX_BODY_BYTES = 8 * 1024 * 1024;

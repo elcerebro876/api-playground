@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "src/app/page.tsx": {
-    "mtime": 1791750298.948845,
-    "ast_hash": "2b1b5fd714723b9ee1e61643e5fa8e8e",
+    "mtime": 1791806124.440948,
+    "ast_hash": "580b7d9210e9efef9357a8db4e2fe438",
     "semantic_hash": ""
   },
   "src/components/LoadingState.tsx": {
@@ -287,6 +287,26 @@
   "src/lib/api-auth.ts": {
     "mtime": 1791744586.2787695,
     "ast_hash": "23f3894dd2f0977d3ef892a6faa9fef8",
+    "semantic_hash": ""
+  },
+  "shot-1-result.png": {
+    "mtime": 1791807064.5652156,
+    "ast_hash": "36fe4d08b970f635046b077762316077",
+    "semantic_hash": ""
+  },
+  "shot-2-fallback.png": {
+    "mtime": 1791807074.7496777,
+    "ast_hash": "49608fe1ffe003df5be3d11f5f544ea7",
+    "semantic_hash": ""
+  },
+  "shot-3-unavailable.png": {
+    "mtime": 1791807423.1167448,
+    "ast_hash": "8847071ea7e6883f897d1dad36857b63",
+    "semantic_hash": ""
+  },
+  "shot-4-capReached.png": {
+    "mtime": 1791807484.6449304,
+    "ast_hash": "d242e835904c5696036c1dd5418818c4",
     "semantic_hash": ""
   }
 }
