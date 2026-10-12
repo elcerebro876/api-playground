@@ -5195,6 +5195,7 @@ function MainContent({
                             setUrl={setUrl}
                             loading={loading}
                             onSend={onSend}
+                            showChevron
                             pendingMethodSwitch={pendingMethodSwitch}
                             onClearPendingSwitch={() =>
                               setPendingMethodSwitch(null)
@@ -11913,6 +11914,7 @@ function UrlInputBar({
   pendingUrlSwitch,
   onClearPendingUrlSwitch,
   focusSignal,
+  showChevron,
 }: {
   compact?: boolean;
   glass?: boolean;
@@ -11932,6 +11934,7 @@ function UrlInputBar({
   pendingUrlSwitch?: { from: string; to: string } | null;
   onClearPendingUrlSwitch?: () => void;
   focusSignal?: number;
+  showChevron?: boolean;
 }) {
   const isDark = activeTheme === "Dark";
   const [showDropdown, setShowDropdown] = useState(false);
@@ -12087,6 +12090,27 @@ function UrlInputBar({
             />{" "}
             {method}{" "}
           </span>{" "}
+          {showChevron && (
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              style={{
+                flexShrink: 0,
+                transform: showDropdown ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s ease",
+              }}
+            >
+              <path
+                d="M4 6L10 12L16 6"
+                stroke={isDark ? "#9e9e9e" : "#5A5A5A"}
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}{" "}
         </button>{" "}
         <AnimatePresence>
           {" "}

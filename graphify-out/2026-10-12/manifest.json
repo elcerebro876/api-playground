@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "src/app/page.tsx": {
-    "mtime": 1791832767.7019148,
-    "ast_hash": "077d6669846d2ee2405e9a2a0862aa4a",
+    "mtime": 1791833496.881858,
+    "ast_hash": "b9e6dd98c0bc291b1bf16b3eaad2ee65",
     "semantic_hash": ""
   },
   "src/components/LoadingState.tsx": {
@@ -327,6 +327,16 @@
   "shot-switch-after2.png": {
     "mtime": 1791825293.0550015,
     "ast_hash": "29956b5005dd81ed35d5b1b4ae0c4f41",
+    "semantic_hash": ""
+  },
+  "urlfix-applied.png": {
+    "mtime": 1791833595.5660768,
+    "ast_hash": "f8694287d98270d3a5b0976840a60c2b",
+    "semantic_hash": ""
+  },
+  "urlfix-card.png": {
+    "mtime": 1791833594.8841088,
+    "ast_hash": "84babc91ef6e2987cf8b6c1ffb35cfc3",
     "semantic_hash": ""
   }
 }
