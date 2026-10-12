@@ -4469,6 +4469,14 @@ function fallbackHintText(
   return "The API rejected the request";
 }
 
+function pathnameOf(value: string): string {
+  try {
+    return new URL(value).pathname || "/";
+  } catch {
+    return value;
+  }
+}
+
 type StagedFix = {
   mode: "move" | "rewrite";
   from: string;
@@ -4831,6 +4839,14 @@ function MainContent({
     from: string;
     to: string;
   } | null>(null);
+  const [appliedUrlFix, setAppliedUrlFix] = useState<DiagnosisResult | null>(
+    null,
+  );
+  const [pendingUrlSwitch, setPendingUrlSwitch] = useState<{
+    from: string;
+    to: string;
+  } | null>(null);
+  const [focusSignal, setFocusSignal] = useState(0);
   const openStagedFix = () => {
     if (!diag) return;
     const mf = diag.headerFix;
@@ -4907,6 +4923,18 @@ function MainContent({
       setFixingNow(false);
       openStagedFix();
     }, 700);
+  };
+  const handleUrlFixClick = () => {
+    if (!diag?.urlFix) return;
+    setStagedFix(null);
+    setHeaderExpanded(false);
+    setUrl(diag.urlFix.to);
+    setPendingUrlSwitch({
+      from: pathnameOf(diag.urlFix.from),
+      to: pathnameOf(diag.urlFix.to),
+    });
+    setAppliedUrlFix(diag);
+    setFocusSignal((n) => n + 1);
   };
   const startFixing = () => {
     if (!stagedFix) return;
@@ -5171,6 +5199,11 @@ function MainContent({
                             onClearPendingSwitch={() =>
                               setPendingMethodSwitch(null)
                             }
+                            pendingUrlSwitch={pendingUrlSwitch}
+                            onClearPendingUrlSwitch={() =>
+                              setPendingUrlSwitch(null)
+                            }
+                            focusSignal={focusSignal}
                           />{" "}
                         </div>{" "}
                       </motion.div>{" "}
@@ -7017,6 +7050,50 @@ function MainContent({
                                   </div>
                                 );
                               })()}{" "}
+                              {diag?.urlFix && (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "16px 16px 0",
+                                  }}
+                                >
+                                  {" "}
+                                  <span
+                                    style={{
+                                      fontFamily:
+                                        "Geist, var(--font-geist-sans)",
+                                      fontSize: 14,
+                                      fontWeight: 500,
+                                      color: isDark ? "#9e9e9e" : "#585858",
+                                    }}
+                                  >
+                                    Path not found
+                                  </span>{" "}
+                                  {typeof response?.status === "number" && (
+                                    <span
+                                      style={{
+                                        borderRadius: 6,
+                                        backgroundColor: isDark
+                                          ? "#2b1414"
+                                          : "#FFD6D6",
+                                        padding: "3px 6px",
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        fontWeight: 400,
+                                        color: isDark
+                                          ? "#ff6b6b"
+                                          : "#FF1616",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {response.status}
+                                    </span>
+                                  )}{" "}
+                                </div>
+                              )}{" "}
                               <div
 style={{
                                     margin: "8px 4px 4px",
@@ -7078,9 +7155,12 @@ style={{
                                       color: isDark ? "#9e9e9e" : "#585858",
                                     }}
                                   >
-                                    {diag?.title}
+                                    {diag?.urlFix
+                                      ? `No route at ${pathnameOf(diag.urlFix.from)}`
+                                      : diag?.title}
                                   </span>{" "}
-                                  {typeof response?.status === "number" && (
+                                  {!diag?.urlFix &&
+                                    typeof response?.status === "number" && (
                                     <span
                                       style={{
                                         borderRadius: 6,
@@ -7114,7 +7194,9 @@ style={{
                                     color: "#939393",
                                   }}
                                 >
-                                  {diag?.message}
+                                  {diag?.urlFix
+                                    ? `The API’s own error says it found no such path. Did you mean ${pathnameOf(diag.urlFix.to)}?`
+                                    : diag?.message}
                                 </div>{" "}
                                 <div
                                   style={{
@@ -7208,6 +7290,61 @@ style={{
                                       {switchedDiag === diag
                                         ? `switched to ${diag?.methodFix}`
                                         : `Switch to ${diag?.methodFix}`}
+                                    </RippleButton>
+                                  )}{" "}
+                                  {diag?.urlFix && (
+                                    <span
+                                      style={{
+                                        borderRadius: 4,
+                                        backgroundColor: isDark
+                                          ? "#2a2a2a"
+                                          : "#E6E6E6",
+                                        padding: "3px 6px",
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 14,
+                                        fontWeight: 400,
+                                        color: isDark ? "#b0b0b0" : "#5A5A5A",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {pathnameOf(diag.urlFix.to)}
+                                    </span>
+                                  )}{" "}
+                                  {diag?.urlFix && (
+                                    <RippleButton
+                                      className={
+                                        appliedUrlFix === diag
+                                          ? ""
+                                          : "transition-colors hover:bg-[#4a4aff]"
+                                      }
+                                      disabled={appliedUrlFix === diag}
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        height: 28,
+                                        padding: "0 8px",
+                                        borderRadius: 6,
+                                        backgroundColor:
+                                          appliedUrlFix === diag
+                                            ? "#C2C2FF"
+                                            : "#5A5AFF",
+                                        color: "#ffffff",
+                                        cursor:
+                                          appliedUrlFix === diag
+                                            ? "default"
+                                            : "pointer",
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        whiteSpace: "nowrap",
+                                      }}
+                                      onClick={handleUrlFixClick}
+                                    >
+                                      {appliedUrlFix === diag
+                                        ? `using ${pathnameOf(diag.urlFix.to)}`
+                                        : `Use ${pathnameOf(diag.urlFix.to)}`}
                                     </RippleButton>
                                   )}{" "}
                                 </div>{" "}
@@ -7609,6 +7746,9 @@ backgroundColor: isDark
                     onSend={onSend}
                     pendingMethodSwitch={pendingMethodSwitch}
                     onClearPendingSwitch={() => setPendingMethodSwitch(null)}
+                    pendingUrlSwitch={pendingUrlSwitch}
+                    onClearPendingUrlSwitch={() => setPendingUrlSwitch(null)}
+                    focusSignal={focusSignal}
                   />
                   <StagedFixEditor
                     stagedFix={stagedFix}
@@ -7734,6 +7874,9 @@ backgroundColor: isDark
                   onSend={onSend}
                   pendingMethodSwitch={pendingMethodSwitch}
                   onClearPendingSwitch={() => setPendingMethodSwitch(null)}
+                  pendingUrlSwitch={pendingUrlSwitch}
+                  onClearPendingUrlSwitch={() => setPendingUrlSwitch(null)}
+                  focusSignal={focusSignal}
                 />
               )}{" "}
             </div>{" "}
@@ -11767,6 +11910,9 @@ function UrlInputBar({
   onSend,
   pendingMethodSwitch,
   onClearPendingSwitch,
+  pendingUrlSwitch,
+  onClearPendingUrlSwitch,
+  focusSignal,
 }: {
   compact?: boolean;
   glass?: boolean;
@@ -11783,6 +11929,9 @@ function UrlInputBar({
   }) => void;
   pendingMethodSwitch?: { from: string; to: string } | null;
   onClearPendingSwitch?: () => void;
+  pendingUrlSwitch?: { from: string; to: string } | null;
+  onClearPendingUrlSwitch?: () => void;
+  focusSignal?: number;
 }) {
   const isDark = activeTheme === "Dark";
   const [showDropdown, setShowDropdown] = useState(false);
@@ -11878,10 +12027,21 @@ function UrlInputBar({
       ? "#75d5d5"
       : "#2fb4b4";
   const [localUrl, setLocalUrl] = useState(url);
+  const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const frame = requestAnimationFrame(() => setLocalUrl(url));
     return () => cancelAnimationFrame(frame);
   }, [url]);
+  useEffect(() => {
+    if (!focusSignal) return;
+    const frame = requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      el.select();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusSignal]);
   return (
     <div
       className={`relative rounded-lg p-3 ${compact ? "w-[393px]" : "w-[467px]"}`}
@@ -12327,6 +12487,7 @@ function UrlInputBar({
         </AnimatePresence>{" "}
       </div>{" "}
       <input
+        ref={inputRef}
         type="text"
         placeholder="Paste an API endpoint..."
         value={localUrl}
@@ -12334,6 +12495,7 @@ function UrlInputBar({
           setLocalUrl(e.target.value);
           setUrl(e.target.value);
           onClearPendingSwitch?.();
+          onClearPendingUrlSwitch?.();
         }}
         className={`flex-1 bg-transparent text-sm tracking-[-0.04em] outline-none ${isDark ? "text-[#d1d1d1] placeholder:text-[#d1d1d1]" : "text-[#9e9e9e] placeholder:text-[#9e9e9e]"}`}
         style={{ fontFamily: "Geist, var(--font-geist-sans)" }}
@@ -12341,6 +12503,7 @@ function UrlInputBar({
       <RippleButton
         onClick={() => {
           onClearPendingSwitch?.();
+          onClearPendingUrlSwitch?.();
           onSend();
         }}
         disabled={loading}
@@ -12368,7 +12531,7 @@ function UrlInputBar({
         <span>Send</span>{" "}
       </RippleButton>{" "}
       </div>
-      {pendingMethodSwitch && (
+      {(pendingMethodSwitch || pendingUrlSwitch) && (
         <div
           style={{
             height: 0.8,
@@ -12410,6 +12573,25 @@ function UrlInputBar({
               usually needs a body
             </span>
           )}
+        </div>
+      )}
+      {pendingUrlSwitch && (
+        <div
+          className="flex items-center justify-between"
+          style={{ marginTop: 8 }}
+        >
+          <span
+            style={{
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 14,
+              fontWeight: 400,
+              lineHeight: "20px",
+              letterSpacing: "-0.05em",
+              color: "#0396DC",
+            }}
+          >
+            URL changed from {pendingUrlSwitch.from}, not yet sent
+          </span>
         </div>
       )}
     </div>

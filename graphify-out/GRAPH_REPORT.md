@@ -1,16 +1,16 @@
 # Graph Report - api-playground  (2026-10-12)
 
 ## Corpus Check
-- 28 files · ~87,755 words
+- 28 files · ~91,770 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 245 nodes · 367 edges · 16 communities (12 shown, 4 thin omitted)
+- 249 nodes · 374 edges · 16 communities (12 shown, 4 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `049e44b0`
+- Built from commit: `af562513`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -62,7 +62,7 @@
 
 ### Community 0 - "page.tsx"
 Cohesion: 0.06
-Nodes (39): BrowseApiSection(), buildCardRequest(), cardBodyPreview(), cardContentVariants, cardItemVariants, cardTextSpring, commonKeys, demoRequests (+31 more)
+Nodes (40): BrowseApiSection(), buildCardRequest(), cardBodyPreview(), cardContentVariants, cardItemVariants, cardTextSpring, commonKeys, demoRequests (+32 more)
 
 ### Community 1 - "devDependencies"
 Cohesion: 0.11
@@ -77,12 +77,12 @@ Cohesion: 0.08
 Nodes (23): framer-motion, next, dependencies, framer-motion, next, posthog-js, react, react-dom (+15 more)
 
 ### Community 4 - "ai.ts"
-Cohesion: 0.12
-Nodes (25): AIJsonOptions, breakerAllows(), breakerCooldownMs(), breakerRecordFailure(), breakerRecordSuccess(), breakers, BreakerState, breakerThreshold() (+17 more)
+Cohesion: 0.16
+Nodes (22): AIJsonOptions, breakerAllows(), breakerCooldownMs(), breakerRecordFailure(), breakerRecordSuccess(), breakers, BreakerState, breakerThreshold() (+14 more)
 
 ### Community 5 - "diagnose.ts"
 Cohesion: 0.09
-Nodes (30): CacheEntry, cacheGet(), cacheSet(), diagnosisCache, GET(), POST(), AUTH_HINTS_LAST_REVIEWED, AuthHint (+22 more)
+Nodes (33): CacheEntry, cacheGet(), cacheSet(), diagnosisCache, GET(), POST(), AUTH_HINTS_LAST_REVIEWED, AuthHint (+25 more)
 
 ### Community 6 - "LoadingState.tsx"
 Cohesion: 0.33
@@ -101,25 +101,25 @@ Cohesion: 0.43
 Nodes (7): ALLOWED_METHODS, assertSafeTarget(), ipToInt(), isPrivateIpv4(), isPrivateIpv6(), POST(), V4_RANGES
 
 ### Community 14 - "explain/route.ts"
-Cohesion: 0.24
-Nodes (13): POST(), requestSignature(), Bucket, buckets, clientIp(), memoryRateLimit(), rateLimit(), RateLimitResult (+5 more)
+Cohesion: 0.16
+Nodes (16): POST(), requestSignature(), ExplainPayload, generateExplanation(), parseExplanation(), Bucket, buckets, clientIp() (+8 more)
 
 ## Knowledge Gaps
-- **99 isolated node(s):** `eslintConfig`, `nextConfig`, `name`, `version`, `private` (+94 more)
+- **100 isolated node(s):** `eslintConfig`, `nextConfig`, `name`, `version`, `private` (+95 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `callAIJson()` connect `ai.ts` to `diagnose.ts`?**
+- **Why does `callAIJson()` connect `ai.ts` to `diagnose.ts`, `explain/route.ts`?**
   _High betweenness centrality (0.021) - this node is a cross-community bridge._
 - **Why does `devDependencies` connect `devDependencies` to `dependencies`?**
   _High betweenness centrality (0.019) - this node is a cross-community bridge._
 - **What connects `eslintConfig`, `nextConfig`, `name` to the rest of the system?**
-  _99 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _100 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `page.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.05925925925925926 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05844155844155844 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**
   _Cohesion score 0.10526315789473684 - nodes in this community are weakly interconnected._
 - **Should `compilerOptions` be split into smaller, more focused modules?**
