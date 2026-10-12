@@ -174,10 +174,14 @@ export function loadDiagnosisCache(key: string): DiagnosisResult | null {
   return entry.value;
 }
 
-export function saveDiagnosisCache(key: string, value: DiagnosisResult): void {
+export function saveDiagnosisCache(
+  key: string,
+  value: DiagnosisResult,
+  ttlMs: number = DIAGNOSIS_CACHE_TTL_MS,
+): void {
   try {
     const store = readDiagnosisCache();
-    store[key] = { value, expires: Date.now() + DIAGNOSIS_CACHE_TTL_MS };
+    store[key] = { value, expires: Date.now() + ttlMs };
     const now = Date.now();
     // Drop expired entries, then keep only the newest by expiry.
     const live = Object.keys(store)

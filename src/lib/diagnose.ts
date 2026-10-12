@@ -221,6 +221,8 @@ export async function generateDiagnosis(
     'valueFix: set ONLY when the header name is already correct for this API, the user DID send it, and the secret VALUE inside it is wrong/expired. key must be one of the auth headers actually present in the request. Set stripScheme true when the current value carries a leading scheme word.',
     "Emit at most one of headerFix/valueFix. If the fix is neither a header rename nor a header-value replacement (for example the key belongs in a query parameter, a header is missing entirely, or the fault is elsewhere), set BOTH to null and state the exact fix in `message`.",
     "Use confidence \"high\" only when the response evidence clearly supports the fault; use \"low\" when you are unsure.",
+    "GROUNDING: only state what a host requires when a KNOWN AUTH CONVENTION is given above. If no convention is given, do not assert what the API expects (for example, never claim an endpoint does not require authentication, nor that it uses a particular scheme or parameter); diagnose strictly from the status and response evidence, and if the fault would depend on knowing the host's convention, use confidence \"low\".",
+    "When no KNOWN AUTH CONVENTION is given, never name a specific scheme or header in `message` (do not write things like \"a valid Bearer token\"); refer to the credential generically, for example \"the value you sent\".",
     "Never invent a cause. If no concrete request-side fault is supported by the evidence, return {\"identifiable\": false}.",
     "",
     "EXAMPLES:",
@@ -320,15 +322,19 @@ export async function generateDiagnosis(
     typeof parsed.evidence === "string" && parsed.evidence.trim()
       ? parsed.evidence.trim().slice(0, 300)
       : undefined;
-  return applyAuthGuards(hint, {
-    identifiable: true,
-    title: parsed.title.trim(),
-    message: parsed.message.trim(),
-    evidence,
-    confidence,
-    headerFix,
-    valueFix,
-  });
+  return applyAuthGuards(
+    hint,
+    {
+      identifiable: true,
+      title: parsed.title.trim(),
+      message: parsed.message.trim(),
+      evidence,
+      confidence,
+      headerFix,
+      valueFix,
+    },
+    input.responseBody ?? "",
+  );
 }
 
 // Rule-based checks applied after the model answers. They cannot add a fix the
@@ -338,12 +344,14 @@ export async function generateDiagnosis(
 function applyAuthGuards(
   hint: AuthHint | null,
   result: DiagnosisResult,
+  body: string,
 ): DiagnosisResult {
   if (!result.identifiable) return result;
 
   let headerFix = result.headerFix ?? null;
   let valueFix = result.valueFix ?? null;
   let message = result.message ?? "";
+  let confidence = result.confidence;
 
   const queryParam =
     hint && hint.expected.kind === "query" ? hint.expected.params[0] : undefined;
@@ -371,5 +379,19 @@ function applyAuthGuards(
     }
   }
 
-  return { ...result, message, headerFix, valueFix };
+  // No known convention for this host: a one-click fix would have to guess how
+  // the API expects its credential. Keep a header rename only when the response
+  // body itself names the target header; drop a same-header value rewrite
+  // entirely (with stripScheme false it is a no-op, and there is no evidence for
+  // the expected value). Confidence cannot exceed "medium" without a convention.
+  if (!hint) {
+    const hay = (typeof body === "string" ? body : String(body ?? "")).toLowerCase();
+    const namedInBody = (name: string) =>
+      name.length > 0 && hay.includes(name.toLowerCase());
+    if (headerFix && !namedInBody(headerFix.to)) headerFix = null;
+    valueFix = null;
+    if (confidence === "high") confidence = "medium";
+  }
+
+  return { ...result, message, confidence, headerFix, valueFix };
 }

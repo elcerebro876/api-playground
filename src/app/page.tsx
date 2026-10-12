@@ -22,6 +22,9 @@ import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed
 import type { ExplainPayload } from "@/lib/explain";
 import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, maskHeaderValue, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed } from "@/lib/posthog";
+// Mirrors the server route's non-identifiable TTL: a genuine "nothing found" is
+// cached briefly so a repeat is instant without occupying the AI.
+const DIAGNOSIS_NOT_FOUND_TTL_MS = 2 * 60 * 1000;
 const cardTextSpring = {
   type: "spring" as const,
   stiffness: 400,
@@ -197,7 +200,12 @@ export default function Home() {
     headers: Record<string, string>;
   } | null>(null);
   const [diagState, setDiagState] = useState<
-    "idle" | "loading" | "result" | "fallback"
+    | "idle"
+    | "loading"
+    | "result"
+    | "fallback"
+    | "unavailable"
+    | "capReached"
   >("idle");
   const [diag, setDiag] = useState<DiagnosisResult | null>(null);
   useEffect(() => {
@@ -354,18 +362,30 @@ export default function Home() {
     // A cached diagnosis is free (no AI call), so it is served even after the
     // per-user usage cap is reached.
     const cached = loadDiagnosisCache(cacheKey);
-    if (cached && cached.identifiable && cached.title && cached.message) {
-      setDiag(cached);
-      setDiagState("result");
+    if (
+      cached &&
+      (cached.identifiable
+        ? Boolean(cached.title && cached.message)
+        : cached.identifiable === false)
+    ) {
+      if (cached.identifiable) {
+        setDiag(cached);
+        setDiagState("result");
+      } else {
+        setDiag(null);
+        setDiagState("fallback");
+      }
       return;
     }
 
-    if (
-      diagUsesRef.current >= DIAGNOSIS_MAX_USES ||
-      diagAvailableRef.current !== true
-    ) {
+    if (diagUsesRef.current >= DIAGNOSIS_MAX_USES) {
       setDiag(null);
-      setDiagState("fallback");
+      setDiagState("capReached");
+      return;
+    }
+    if (diagAvailableRef.current !== true) {
+      setDiag(null);
+      setDiagState("unavailable");
       return;
     }
     const token = diagTokenRef.current;
@@ -384,20 +404,25 @@ export default function Home() {
         if (!res.ok) throw new Error(String(res.status));
         const j: DiagnosisResult = await res.json();
         if (token !== diagTokenRef.current) return;
-        diagUsesRef.current += 1;
-        saveDiagnosisUses(diagUsesRef.current);
         if (j && j.identifiable && j.title && j.message) {
+          // Only a real diagnosis counts against the per-user cap.
+          diagUsesRef.current += 1;
+          saveDiagnosisUses(diagUsesRef.current);
           setDiag(j);
           setDiagState("result");
           saveDiagnosisCache(cacheKey, j);
         } else {
+          // A genuine "nothing found" is cached briefly so repeats are instant,
+          // but it never counts against the cap. (Provider failures throw before
+          // reaching here and are never cached.)
+          saveDiagnosisCache(cacheKey, j, DIAGNOSIS_NOT_FOUND_TTL_MS);
           setDiag(null);
           setDiagState("fallback");
         }
       } catch {
         if (token !== diagTokenRef.current) return;
         setDiag(null);
-        setDiagState("fallback");
+        setDiagState("unavailable");
       } finally {
         clearTimeout(timer);
       }
@@ -4773,7 +4798,13 @@ function MainContent({
   sessionCardTests: Record<string, { key: string; entry: HistoryEntry }>;
   onCardTested: (apiName: string, snapshot: HistoryEntry, key: string) => void;
   onViewLastResponse: (apiName: string) => void;
-  diagState: "idle" | "loading" | "result" | "fallback";
+  diagState:
+    | "idle"
+    | "loading"
+    | "result"
+    | "fallback"
+    | "unavailable"
+    | "capReached";
   diag: DiagnosisResult | null;
   lastRequest: {
     method: string;
@@ -7192,6 +7223,58 @@ backgroundColor: isDark
                                     }}
                                   >
                                     {" "}
+                                    {diagState === "fallback" ? (
+                                      <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 18 18"
+                                        fill="none"
+                                        style={{ flexShrink: 0 }}
+                                      >
+                                        <circle
+                                          cx="9"
+                                          cy="9"
+                                          r="7.25"
+                                          stroke={isDark ? "#9e9e9e" : "#585858"}
+                                          strokeWidth="1.4"
+                                        />
+                                        <text
+                                          x="9"
+                                          y="12.6"
+                                          textAnchor="middle"
+                                          fontSize="10.5"
+                                          fontWeight="600"
+                                          fill={isDark ? "#9e9e9e" : "#585858"}
+                                        >
+                                          ?
+                                        </text>
+                                      </svg>
+                                    ) : diagState === "capReached" ? (
+                                      <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 18 18"
+                                        fill="none"
+                                        style={{ flexShrink: 0 }}
+                                      >
+                                        <path
+                                          d="M5.5 8.25V6a3.5 3.5 0 0 1 7 0v2.25"
+                                          stroke={isDark ? "#9e9e9e" : "#585858"}
+                                          strokeWidth="1.4"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                        <rect
+                                          x="3.75"
+                                          y="8.25"
+                                          width="10.5"
+                                          height="6.5"
+                                          rx="1.5"
+                                          stroke={isDark ? "#9e9e9e" : "#585858"}
+                                          strokeWidth="1.4"
+                                        />
+                                      </svg>
+                                    ) : (
                                     <svg
                                       width="18"
                                       height="18"
@@ -7235,7 +7318,8 @@ backgroundColor: isDark
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                       />{" "}
-                                    </svg>{" "}
+                                    </svg>
+                                    )}
                                     <span
                                       style={{
                                         fontFamily:
@@ -7247,7 +7331,11 @@ backgroundColor: isDark
                                           : "#585858",
                                       }}
                                     >
-                                      Coaching unavailable
+                                      {diagState === "fallback"
+                                        ? "Not enough to go on"
+                                        : diagState === "capReached"
+                                          ? "Limit reached"
+                                          : "Coaching unavailable"}
                                     </span>{" "}
                                   </div>{" "}
                                   <div
@@ -7262,9 +7350,14 @@ backgroundColor: isDark
                                       color: "#939393",
                                     }}
                                   >
-                                    Couldn&rsquo;t reach the AI just now. Try
-                                    again in a moment.
+{diagState === "fallback"
+                                        ? "There isn't enough in the response to pinpoint the cause. Check the request and the API's documentation."
+                                        : diagState === "capReached"
+                                          ? "You've used your 5 free coached errors. Sign up for unlimited."
+                                          : "Couldn't reach the AI just now. Try again in a moment."}
                                   </div>{" "}
+                                  {diagState !== "fallback" &&
+                                    diagState !== "capReached" && (
                                   <div
                                     style={{
                                       marginTop: 8,
@@ -7294,7 +7387,8 @@ backgroundColor: isDark
                                     >
                                       Try again
                                     </RippleButton>{" "}
-                                  </div>{" "}
+                                  </div>
+                                  )}
                                 </div>{" "}
                               </>
                             )}{" "}

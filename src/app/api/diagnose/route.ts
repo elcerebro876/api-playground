@@ -11,6 +11,11 @@ import { clientIp, rateLimit } from "@/lib/rate-limit";
 // which is fine: it exists to make a user's repeat of the SAME failing request
 // resolve instantly (and skip the AI call) instead of re-running the chain.
 const CACHE_TTL_MS = 10 * 60 * 1000;
+// A genuine "nothing found" is cheap to redo, but a user often retries the same
+// ambiguous failure; cache it briefly so the repeats are instant. Provider
+// failures never reach here (they throw and return a 500), so they are never
+// cached.
+const NON_IDENTIFIABLE_CACHE_TTL_MS = 2 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 200;
 
 type CacheEntry = { value: DiagnosisResult; expires: number };
@@ -29,9 +34,9 @@ function cacheGet(key: string): DiagnosisResult | null {
   return entry.value;
 }
 
-function cacheSet(key: string, value: DiagnosisResult): void {
+function cacheSet(key: string, value: DiagnosisResult, ttlMs: number): void {
   diagnosisCache.delete(key);
-  diagnosisCache.set(key, { value, expires: Date.now() + CACHE_TTL_MS });
+  diagnosisCache.set(key, { value, expires: Date.now() + ttlMs });
   while (diagnosisCache.size > CACHE_MAX_ENTRIES) {
     const oldest = diagnosisCache.keys().next().value;
     if (oldest === undefined) break;
@@ -91,7 +96,11 @@ export async function POST(request: Request) {
 
   try {
     const result = await generateDiagnosis(input);
-    if (result.identifiable) cacheSet(cacheKey, result);
+    cacheSet(
+      cacheKey,
+      result,
+      result.identifiable ? CACHE_TTL_MS : NON_IDENTIFIABLE_CACHE_TTL_MS,
+    );
     return Response.json(result);
   } catch (e) {
     console.error("[diagnose] failed", (e as Error)?.message);

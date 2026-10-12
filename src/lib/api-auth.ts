@@ -6,9 +6,13 @@
 //      Authorization header).
 //   2. Sanity-check the model's proposed one-click fix afterwards.
 //
+// Last reviewed: 2026-10-11
+//
 // Keep this list conservative: only add an entry when the convention is
-// well-documented and stable. A wrong entry is worse than no entry, because it
-// would actively mislead the model.
+// well-documented and stable, and set `verified` to the date it was checked
+// against the provider's official docs. A wrong entry is worse than no entry,
+// because it would actively mislead the model. Entries that cannot be sourced
+// are kept commented out at the bottom (quarantined) rather than matched.
 
 export type ExpectedAuth =
   // Secret travels in a header. `names` stays lowercase.
@@ -28,13 +32,19 @@ export type AuthHint = {
   // Injected verbatim into the prompt as an authoritative convention note.
   note: string;
   expected: ExpectedAuth;
+  // Date this entry was last checked against the provider's official docs.
+  // Absent means "not re-verified" - do not treat it as authoritative.
+  verified?: string;
 };
+
+export const AUTH_HINTS_LAST_REVIEWED = "2026-10-11";
 
 const HINTS: AuthHint[] = [
   {
     host: "openweathermap.org",
     note: "OpenWeather expects the API key in the `appid` query parameter. It does NOT use an Authorization header.",
     expected: { kind: "query", params: ["appid"] },
+    verified: "2026-10-11",
   },
   {
     host: "stripe.com",
@@ -60,6 +70,13 @@ const HINTS: AuthHint[] = [
     host: "cohere.ai",
     note: "Cohere expects `Authorization: Bearer <key>`.",
     expected: { kind: "header", names: ["authorization"], prefix: "Bearer" },
+    verified: "2026-10-11",
+  },
+  {
+    host: "cohere.com",
+    note: "Cohere expects `Authorization: Bearer <key>`.",
+    expected: { kind: "header", names: ["authorization"], prefix: "Bearer" },
+    verified: "2026-10-11",
   },
   {
     host: "mapbox.com",
@@ -73,8 +90,9 @@ const HINTS: AuthHint[] = [
   },
   {
     host: "themoviedb.org",
-    note: "TMDb expects `?api_key=<v3 key>` or `Authorization: Bearer <v4 token>`.",
-    expected: { kind: "query", params: ["api_key"] },
+    note: "TMDb recommends `Authorization: Bearer <API Read Access Token>` (works for v3 and v4); a legacy v3 `api_key` query parameter is also accepted.",
+    expected: { kind: "header", names: ["authorization"], prefix: "Bearer" },
+    verified: "2026-10-11",
   },
   {
     host: "unsplash.com",
@@ -105,11 +123,13 @@ const HINTS: AuthHint[] = [
     host: "mailgun.net",
     note: "Mailgun uses HTTP Basic auth: username `api`, password = your private API key.",
     expected: { kind: "basic" },
+    verified: "2026-10-11",
   },
   {
     host: "twilio.com",
-    note: "Twilio uses HTTP Basic auth: Account SID as username, Auth Token as password.",
+    note: "Twilio uses HTTP Basic auth: API key SID as username and API key secret as password (or, for local testing, Account SID as username and Auth Token as password).",
     expected: { kind: "basic" },
+    verified: "2026-10-11",
   },
   {
     host: "spotify.com",
@@ -125,6 +145,7 @@ const HINTS: AuthHint[] = [
     host: "discord.com",
     note: "Discord bot calls expect `Authorization: Bot <token>`.",
     expected: { kind: "header", names: ["authorization"], prefix: "Bot" },
+    verified: "2026-10-11",
   },
   {
     host: "telegram.org",
@@ -135,11 +156,13 @@ const HINTS: AuthHint[] = [
     host: "pexels.com",
     note: "Pexels expects the key raw in `Authorization: <key>` (no scheme word).",
     expected: { kind: "header", names: ["authorization"] },
+    verified: "2026-10-11",
   },
   {
     host: "assemblyai.com",
     note: "AssemblyAI expects the key raw in `Authorization: <key>` (no scheme word).",
     expected: { kind: "header", names: ["authorization"] },
+    verified: "2026-10-11",
   },
   {
     host: "openrouteservice.org",
@@ -157,11 +180,6 @@ const HINTS: AuthHint[] = [
     expected: { kind: "query", params: ["apikey"] },
   },
   {
-    host: "giphy.com",
-    note: "Giphy expects the key in the `api_key` query parameter.",
-    expected: { kind: "query", params: ["api_key"] },
-  },
-  {
     host: "finnhub.io",
     note: "Finnhub expects the token in the `token` query parameter (or `X-Finnhub-Token` header).",
     expected: { kind: "query", params: ["token"] },
@@ -172,24 +190,10 @@ const HINTS: AuthHint[] = [
     expected: { kind: "query", params: ["apikey"] },
   },
   {
-    host: "spoonacular.com",
-    note: "Spoonacular expects the key in the `apiKey` query parameter.",
-    expected: { kind: "query", params: ["apikey"] },
-  },
-  {
-    host: "weatherbit.io",
-    note: "Weatherbit expects the key in the `key` query parameter.",
-    expected: { kind: "query", params: ["key"] },
-  },
-  {
-    host: "fixer.io",
-    note: "Fixer expects the key in the `access_key` query parameter.",
-    expected: { kind: "query", params: ["access_key"] },
-  },
-  {
     host: "exchangerate.host",
     note: "exchangerate.host expects the key in the `access_key` query parameter.",
     expected: { kind: "query", params: ["access_key"] },
+    verified: "2026-10-11",
   },
   {
     host: "googleapis.com",
@@ -208,8 +212,9 @@ const HINTS: AuthHint[] = [
   },
   {
     host: "replicate.com",
-    note: "Replicate expects `Authorization: Token <key>`.",
-    expected: { kind: "header", names: ["authorization"], prefix: "Token" },
+    note: "Replicate expects `Authorization: Bearer <token>` (tokens start with r8_).",
+    expected: { kind: "header", names: ["authorization"], prefix: "Bearer" },
+    verified: "2026-10-11",
   },
   {
     host: "groq.com",
@@ -251,22 +256,20 @@ const HINTS: AuthHint[] = [
     note: "DigitalOcean expects `Authorization: Bearer <token>`.",
     expected: { kind: "header", names: ["authorization"], prefix: "Bearer" },
   },
-  {
-    host: "currencyapi.com",
-    note: "CurrencyAPI expects the key in the `apikey` header.",
-    expected: { kind: "header", names: ["apikey"] },
-  },
-  {
-    host: "polygon.io",
-    note: "Polygon.io expects the key in the `apiKey` query parameter (or `Authorization: Bearer`).",
-    expected: { kind: "query", params: ["apikey"] },
-  },
-  {
-    host: "ipinfo.io",
-    note: "IPinfo expects the token in the `token` query parameter.",
-    expected: { kind: "query", params: ["token"] },
-  },
 ];
+
+// Quarantined: conventions that could NOT be confirmed against the provider's
+// official documentation. They are intentionally NOT matched until verified, so
+// the model cannot be fed a possibly-wrong convention. Re-enable one only after
+// checking the docs and adding a `verified` date.
+//
+//   { host: "currencyapi.com", expected: { kind: "header", names: ["apikey"] } },
+//   { host: "polygon.io", expected: { kind: "query", params: ["apikey"] } },
+//   { host: "ipinfo.io", expected: { kind: "query", params: ["token"] } },
+//   { host: "fixer.io", expected: { kind: "query", params: ["access_key"] } },
+//   { host: "giphy.com", expected: { kind: "query", params: ["api_key"] } },
+//   { host: "spoonacular.com", expected: { kind: "query", params: ["apikey"] } },
+//   { host: "weatherbit.io", expected: { kind: "query", params: ["key"] } },
 
 // Resolve the convention for a request URL, if this host is known. Matches the
 // exact host or any subdomain of it (so `api.openweathermap.org` hits
