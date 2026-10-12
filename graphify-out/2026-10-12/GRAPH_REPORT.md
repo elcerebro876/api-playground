@@ -1,16 +1,16 @@
 # Graph Report - api-playground  (2026-10-12)
 
 ## Corpus Check
-- 27 files · ~82,671 words
+- 28 files · ~87,796 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 242 nodes · 361 edges · 16 communities (12 shown, 4 thin omitted)
+- 245 nodes · 367 edges · 16 communities (12 shown, 4 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `dd637b92`
+- Built from commit: `049e44b0`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -39,9 +39,9 @@
 5. `isAIConfigured()` - 9 edges
 6. `buildDiagnosisInput()` - 8 edges
 7. `POST()` - 7 edges
-8. `rateLimit()` - 7 edges
-9. `include` - 7 edges
-10. `diagnosisCacheKey()` - 6 edges
+8. `generateDiagnosis()` - 7 edges
+9. `rateLimit()` - 7 edges
+10. `include` - 7 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `GET()` --calls--> `isAIConfigured()`  [EXTRACTED]
@@ -81,8 +81,8 @@ Cohesion: 0.12
 Nodes (25): AIJsonOptions, breakerAllows(), breakerCooldownMs(), breakerRecordFailure(), breakerRecordSuccess(), breakers, BreakerState, breakerThreshold() (+17 more)
 
 ### Community 5 - "diagnose.ts"
-Cohesion: 0.10
-Nodes (28): CacheEntry, cacheGet(), cacheSet(), diagnosisCache, GET(), POST(), AUTH_HINTS_LAST_REVIEWED, AuthHint (+20 more)
+Cohesion: 0.09
+Nodes (30): CacheEntry, cacheGet(), cacheSet(), diagnosisCache, GET(), POST(), AUTH_HINTS_LAST_REVIEWED, AuthHint (+22 more)
 
 ### Community 6 - "LoadingState.tsx"
 Cohesion: 0.33
@@ -105,19 +105,19 @@ Cohesion: 0.24
 Nodes (13): POST(), requestSignature(), Bucket, buckets, clientIp(), memoryRateLimit(), rateLimit(), RateLimitResult (+5 more)
 
 ## Knowledge Gaps
-- **98 isolated node(s):** `eslintConfig`, `nextConfig`, `name`, `version`, `private` (+93 more)
+- **99 isolated node(s):** `eslintConfig`, `nextConfig`, `name`, `version`, `private` (+94 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `devDependencies` connect `devDependencies` to `dependencies`?**
-  _High betweenness centrality (0.020) - this node is a cross-community bridge._
 - **Why does `callAIJson()` connect `ai.ts` to `diagnose.ts`?**
-  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
+- **Why does `devDependencies` connect `devDependencies` to `dependencies`?**
+  _High betweenness centrality (0.019) - this node is a cross-community bridge._
 - **What connects `eslintConfig`, `nextConfig`, `name` to the rest of the system?**
-  _98 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _99 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `page.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.05925925925925926 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**

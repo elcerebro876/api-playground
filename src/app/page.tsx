@@ -4824,6 +4824,13 @@ function MainContent({
       if (fixTimerRef.current) clearTimeout(fixTimerRef.current);
     };
   }, []);
+  const [switchedDiag, setSwitchedDiag] = useState<DiagnosisResult | null>(
+    null,
+  );
+  const [pendingMethodSwitch, setPendingMethodSwitch] = useState<{
+    from: string;
+    to: string;
+  } | null>(null);
   const openStagedFix = () => {
     if (!diag) return;
     const mf = diag.headerFix;
@@ -5160,6 +5167,10 @@ function MainContent({
                             setUrl={setUrl}
                             loading={loading}
                             onSend={onSend}
+                            pendingMethodSwitch={pendingMethodSwitch}
+                            onClearPendingSwitch={() =>
+                              setPendingMethodSwitch(null)
+                            }
                           />{" "}
                         </div>{" "}
                       </motion.div>{" "}
@@ -7154,7 +7165,12 @@ style={{
                                   )}{" "}
                                   {diag?.methodFix && (
                                     <RippleButton
-                                      className="transition-colors hover:bg-[#4a4aff]"
+                                      className={
+                                        switchedDiag === diag
+                                          ? ""
+                                          : "transition-colors hover:bg-[#4a4aff]"
+                                      }
+                                      disabled={switchedDiag === diag}
                                       style={{
                                         display: "flex",
                                         alignItems: "center",
@@ -7163,30 +7179,35 @@ style={{
                                         padding: "0 8px",
                                         borderRadius: 6,
                                         backgroundColor:
-                                          fixingNow || stagedFix
+                                          switchedDiag === diag
                                             ? "#C2C2FF"
                                             : "#5A5AFF",
-                                        color:
-                                          fixingNow || stagedFix
-                                            ? "#5A5AFF"
-                                            : "#ffffff",
+                                        color: "#ffffff",
+                                        cursor:
+                                          switchedDiag === diag
+                                            ? "default"
+                                            : "pointer",
                                         fontFamily:
                                           "Geist, var(--font-geist-sans)",
                                         fontSize: 12,
                                         whiteSpace: "nowrap",
                                       }}
                                       onClick={() => {
-                                        setMethod(diag?.methodFix ?? "GET");
+                                        const nextMethod =
+                                          diag?.methodFix ?? "GET";
+                                        setMethod(nextMethod);
                                         setStagedFix(null);
                                         setHeaderExpanded(false);
-                                        onSend({
-                                          method:
-                                            diag?.methodFix ?? "GET",
-                                          url: lastRequest?.url || url,
+                                        setSwitchedDiag(diag ?? null);
+                                        setPendingMethodSwitch({
+                                          from: lastRequest?.method || method,
+                                          to: nextMethod,
                                         });
                                       }}
                                     >
-                                      Switch to {diag?.methodFix}
+                                      {switchedDiag === diag
+                                        ? `switched to ${diag?.methodFix}`
+                                        : `Switch to ${diag?.methodFix}`}
                                     </RippleButton>
                                   )}{" "}
                                 </div>{" "}
@@ -7586,6 +7607,8 @@ backgroundColor: isDark
                     setUrl={setUrl}
                     loading={loading}
                     onSend={onSend}
+                    pendingMethodSwitch={pendingMethodSwitch}
+                    onClearPendingSwitch={() => setPendingMethodSwitch(null)}
                   />
                   <StagedFixEditor
                     stagedFix={stagedFix}
@@ -7709,6 +7732,8 @@ backgroundColor: isDark
                   setUrl={setUrl}
                   loading={loading}
                   onSend={onSend}
+                  pendingMethodSwitch={pendingMethodSwitch}
+                  onClearPendingSwitch={() => setPendingMethodSwitch(null)}
                 />
               )}{" "}
             </div>{" "}
@@ -11740,6 +11765,8 @@ function UrlInputBar({
   setUrl,
   loading,
   onSend,
+  pendingMethodSwitch,
+  onClearPendingSwitch,
 }: {
   compact?: boolean;
   glass?: boolean;
@@ -11754,6 +11781,8 @@ function UrlInputBar({
     url?: string;
     headers?: Record<string, string>;
   }) => void;
+  pendingMethodSwitch?: { from: string; to: string } | null;
+  onClearPendingSwitch?: () => void;
 }) {
   const isDark = activeTheme === "Dark";
   const [showDropdown, setShowDropdown] = useState(false);
@@ -11855,7 +11884,7 @@ function UrlInputBar({
   }, [url]);
   return (
     <div
-      className={`relative flex ${compact ? "w-[393px]" : "w-[467px]"} items-center gap-4 rounded-lg p-3`}
+      className={`relative rounded-lg p-3 ${compact ? "w-[393px]" : "w-[467px]"}`}
       style={{
         border: isDark ? "0.8px solid #2a2a2a" : "0.8px solid #f2f2f2",
         borderRadius: 8,
@@ -11871,6 +11900,7 @@ function UrlInputBar({
         transition: "background-color 0.4s ease, border-color 0.4s ease",
       }}
     >
+      <div className="flex items-center gap-4">
       {" "}
       <div className="relative">
         {" "}
@@ -11897,24 +11927,6 @@ function UrlInputBar({
             />{" "}
             {method}{" "}
           </span>{" "}
-          <motion.svg
-            width="17"
-            height="16"
-            viewBox="0 0 17 16"
-            fill="none"
-            animate={{ rotate: showDropdown ? 180 : 0 }}
-            transition={cardTextSpring}
-            style={{ originX: "50%", originY: "50%", transformBox: "fill-box" }}
-          >
-            {" "}
-            <path
-              d="M4 6l6 6 6-6"
-              stroke="#5a5a5a"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />{" "}
-          </motion.svg>{" "}
         </button>{" "}
         <AnimatePresence>
           {" "}
@@ -11951,6 +11963,7 @@ function UrlInputBar({
                   onClick={() => {
                     setMethod(m);
                     setShowDropdown(false);
+                    onClearPendingSwitch?.();
                   }}
                   onMouseEnter={() => setHoveredMethod(m)}
                   style={{
@@ -12320,12 +12333,16 @@ function UrlInputBar({
         onChange={(e) => {
           setLocalUrl(e.target.value);
           setUrl(e.target.value);
+          onClearPendingSwitch?.();
         }}
         className={`flex-1 bg-transparent text-sm tracking-[-0.04em] outline-none ${isDark ? "text-[#d1d1d1] placeholder:text-[#d1d1d1]" : "text-[#9e9e9e] placeholder:text-[#9e9e9e]"}`}
         style={{ fontFamily: "Geist, var(--font-geist-sans)" }}
       />{" "}
       <RippleButton
-        onClick={() => onSend()}
+        onClick={() => {
+          onClearPendingSwitch?.();
+          onSend();
+        }}
         disabled={loading}
         className="flex items-center gap-1 px-2 py-1.5 text-xs text-white tracking-[-0.04em] transition-colors hover:bg-[#4a4aff] disabled:opacity-60"
         style={{ borderRadius: 6, backgroundColor: "#5b5bff" }}
@@ -12350,6 +12367,51 @@ function UrlInputBar({
         </svg>{" "}
         <span>Send</span>{" "}
       </RippleButton>{" "}
+      </div>
+      {pendingMethodSwitch && (
+        <div
+          style={{
+            height: 0.8,
+            backgroundColor: isDark ? "#2a2a2a" : "#F2F2F2",
+            marginTop: 12,
+          }}
+        />
+      )}
+      {pendingMethodSwitch && (
+        <div
+          className="flex items-center justify-between"
+          style={{ marginTop: 8 }}
+        >
+          <span
+            style={{
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 14,
+              fontWeight: 400,
+              lineHeight: "20px",
+              letterSpacing: "-0.05em",
+              color: "#0396DC",
+            }}
+          >
+            Method changed from {pendingMethodSwitch.from}. not yet sent
+          </span>
+          {["POST", "PUT", "PATCH"].includes(pendingMethodSwitch.to) && (
+            <span
+              style={{
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 14,
+                fontWeight: 400,
+                lineHeight: "20px",
+                letterSpacing: "-0.05em",
+                color: "#939393",
+              }}
+            >
+              {pendingMethodSwitch.to.charAt(0) +
+                pendingMethodSwitch.to.slice(1).toLowerCase()}{" "}
+              usually needs a body
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

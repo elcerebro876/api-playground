@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "src/app/page.tsx": {
-    "mtime": 1791819435.030995,
-    "ast_hash": "36d9d6ee82944ba163efba215c797c2f",
+    "mtime": 1791826021.8758345,
+    "ast_hash": "cd282b47282b77cd533f02d607eb45b6",
     "semantic_hash": ""
   },
   "src/components/LoadingState.tsx": {
@@ -312,6 +312,21 @@
   "src/lib/http-methods.ts": {
     "mtime": 1791819289.8039727,
     "ast_hash": "fa67fb8757c339de7cbbc7d6a9582e63",
+    "semantic_hash": ""
+  },
+  "shot-405-button-full.png": {
+    "mtime": 1791820271.4259918,
+    "ast_hash": "f040d438a137efb562bb851afc664e7a",
+    "semantic_hash": ""
+  },
+  "shot-405-button.png": {
+    "mtime": 1791820271.0661292,
+    "ast_hash": "cfdff47b3cd538c124ec45dba97a28c0",
+    "semantic_hash": ""
+  },
+  "shot-switch-after2.png": {
+    "mtime": 1791825293.0550015,
+    "ast_hash": "29956b5005dd81ed35d5b1b4ae0c4f41",
     "semantic_hash": ""
   }
 }
