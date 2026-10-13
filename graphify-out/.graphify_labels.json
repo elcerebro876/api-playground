@@ -13,6 +13,6 @@
   "11": "next.config.ts",
   "12": "postcss.config.mjs",
   "13": "route.js",
-  "14": "explain/route.ts",
+  "14": "diagnose/route.ts",
   "15": "CLAUDE.md"
 }

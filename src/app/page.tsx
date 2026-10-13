@@ -206,8 +206,13 @@ export default function Home() {
     | "fallback"
     | "unavailable"
     | "capReached"
+    | "rateLimited"
   >("idle");
   const [diag, setDiag] = useState<DiagnosisResult | null>(null);
+  const [rateLimit, setRateLimit] = useState<{
+    until: number;
+    seconds: number;
+  } | null>(null);
   useEffect(() => {
     diagUsesRef.current = loadDiagnosisUses();
     let alive = true;
@@ -359,6 +364,18 @@ export default function Home() {
     });
     const cacheKey = diagnosisCacheKey(input);
 
+    // A 429 is self-evident: the API is rate limiting the request. Skip the AI
+    // (and the usage cap) and coach the user to wait for Retry-After, then retry.
+    if (input.status === 429) {
+      const secs = parseRetryAfter(input.responseHeaders?.["retry-after"]);
+      setRateLimit(
+        secs != null ? { until: Date.now() + secs * 1000, seconds: secs } : null,
+      );
+      setDiag(null);
+      setDiagState("rateLimited");
+      return;
+    }
+
     // A cached diagnosis is free (no AI call), so it is served even after the
     // per-user usage cap is reached.
     const cached = loadDiagnosisCache(cacheKey);
@@ -464,6 +481,7 @@ export default function Home() {
       diagTokenRef.current += 1;
       setDiagState("idle");
       setDiag(null);
+      setRateLimit(null);
       if (!opts?.apiName) {
         setLastExplorerReq({ method: m, url: u, headers: { ...h } });
       }
@@ -888,6 +906,7 @@ export default function Home() {
               diag={diag}
               lastRequest={lastExplorerReq}
               onRetryDiagnosis={retryDiagnosis}
+              rateLimit={rateLimit}
             />{" "}
           </motion.div>{" "}
         </div>{" "}
@@ -4477,6 +4496,192 @@ function pathnameOf(value: string): string {
   }
 }
 
+// Retry-After is either a delay in seconds or an HTTP-date. Returns whole
+// seconds (>= 0), or null when the header is absent/unparseable.
+function parseRetryAfter(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const v = value.trim();
+  if (/^\d+$/.test(v)) return Math.max(0, Number(v));
+  const t = Date.parse(v);
+  if (Number.isNaN(t)) return null;
+  return Math.max(0, Math.round((t - Date.now()) / 1000));
+}
+
+// Counts down to the Retry-After deadline, then flips to an active "Retry now".
+function RateLimitRetryButton({
+  until,
+  onRetry,
+}: {
+  until: number | null;
+  onRetry: () => void;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (until == null) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [until]);
+  const remaining =
+    until == null ? 0 : Math.max(0, Math.ceil((until - now) / 1000));
+  const ready = until == null || remaining <= 0;
+  return (
+    <RippleButton
+      disabled={!ready}
+      className={
+        ready
+          ? "transition-colors hover:bg-[#4a4aff]"
+          : "transition-colors"
+      }
+      onClick={() => {
+        if (ready) onRetry();
+      }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+        padding: "6px 8px",
+        borderRadius: 6,
+        backgroundColor: ready ? "#5A5AFF" : "#C2C2FF",
+        color: "#FFFFFF",
+        cursor: ready ? "pointer" : "default",
+        fontFamily: "Geist, var(--font-geist-sans)",
+        fontSize: 12,
+        fontWeight: 400,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {ready ? "Retry now" : `Retry in ${remaining}s`}
+    </RippleButton>
+  );
+}
+
+// Coaching card for a 429: the request was rate limited by the API.
+function RateLimitCard({
+  isDark,
+  rateLimit,
+  onRetry,
+}: {
+  isDark: boolean;
+  rateLimit: { until: number; seconds: number } | null;
+  onRetry: () => void;
+}) {
+  const seconds = rateLimit?.seconds ?? null;
+  const message =
+    seconds != null
+      ? `The API asked you to wait ${seconds} ${
+          seconds === 1 ? "second" : "seconds"
+        }, per its Retry-After header.`
+      : "The API is rate limiting this request. Wait a moment, then try again.";
+  return (
+    <>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "16px 16px 0",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 14,
+            fontWeight: 500,
+            color: isDark ? "#9e9e9e" : "#585858",
+          }}
+        >
+          Rate limited
+        </span>
+        <span
+          style={{
+            borderRadius: 6,
+            backgroundColor: isDark ? "#2b1414" : "#FFD6D6",
+            padding: "3px 6px",
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 12,
+            fontWeight: 400,
+            color: isDark ? "#ff6b6b" : "#FF1616",
+            whiteSpace: "nowrap",
+          }}
+        >
+          429
+        </span>
+      </div>
+      <div
+        style={{
+          margin: "8px 4px 4px",
+          borderRadius: 6,
+          backgroundColor: isDark ? "#161616" : "#FAFAFA",
+          border: isDark ? "0.8px solid #2d2d2d" : "0.8px solid #f2f2f2",
+          padding: 12,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            fill="none"
+            style={{ flexShrink: 0 }}
+          >
+            <path
+              d="M13.5 13.5C13.7 12.5 14.2 11.8 15 11C16 10.1 16.5 8.8 16.5 7.5C16.5 5.9087 15.8679 4.38258 14.7426 3.25736C13.6174 2.13214 12.0913 1.5 10.5 1.5C8.9087 1.5 7.38258 2.13214 6.25736 3.25736C5.13214 4.38258 4.5 5.9087 4.5 7.5C4.5 8.5 4.7 9.7 6 11C6.7 11.7 7.3 12.5 7.5 13.5"
+              stroke="#5A5AFF"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M6.75 13.5L12.75 13.5"
+              stroke="#5A5AFF"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M7.5 16.5L11.5 16.5"
+              stroke="#5A5AFF"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span
+            style={{
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 14,
+              fontWeight: 500,
+              color: isDark ? "#9e9e9e" : "#585858",
+            }}
+          >
+            Too many requests
+          </span>
+        </div>
+        <div
+          style={{
+            marginTop: 4,
+            paddingLeft: 26,
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 14,
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: "#939393",
+          }}
+        >
+          {message}
+        </div>
+        <div style={{ marginTop: 8, display: "flex", alignItems: "center" }}>
+          <RateLimitRetryButton
+            until={rateLimit?.until ?? null}
+            onRetry={onRetry}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
 type StagedFix = {
   mode: "move" | "rewrite";
   from: string;
@@ -4748,6 +4953,7 @@ function MainContent({
   diag,
   lastRequest,
   onRetryDiagnosis,
+  rateLimit,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -4812,7 +5018,8 @@ function MainContent({
     | "result"
     | "fallback"
     | "unavailable"
-    | "capReached";
+    | "capReached"
+    | "rateLimited";
   diag: DiagnosisResult | null;
   lastRequest: {
     method: string;
@@ -4820,6 +5027,7 @@ function MainContent({
     headers: Record<string, string>;
   } | null;
   onRetryDiagnosis: () => void;
+  rateLimit: { until: number; seconds: number } | null;
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
@@ -7351,6 +7559,18 @@ style={{
                                 </div>{" "}
                               </div>{" "}
                             </>
+                          ) : diagState === "rateLimited" ? (
+                            <RateLimitCard
+                              isDark={isDark}
+                              rateLimit={rateLimit}
+                              onRetry={() =>
+                                onSend({
+                                  method:
+                                    lastRequest?.method || method,
+                                  url: lastRequest?.url || url,
+                                })
+                              }
+                            />
                           ) : (
                               <>
                                 {" "}
