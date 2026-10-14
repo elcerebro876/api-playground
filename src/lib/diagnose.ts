@@ -529,3 +529,19 @@ function levenshtein(a: string, b: string): number {
   }
   return prev[n];
 }
+
+export function sameOrigin(a: URL, b: URL): boolean {
+  const normalizePort = (url: URL) => {
+    const p = url.port;
+    if (p === "") {
+      if (url.protocol === "https:") return "443";
+      if (url.protocol === "http:") return "80";
+    }
+    return p;
+  };
+  return (
+    a.protocol === b.protocol &&
+    a.hostname === b.hostname &&
+    normalizePort(a) === normalizePort(b)
+  );
+}
