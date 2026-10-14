@@ -30,6 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# logs (may contain request data - never commit)
+*.log
+
 # env files (can opt-in for committing if needed)
 .env*
 
