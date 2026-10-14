@@ -376,6 +376,14 @@ export default function Home() {
       return;
     }
 
+    // A 400 whose body carries no usable evidence (empty, or a gateway's HTML
+    // page) is not worth an AI call; the generic fallback explains it better.
+    if (input.status === 400 && !isDiagnosableErrorBody(input.responseBody)) {
+      setDiag(null);
+      setDiagState("fallback");
+      return;
+    }
+
     // A cached diagnosis is free (no AI call), so it is served even after the
     // per-user usage cap is reached.
     const cached = loadDiagnosisCache(cacheKey);
@@ -4488,6 +4496,27 @@ function fallbackHintText(
   return "The API rejected the request";
 }
 
+// A 400 body is only worth an AI call when it is a structured (non-HTML) payload
+// with actual content. An empty body or a gateway's HTML page tells us nothing.
+function isDiagnosableErrorBody(body: string | undefined): boolean {
+  const text = String(body ?? "").trim();
+  if (!text) return false;
+  return !/<!doctype html|<html|<head|nginx|cloudflare/i.test(text.slice(0, 2000));
+}
+
+// Model text is rendered as plain text: no links, no markdown emphasis. This
+// unwraps links to their label and strips formatting markers and stray tags.
+function plainText(value: string | undefined | null): string {
+  if (!value) return "";
+  return String(value)
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/[*`~]+/g, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function pathnameOf(value: string): string {
   try {
     return new URL(value).pathname || "/";
@@ -5055,6 +5084,8 @@ function MainContent({
     to: string;
   } | null>(null);
   const [focusSignal, setFocusSignal] = useState(0);
+  const urlHighlightSignal =
+    diagState === "result" && diag?.highlightUrl ? diag : null;
   const openStagedFix = () => {
     if (!diag) return;
     const mf = diag.headerFix;
@@ -5413,6 +5444,7 @@ function MainContent({
                               setPendingUrlSwitch(null)
                             }
                             focusSignal={focusSignal}
+                            highlightSignal={urlHighlightSignal}
                           />{" "}
                         </div>{" "}
                       </motion.div>{" "}
@@ -7191,6 +7223,7 @@ function MainContent({
                             <>
                               {" "}
                               {(() => {
+                                if (response?.status === 400) return null;
                                 const fix = diag?.headerFix;
                                 const authEntry =
                                   !fix &&
@@ -7259,6 +7292,46 @@ function MainContent({
                                   </div>
                                 );
                               })()}{" "}
+                              {response?.status === 400 && (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    padding: "16px 16px 0",
+                                  }}
+                                >
+                                  {" "}
+                                  <span
+                                    style={{
+                                      fontFamily:
+                                        "Geist, var(--font-geist-sans)",
+                                      fontSize: 14,
+                                      fontWeight: 500,
+                                      color: isDark ? "#9e9e9e" : "#585858",
+                                    }}
+                                  >
+                                    {plainText(diag?.label) || "Bad request"}
+                                  </span>{" "}
+                                  <span
+                                    style={{
+                                      borderRadius: 6,
+                                      backgroundColor: isDark
+                                        ? "#2b1414"
+                                        : "#FFD6D6",
+                                      padding: "3px 6px",
+                                      fontFamily:
+                                        "Geist, var(--font-geist-sans)",
+                                      fontSize: 12,
+                                      fontWeight: 400,
+                                      color: isDark ? "#ff6b6b" : "#FF1616",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {response.status}
+                                  </span>{" "}
+                                </div>
+                              )}{" "}
                               {diag?.urlFix && (
                                 <div
                                   style={{
@@ -7366,9 +7439,10 @@ style={{
                                   >
                                     {diag?.urlFix
                                       ? `No route at ${pathnameOf(diag.urlFix.from)}`
-                                      : diag?.title}
+                                      : plainText(diag?.title)}
                                   </span>{" "}
                                   {!diag?.urlFix &&
+                                    response?.status !== 400 &&
                                     typeof response?.status === "number" && (
                                     <span
                                       style={{
@@ -7405,7 +7479,7 @@ style={{
                                 >
                                   {diag?.urlFix
                                     ? `The API’s own error says it found no such path. Did you mean ${pathnameOf(diag.urlFix.to)}?`
-                                    : diag?.message}
+                                    : plainText(diag?.message)}
                                 </div>{" "}
                                 <div
                                   style={{
@@ -7970,6 +8044,7 @@ backgroundColor: isDark
                     pendingUrlSwitch={pendingUrlSwitch}
                     onClearPendingUrlSwitch={() => setPendingUrlSwitch(null)}
                     focusSignal={focusSignal}
+                    highlightSignal={urlHighlightSignal}
                   />
                   <StagedFixEditor
                     stagedFix={stagedFix}
@@ -8098,6 +8173,7 @@ backgroundColor: isDark
                   pendingUrlSwitch={pendingUrlSwitch}
                   onClearPendingUrlSwitch={() => setPendingUrlSwitch(null)}
                   focusSignal={focusSignal}
+                  highlightSignal={urlHighlightSignal}
                 />
               )}{" "}
             </div>{" "}
@@ -12134,6 +12210,7 @@ function UrlInputBar({
   pendingUrlSwitch,
   onClearPendingUrlSwitch,
   focusSignal,
+  highlightSignal,
   showChevron,
 }: {
   compact?: boolean;
@@ -12154,10 +12231,12 @@ function UrlInputBar({
   pendingUrlSwitch?: { from: string; to: string } | null;
   onClearPendingUrlSwitch?: () => void;
   focusSignal?: number;
+  highlightSignal?: DiagnosisResult | null;
   showChevron?: boolean;
 }) {
   const isDark = activeTheme === "Dark";
   const [showDropdown, setShowDropdown] = useState(false);
+  const [highlighting, setHighlighting] = useState(false);
   const [hoveredMethod, setHoveredMethod] = useState("GET");
   const methods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
   const popupContent: Record<
@@ -12265,6 +12344,18 @@ function UrlInputBar({
     });
     return () => cancelAnimationFrame(frame);
   }, [focusSignal]);
+  useEffect(() => {
+    if (!highlightSignal?.highlightUrl) return;
+    const frame = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      setHighlighting(true);
+    });
+    const timer = setTimeout(() => setHighlighting(false), 1600);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, [highlightSignal]);
   return (
     <div
       className={`relative rounded-lg p-3 ${compact ? "w-[393px]" : "w-[467px]"}`}
@@ -12280,7 +12371,9 @@ function UrlInputBar({
             : "#ffffff",
         backdropFilter: glass ? "blur(8px)" : undefined,
         WebkitBackdropFilter: glass ? "blur(8px)" : undefined,
-        transition: "background-color 0.4s ease, border-color 0.4s ease",
+        boxShadow: highlighting ? "0 0 0 2px #5b5bff" : undefined,
+        transition:
+          "background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.3s ease",
       }}
     >
       <div className="flex items-center gap-4">

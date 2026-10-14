@@ -26,6 +26,9 @@ export type DiagnosisResult = {
   identifiable: boolean;
   title?: string;
   message?: string;
+  // Short human label for the card (for example "Bad request"); callers fall
+  // back to a status-derived label when the model does not supply one.
+  label?: string;
   // Short quote from the response that justifies the diagnosis, if provided.
   evidence?: string;
   confidence?: DiagnosisConfidence;
@@ -33,6 +36,8 @@ export type DiagnosisResult = {
   valueFix?: DiagnosisValueFix | null;
   methodFix?: string | null;
   urlFix?: DiagnosisUrlFix | null;
+  // When set, the UI draws attention to the URL input for this diagnosis.
+  highlightUrl?: boolean;
 };
 
 const SCHEME_RE = /^(Bearer|Basic|Token|ApiKey|API[-_ ]?Key|Digest)\s+/i;
