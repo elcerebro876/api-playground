@@ -1,7 +1,7 @@
 import { getSupabase, type ExplainRecord } from "@/lib/supabase";
 import { generateExplanation } from "@/lib/explain";
 import { isAIConfigured } from "@/lib/ai";
-import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { clientIp, hashKey, rateLimit } from "@/lib/rate-limit";
 
 // Cheap deterministic signature of the request so cached explanations are not
 // reused across requests that produced different responses (e.g. different
@@ -17,7 +17,7 @@ function requestSignature(responseBody: string): string {
 
 export async function POST(request: Request) {
   const ip = clientIp(request);
-  const rl = await rateLimit(`explain:${ip}`);
+  const rl = await rateLimit(await hashKey("explain", ip));
   if (!rl.ok) {
     if ("retryAfter" in rl) {
       return Response.json(

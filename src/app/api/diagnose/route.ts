@@ -2,47 +2,16 @@ import {
   buildDiagnosisInput,
   diagnosisCacheKey,
   generateDiagnosis,
-  type DiagnosisResult,
 } from "@/lib/diagnose";
 import { isAIConfigured } from "@/lib/ai";
-import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { clientIp, hashKey, rateLimit } from "@/lib/rate-limit";
+import { cacheGet, cacheGetFromStore, cachePut } from "@/lib/diagnose-cache";
 
-// In-memory diagnosis cache. Per-instance and cleared on cold start/deploy,
-// which is fine: it exists to make a user's repeat of the SAME failing request
-// resolve instantly (and skip the AI call) instead of re-running the chain.
-const CACHE_TTL_MS = 10 * 60 * 1000;
-// A genuine "nothing found" is cheap to redo, but a user often retries the same
-// ambiguous failure; cache it briefly so the repeats are instant. Provider
-// failures never reach here (they throw and return a 500), so they are never
-// cached.
-const NON_IDENTIFIABLE_CACHE_TTL_MS = 2 * 60 * 1000;
-const CACHE_MAX_ENTRIES = 200;
-
-type CacheEntry = { value: DiagnosisResult; expires: number };
-const diagnosisCache = new Map<string, CacheEntry>();
-
-function cacheGet(key: string): DiagnosisResult | null {
-  const entry = diagnosisCache.get(key);
-  if (!entry) return null;
-  if (entry.expires <= Date.now()) {
-    diagnosisCache.delete(key);
-    return null;
-  }
-  // Refresh recency (Map preserves insertion order for LRU eviction).
-  diagnosisCache.delete(key);
-  diagnosisCache.set(key, entry);
-  return entry.value;
-}
-
-function cacheSet(key: string, value: DiagnosisResult, ttlMs: number): void {
-  diagnosisCache.delete(key);
-  diagnosisCache.set(key, { value, expires: Date.now() + ttlMs });
-  while (diagnosisCache.size > CACHE_MAX_ENTRIES) {
-    const oldest = diagnosisCache.keys().next().value;
-    if (oldest === undefined) break;
-    diagnosisCache.delete(oldest);
-  }
-}
+// TTLs for the shared diagnosis cache (L1 in-process + L2 Supabase). A genuine
+// "nothing found" is cheap to redo, but a user often retries the same ambiguous
+// failure, so it is cached briefly. Provider failures throw before caching.
+const CACHE_TTL_SECS = 10 * 60;
+const NON_IDENTIFIABLE_CACHE_TTL_SECS = 2 * 60;
 
 export async function GET() {
   return Response.json({ configured: isAIConfigured() });
@@ -50,7 +19,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const ip = clientIp(request);
-  const rl = await rateLimit(`diagnose:${ip}`);
+  const rl = await rateLimit(await hashKey("diagnose", ip));
   if (!rl.ok) {
     if ("retryAfter" in rl) {
       return Response.json(
@@ -95,17 +64,18 @@ export async function POST(request: Request) {
   }
 
   const cacheKey = diagnosisCacheKey(input);
-  const cached = cacheGet(cacheKey);
+  const cached = cacheGet(cacheKey) ?? (await cacheGetFromStore(cacheKey));
   if (cached) {
-    return Response.json(cached);
+    return Response.json(cached.result);
   }
 
   try {
     const result = await generateDiagnosis(input);
-    cacheSet(
+    await cachePut(
       cacheKey,
       result,
-      result.identifiable ? CACHE_TTL_MS : NON_IDENTIFIABLE_CACHE_TTL_MS,
+      result.identifiable,
+      result.identifiable ? CACHE_TTL_SECS : NON_IDENTIFIABLE_CACHE_TTL_SECS,
     );
     return Response.json(result);
   } catch (e) {
