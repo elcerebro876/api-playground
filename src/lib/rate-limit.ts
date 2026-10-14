@@ -6,6 +6,18 @@ const DAILY_MAX_PER_IP = 30;
 
 const DIAGNOSE_DAILY_MAX_DEFAULT = 300;
 
+// Global daily ceiling across ALL clients, so total model spend is bounded even
+// when many distinct IPs appear. The value is derived in code (never baked into
+// SQL): DIAGNOSE_GLOBAL_DAILY_MAX wins when set, otherwise ten times the per-IP
+// daily allowance, i.e. an expected concurrent client-IP budget.
+const GLOBAL_DAILY_IP_BUDGET = 10;
+
+export function globalDailyMax(): number {
+  const override = Number(process.env.DIAGNOSE_GLOBAL_DAILY_MAX);
+  if (Number.isFinite(override) && override > 0) return Math.floor(override);
+  return DAILY_MAX_PER_IP * GLOBAL_DAILY_IP_BUDGET;
+}
+
 export type RateLimitResult =
   | { ok: true; remaining: number }
   | { ok: false; retryAfter: number }

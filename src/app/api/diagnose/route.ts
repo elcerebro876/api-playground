@@ -4,7 +4,13 @@ import {
   generateDiagnosis,
 } from "@/lib/diagnose";
 import { isAIConfigured } from "@/lib/ai";
-import { clientIp, hashKey, rateLimit } from "@/lib/rate-limit";
+import {
+  clientIp,
+  consumeGlobalDaily,
+  globalDailyMax,
+  hashKey,
+  rateLimit,
+} from "@/lib/rate-limit";
 import { cacheGet, cacheGetFromStore, cachePut } from "@/lib/diagnose-cache";
 
 // TTLs for the shared diagnosis cache (L1 in-process + L2 Supabase). A genuine
@@ -67,6 +73,17 @@ export async function POST(request: Request) {
   const cached = cacheGet(cacheKey) ?? (await cacheGetFromStore(cacheKey));
   if (cached) {
     return Response.json(cached.result);
+  }
+
+  // Only a cache miss can reach the model, so the shared ceiling is charged here
+  // (after cache lookup, before the AI call). On an unavailable counter we fail
+  // open rather than block a valid diagnosis.
+  const global = await consumeGlobalDaily("diagnose", globalDailyMax());
+  if (!global.ok && "retryAfter" in global) {
+    return Response.json(
+      { error: "Daily diagnosis limit reached, try again later" },
+      { status: 429, headers: { "Retry-After": String(global.retryAfter) } },
+    );
   }
 
   try {
