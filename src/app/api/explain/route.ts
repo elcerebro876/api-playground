@@ -2,6 +2,7 @@ import { getSupabase, type ExplainRecord } from "@/lib/supabase";
 import { generateExplanation } from "@/lib/explain";
 import { isAIConfigured } from "@/lib/ai";
 import { clientIp, hashKey, rateLimit } from "@/lib/rate-limit";
+import { captureServerError } from "@/lib/error-reporter";
 
 // Cheap deterministic signature of the request so cached explanations are not
 // reused across requests that produced different responses (e.g. different
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     const err = e as Error;
+    await captureServerError(e, { route: "explain", phase: "generate" });
     return Response.json(
       {
         error: err?.message || "Couldn't generate an explanation, try again",

@@ -12,6 +12,7 @@ import {
   rateLimit,
 } from "@/lib/rate-limit";
 import { cacheGet, cacheGetFromStore, cachePut } from "@/lib/diagnose-cache";
+import { captureServerError } from "@/lib/error-reporter";
 
 // TTLs for the shared diagnosis cache (L1 in-process + L2 Supabase). A genuine
 // "nothing found" is cheap to redo, but a user often retries the same ambiguous
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
     return Response.json(result);
   } catch (e) {
     console.error("[diagnose] failed", (e as Error)?.message);
+    await captureServerError(e, { route: "diagnose", phase: "generate" });
     return Response.json(
       { error: "Couldn't diagnose this request, try again" },
       { status: 500 },
