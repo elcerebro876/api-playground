@@ -1,45 +1,23 @@
 import { getSupabase } from "@/lib/supabase";
 
-// Server-side AI-cost backstop, keyed by client IP. Uses a shared Postgres
-// counter (via the existing Supabase client) so the limit actually holds
-// across serverless instances. Falls back to a best-effort in-memory bucket
-// when the database is unreachable (pre-migration, DB down), keeping the app
-// working while weakening the guarantee rather than breaking requests.
-
 const BURST_MAX = 12;
 const BURST_WINDOW_SECS = 10 * 60;
-const DAILY_MAX = 30;
-const MAX_BUCKETS = 10000;
+const DAILY_MAX_PER_IP = 30;
 
-interface Bucket {
-  count: number;
-  resetAt: number;
-}
+const DIAGNOSE_DAILY_MAX_DEFAULT = 300;
 
-const buckets = new Map<string, Bucket>();
+export type RateLimitResult =
+  | { ok: true; remaining: number }
+  | { ok: false; retryAfter: number }
+  | { ok: false; unavailable: true };
 
-function memoryRateLimit(
-  key: string,
-): { ok: true; remaining: number } | { ok: false; retryAfter: number } {
-  const now = Date.now();
-  if (buckets.size >= MAX_BUCKETS) {
-    for (const [k, b] of buckets) {
-      if (b.resetAt <= now) buckets.delete(k);
-    }
-  }
-  const bucket = buckets.get(key);
-  if (!bucket || bucket.resetAt <= now) {
-    buckets.set(key, { count: 1, resetAt: now + BURST_WINDOW_SECS * 1000 });
-    return { ok: true, remaining: BURST_MAX - 1 };
-  }
-  if (bucket.count >= BURST_MAX) {
-    return {
-      ok: false,
-      retryAfter: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
-    };
-  }
-  bucket.count += 1;
-  return { ok: true, remaining: BURST_MAX - bucket.count };
+async function sha256Hex(input: string): Promise<string> {
+  const enc = new TextEncoder();
+  const hash = await crypto.subtle.digest("SHA-256", enc.encode(input));
+  const bytes = new Uint8Array(hash);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 type RpcResult = {
@@ -48,7 +26,7 @@ type RpcResult = {
   retry_after: number;
 };
 
-async function sharedRateLimit(key: string): Promise<RpcResult | null> {
+async function bumpShared(key: string): Promise<RpcResult | null> {
   const client = getSupabase();
   if (!client) return null;
   try {
@@ -56,7 +34,7 @@ async function sharedRateLimit(key: string): Promise<RpcResult | null> {
       k: key,
       burst_max: BURST_MAX,
       burst_window_secs: BURST_WINDOW_SECS,
-      daily_max: DAILY_MAX,
+      daily_max: DAILY_MAX_PER_IP,
     });
     if (error) throw error;
     if (
@@ -68,35 +46,57 @@ async function sharedRateLimit(key: string): Promise<RpcResult | null> {
     }
     return data as RpcResult;
   } catch {
-    // Shared limiter unavailable (migration not applied, DB down): report null
-    // so the caller falls back to the in-memory bucket.
     return null;
   }
 }
 
-export type RateLimitResult =
-  | { ok: true; remaining: number }
-  | { ok: false; retryAfter: number };
-
 export async function rateLimit(key: string): Promise<RateLimitResult> {
-  const shared = await sharedRateLimit(key);
+  const shared = await bumpShared(key);
   if (shared) {
     return shared.ok
       ? { ok: true, remaining: Number(shared.remaining ?? 0) }
       : { ok: false, retryAfter: Number(shared.retry_after ?? 1) };
   }
-  return memoryRateLimit(key);
+  return { ok: false, unavailable: true };
+}
+
+export async function consumeGlobalDaily(namespace: string, maxCount?: number): Promise<RateLimitResult> {
+  const client = getSupabase();
+  const max = Math.max(1, Number(maxCount ?? DIAGNOSE_DAILY_MAX_DEFAULT));
+  if (!client) return { ok: false, unavailable: true };
+  const k = `${namespace}:daily`;
+  try {
+    const { data, error } = await client.rpc("consume_global_daily", {
+      k,
+      max_count: max,
+    });
+    if (error) throw error;
+    if (
+      !data ||
+      typeof data !== "object" ||
+      typeof (data as RpcResult).ok !== "boolean"
+    ) {
+      throw new Error("unexpected consume_global_daily payload");
+    }
+    const d = data as RpcResult;
+    return d.ok
+      ? { ok: true, remaining: Number(d.remaining ?? 0) }
+      : { ok: false, retryAfter: Number(d.retry_after ?? 1) };
+  } catch {
+    return { ok: false, unavailable: true };
+  }
 }
 
 export function clientIp(request: Request): string {
-  // Only trust the first x-forwarded-for hop when running behind the Vercel
-  // platform, which sets and overwrites the header server-side. On any other
-  // deployment a client-supplied x-forwarded-for is spoofable, so prefer
-  // x-real-ip (set by the trusted reverse proxy) instead.
   if (process.env.VERCEL) {
     const fwd = request.headers.get("x-forwarded-for");
     const first = fwd?.split(",")[0]?.trim();
     if (first) return first;
   }
   return request.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
+export async function hashKey(namespace: string, ip: string): Promise<string> {
+  const h = await sha256Hex(`${namespace}:${ip}`);
+  return `${namespace}:${h}`;
 }

@@ -19,9 +19,15 @@ export async function POST(request: Request) {
   const ip = clientIp(request);
   const rl = await rateLimit(`explain:${ip}`);
   if (!rl.ok) {
+    if ("retryAfter" in rl) {
+      return Response.json(
+        { error: "Too many requests, try again later" },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+      );
+    }
     return Response.json(
-      { error: "Too many requests, try again later" },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+      { error: "Coaching is temporarily unavailable. Please try again later." },
+      { status: 503 },
     );
   }
 
