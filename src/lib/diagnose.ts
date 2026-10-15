@@ -392,16 +392,48 @@ export async function generateDiagnosis(
   );
 }
 
+// A 400 is a payload problem the composer cannot express (it has no body field)
+// and a 429 is the API telling us to wait; neither is ever actionable as a
+// one-click fix. Cached entries written before this rule existed are stripped on
+// read so they cannot replay a stale fix.
+const NO_FIX_STATUSES = new Set([400, 429]);
+
+export function stripFixes<T extends DiagnosisResult>(
+  result: T,
+  status: number | null | undefined,
+): T {
+  if (status == null || !NO_FIX_STATUSES.has(status)) return result;
+  return {
+    ...result,
+    headerFix: null,
+    valueFix: null,
+    methodFix: null,
+    urlFix: null,
+  };
+}
+
 // Rule-based checks applied after the model answers. They cannot add a fix the
 // schema cannot express, but they can remove a fix that contradicts a known
 // convention or is under-confident, so the user is never handed a one-click
 // action that is known to be wrong.
-function applyAuthGuards(
+export function applyAuthGuards(
   hint: AuthHint | null,
   result: DiagnosisResult,
   input: DiagnosisInput,
 ): DiagnosisResult {
   if (!result.identifiable) return result;
+
+  // First guard: a 400 or a 429 is never a one-click fix, regardless of
+  // confidence or evidence. Nothing downstream may re-add one.
+  if (NO_FIX_STATUSES.has(input.status ?? -1)) {
+    return {
+      ...result,
+      headerFix: null,
+      valueFix: null,
+      methodFix: null,
+      urlFix: null,
+    };
+  }
 
   let headerFix = result.headerFix ?? null;
   let valueFix = result.valueFix ?? null;

@@ -1,11 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  applyAuthGuards,
   buildDiagnosisInput,
   diagnosisCacheKey,
   maskHeaderValue,
   maskUrlSecrets,
   statusLabel,
+  stripFixes,
+  type DiagnosisInput,
+  type DiagnosisResult,
 } from "@/lib/diagnose";
 
 test("statusLabel covers only statuses that have product copy", () => {
@@ -69,4 +73,86 @@ test("diagnosisCacheKey is stable for identical inputs and splits on change", ()
   });
   assert.equal(diagnosisCacheKey(base), diagnosisCacheKey(same));
   assert.notEqual(diagnosisCacheKey(base), diagnosisCacheKey(other));
+});
+
+function fullResult(): DiagnosisResult {
+  return {
+    identifiable: true,
+    title: "Wrong thing",
+    message: "Some message",
+    confidence: "high",
+    headerFix: { from: "Authorization", to: "x-api-key", stripScheme: true },
+    valueFix: { key: "Authorization", stripScheme: false },
+    methodFix: "POST",
+    urlFix: { from: "https://api.example.com/v1/charge", to: "/v1/charges" },
+  };
+}
+
+function input(status: number, extra: Partial<DiagnosisInput> = {}): DiagnosisInput {
+  return {
+    method: "GET",
+    url: "https://api.example.com/v1/charge",
+    requestHeaders: { Authorization: "Bearer tok" },
+    status,
+    responseHeaders: {},
+    responseBody: "{}",
+    ...extra,
+  };
+}
+
+test("A2: a 400 returns all four fixes null even with high confidence", () => {
+  const out = applyAuthGuards(null, fullResult(), input(400));
+  assert.equal(out.headerFix, null);
+  assert.equal(out.valueFix, null);
+  assert.equal(out.methodFix, null);
+  assert.equal(out.urlFix, null);
+});
+
+test("A2: a 429 returns all four fixes null even with high confidence", () => {
+  const out = applyAuthGuards(null, fullResult(), input(429));
+  assert.equal(out.headerFix, null);
+  assert.equal(out.valueFix, null);
+  assert.equal(out.methodFix, null);
+  assert.equal(out.urlFix, null);
+});
+
+test("A2: a 404 with a near-miss path still keeps its urlFix", () => {
+  const out = applyAuthGuards(
+    null,
+    fullResult(),
+    input(404, {
+      responseBody: '{"error":"No such path /v1/charge. Did you mean /v1/charges?"}',
+    }),
+  );
+  assert.ok(out.urlFix, "urlFix should survive a 404");
+  assert.equal(out.urlFix!.to, "https://api.example.com/v1/charges");
+  assert.equal(out.methodFix, null);
+});
+
+test("A2: a 405 with an Allow header still keeps its methodFix", () => {
+  const out = applyAuthGuards(
+    null,
+    fullResult(),
+    input(405, { responseHeaders: { allow: "POST" } }),
+  );
+  assert.equal(out.methodFix, "POST");
+  assert.equal(out.headerFix, null);
+  assert.equal(out.valueFix, null);
+});
+
+test("A2: a cached 400 carrying a fix is stripped on read", () => {
+  const cached = fullResult();
+  const stripped = stripFixes(cached, 400);
+  assert.equal(stripped.headerFix, null);
+  assert.equal(stripped.valueFix, null);
+  assert.equal(stripped.methodFix, null);
+  assert.equal(stripped.urlFix, null);
+  assert.equal(stripped.title, cached.title);
+
+  const stripped429 = stripFixes(fullResult(), 429);
+  assert.equal(stripped429.headerFix, null);
+  assert.equal(stripped429.urlFix, null);
+
+  const untouched = stripFixes(fullResult(), 404);
+  assert.ok(untouched.urlFix, "a 404 cached entry keeps its fix");
 });

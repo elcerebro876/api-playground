@@ -2,6 +2,8 @@ import {
   buildDiagnosisInput,
   diagnosisCacheKey,
   generateDiagnosis,
+  stripFixes,
+  type DiagnosisResult,
 } from "@/lib/diagnose";
 import { isAIConfigured } from "@/lib/ai";
 import {
@@ -73,7 +75,11 @@ export async function POST(request: Request) {
   const cacheKey = diagnosisCacheKey(input);
   const cached = cacheGet(cacheKey) ?? (await cacheGetFromStore(cacheKey));
   if (cached) {
-    return Response.json(cached.result);
+    // Entries written before the 400/429 no-fix rule may still carry a fix;
+    // strip on read so they cannot replay one.
+    return Response.json(
+      stripFixes(cached.result as DiagnosisResult, input.status),
+    );
   }
 
   // Only a cache miss can reach the model, so the shared ceiling is charged here

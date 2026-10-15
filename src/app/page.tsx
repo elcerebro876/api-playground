@@ -20,7 +20,7 @@ import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
 import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, type HistoryEntry } from "@/lib/storage";
 import type { ExplainPayload } from "@/lib/explain";
-import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, maskHeaderValue, statusLabel, type DiagnosisResult } from "@/lib/diagnose";
+import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, maskHeaderValue, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed } from "@/lib/posthog";
 // Mirrors the server route's non-identifiable TTL: a genuine "nothing found" is
 // cached briefly so a repeat is instant without occupying the AI.
@@ -394,10 +394,12 @@ export default function Home() {
         : cached.identifiable === false)
     ) {
       if (cached.identifiable) {
-        setDiag({
-          ...cached,
-          label: cached.label || statusLabel(input.status) || undefined,
-        });
+        setDiag(
+          stripFixes(
+            { ...cached, label: cached.label || statusLabel(input.status) || undefined },
+            input.status,
+          ),
+        );
         setDiagState("result");
       } else {
         setDiag(null);
