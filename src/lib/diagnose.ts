@@ -65,6 +65,25 @@ export function maskHeaders(
   return out;
 }
 
+// Deterministic card label for a status, in code — never model-supplied. Only
+// statuses that already have product copy are covered; anything else returns
+// null so the UI keeps showing its existing model/absent copy unchanged.
+export function statusLabel(status: number | null | undefined): string | null {
+  switch (status) {
+    case 400:
+      return "Bad request";
+    case 401:
+    case 403:
+      return "Auth rejected by the API";
+    case 404:
+      return "Path not found";
+    case 429:
+      return "Rate limited by the API";
+    default:
+      return null;
+  }
+}
+
 const SECRET_QUERY_RE =
   /key|api[-_]?key|token|secret|password|passwd|auth|signature|client[_\-]?secret|appid/i;
 

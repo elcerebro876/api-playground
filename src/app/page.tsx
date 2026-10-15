@@ -20,7 +20,7 @@ import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
 import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, type HistoryEntry } from "@/lib/storage";
 import type { ExplainPayload } from "@/lib/explain";
-import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, maskHeaderValue, type DiagnosisResult } from "@/lib/diagnose";
+import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, maskHeaderValue, statusLabel, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed } from "@/lib/posthog";
 // Mirrors the server route's non-identifiable TTL: a genuine "nothing found" is
 // cached briefly so a repeat is instant without occupying the AI.
@@ -394,7 +394,10 @@ export default function Home() {
         : cached.identifiable === false)
     ) {
       if (cached.identifiable) {
-        setDiag(cached);
+        setDiag({
+          ...cached,
+          label: cached.label || statusLabel(input.status) || undefined,
+        });
         setDiagState("result");
       } else {
         setDiag(null);
@@ -433,7 +436,7 @@ export default function Home() {
           // Only a real diagnosis counts against the per-user cap.
           diagUsesRef.current += 1;
           saveDiagnosisUses(diagUsesRef.current);
-          setDiag(j);
+          setDiag({ ...j, label: j.label || statusLabel(input.status) || undefined });
           setDiagState("result");
           saveDiagnosisCache(cacheKey, j);
         } else {
@@ -7311,7 +7314,9 @@ function MainContent({
                                       color: isDark ? "#9e9e9e" : "#585858",
                                     }}
                                   >
-                                    {plainText(diag?.label) || "Bad request"}
+                                    {plainText(diag?.label) ||
+                                      statusLabel(response?.status) ||
+                                      "Bad request"}
                                   </span>{" "}
                                   <span
                                     style={{
