@@ -85,6 +85,12 @@ export function isPrivateIpv6(ip: string): boolean {
       `${groups[6] >> 8}.${groups[6] & 0xff}.${groups[7] >> 8}.${groups[7] & 0xff}`,
     );
   }
+  if (groups[0] === 0x64 && groups[1] === 0xff9b) {
+    if (groups[2] === 0 && groups.slice(3, 6).every((g) => g === 0)) return true;
+    if (groups[2] === 1) return true;
+  }
+  if (groups[0] === 0x2002) return true;
+  if (groups[0] === 0x2001 && groups[1] === 0) return true;
   if ((groups[0] & 0xfe00) === 0xfc00) return true;
   if ((groups[0] & 0xffc0) === 0xfe80) return true;
   return false;
@@ -106,6 +112,23 @@ export function withoutSensitiveHeaders(
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(headers)) {
     if (!isSensitiveHeader(k)) out[k] = v;
+  }
+  return out;
+}
+
+const CROSS_ORIGIN_HEADER_ALLOWLIST = new Set([
+  "accept",
+  "accept-language",
+  "content-type",
+  "user-agent",
+]);
+
+export function restrictCrossOriginHeaders(
+  headers: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers)) {
+    if (CROSS_ORIGIN_HEADER_ALLOWLIST.has(k.toLowerCase())) out[k] = v;
   }
   return out;
 }

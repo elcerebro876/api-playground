@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   isPrivateIpv4,
   isPrivateIpv6,
+  restrictCrossOriginHeaders,
   withoutSensitiveHeaders,
 } from "@/lib/proxy-hardening";
 
@@ -38,13 +39,19 @@ test("isPrivateIpv6 blocks hex-form IPv4-mapped and compatible bypasses", () => 
     "fd12:3456::9",
     "fe80::1",
     "febf::1",
+    "64:ff9b::1",
+    "64:ff9b::7f00:1",
+    "64:ff9b:1::1",
+    "2002::1",
+    "2002:c000:0204::1",
+    "2001::1",
+    "2001:0:7f00:1::1",
   ];
   for (const ip of blocked) assert.equal(isPrivateIpv6(ip), true, ip);
   const publicIps = [
     "2606:4700:1111::1111",
     "2001:4860:4860::8888",
     "::ffff:808:808",
-    "64:ff9b::7f00:1",
   ];
   for (const ip of publicIps) assert.equal(isPrivateIpv6(ip), false, ip);
 });
@@ -67,5 +74,28 @@ test("withoutSensitiveHeaders drops credentials and keeps the rest", () => {
     Accept: "application/json",
     "x-request-id": "req-1",
     "x-keyword": "keep",
+  });
+});
+
+test("restrictCrossOriginHeaders keeps only the safe allowlist", () => {
+  const out = restrictCrossOriginHeaders({
+    accept: "*/*",
+    "Accept-Language": "en",
+    "Content-Type": "application/json",
+    "User-Agent": "playground/1",
+    apikey: "s1",
+    Apikey: "s2",
+    "x-apikey": "s3",
+    "ocp-apim-subscription-key": "s4",
+    authorization: "Bearer sk-123",
+    "x-foo-credential": "s5",
+    cookie: "session=abc",
+    "x-request-id": "req-1",
+  });
+  assert.deepEqual(out, {
+    accept: "*/*",
+    "Accept-Language": "en",
+    "Content-Type": "application/json",
+    "User-Agent": "playground/1",
   });
 });
