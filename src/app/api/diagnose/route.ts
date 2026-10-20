@@ -95,7 +95,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await generateDiagnosis(input);
+    const result = stripFixes(
+      await generateDiagnosis(input),
+      input.status,
+    );
     await cachePut(
       cacheKey,
       result,

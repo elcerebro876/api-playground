@@ -1,43 +1,37 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { isPrivateIpv4, isPrivateIpv6 } from "./proxy-hardening";
-
-export class ProxyBlockedError extends Error {
-  readonly source = "proxy";
-  constructor(message: string, readonly code: string) {
-    super(message);
-  }
-}
+import { ProxyError } from "./proxy-errors";
 
 export async function assertSafeTarget(currentUrl: string): Promise<URL> {
   let parsed: URL;
   try {
     parsed = new URL(currentUrl);
   } catch {
-    throw new Error("Invalid URL");
+    throw new ProxyError("bad_url");
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("Only http/https targets are allowed");
+    throw new ProxyError("bad_url");
   }
-  if (!parsed.hostname) throw new Error("Missing host");
+  if (!parsed.hostname) throw new ProxyError("bad_url");
   if (parsed.port !== "" && parsed.port !== "80" && parsed.port !== "443") {
-    throw new ProxyBlockedError("Blocked port", "blocked_port");
+    throw new ProxyError("blocked_port");
   }
   const ipVersion = isIP(parsed.hostname);
   if (ipVersion === 4) {
-    if (isPrivateIpv4(parsed.hostname)) throw new Error("Blocked target");
+    if (isPrivateIpv4(parsed.hostname)) throw new ProxyError("blocked_target");
     return parsed;
   }
   if (ipVersion === 6) {
-    if (isPrivateIpv6(parsed.hostname)) throw new Error("Blocked target");
+    if (isPrivateIpv6(parsed.hostname)) throw new ProxyError("blocked_target");
     return parsed;
   }
   const addrs = await lookup(parsed.hostname, { all: true, verbatim: true });
-  if (!addrs.length) throw new Error("Could not resolve host");
+  if (!addrs.length) throw new ProxyError("upstream_failed");
   for (const { address, family } of addrs) {
     const blocked =
       family === 4 ? isPrivateIpv4(address) : isPrivateIpv6(address);
-    if (blocked) throw new Error("Blocked target");
+    if (blocked) throw new ProxyError("blocked_target");
   }
   return parsed;
 }

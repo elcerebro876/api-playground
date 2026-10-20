@@ -160,6 +160,23 @@ test("A2: a cached 400 carrying a fix is stripped on read", () => {
   assert.ok(untouched.urlFix, "a 404 cached entry keeps its fix");
 });
 
+test("D5: stripFixes removes all fixes when status is null or undefined", () => {
+  const cached = fullResult();
+
+  const strippedNull = stripFixes(cached, null);
+  assert.equal(strippedNull.headerFix, null);
+  assert.equal(strippedNull.valueFix, null);
+  assert.equal(strippedNull.methodFix, null);
+  assert.equal(strippedNull.urlFix, null);
+  assert.equal(strippedNull.title, cached.title);
+
+  const strippedUndef = stripFixes(fullResult(), undefined);
+  assert.equal(strippedUndef.headerFix, null);
+  assert.equal(strippedUndef.valueFix, null);
+  assert.equal(strippedUndef.methodFix, null);
+  assert.equal(strippedUndef.urlFix, null);
+});
+
 test("A3: jsonBodyRequired fires on missing/required body phrasing", () => {
   assert.equal(jsonBodyRequired('{"message":"Request body is required"}'), true);
   assert.equal(jsonBodyRequired('{"error":"Missing body"}'), true);

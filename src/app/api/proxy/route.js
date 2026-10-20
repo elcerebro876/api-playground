@@ -4,6 +4,11 @@ import * as httpMethods from "../../../lib/http-methods";
 import { clientIp, hashKey, rateLimit } from "../../../lib/rate-limit";
 import { assertSafeTarget } from "../../../lib/proxy-target";
 import {
+  ProxyError,
+  proxyErrorResponse,
+  targetSuccessResponse,
+} from "../../../lib/proxy-errors";
+import {
   isPrivateIpv4,
   isPrivateIpv6,
   redirectHopHeaders,
@@ -29,7 +34,7 @@ function safeLookup(hostname, options, callback) {
         family === 4 ? !isPrivateIpv4(address) : !isPrivateIpv6(address),
       );
       if (!safe.length) {
-        callback(new Error("Blocked target"));
+        callback(new ProxyError("blocked_target"));
         return;
       }
       if (options && options.all) {
@@ -54,24 +59,23 @@ export async function POST(request) {
   if (!rl.ok) {
     const time = Date.now() - start;
     if ("retryAfter" in rl) {
-      return Response.json(
-        { error: "Too many proxy requests, try again later", time },
-        { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
-      );
+      return proxyErrorResponse("rate_limited", time, {
+        retryAfterSec: rl.retryAfter,
+      });
     }
-    return Response.json(
-      {
-        error: "Proxy is temporarily unavailable. Please try again later.",
-        time,
-      },
-      { status: 503 },
-    );
+    return proxyErrorResponse("store_unavailable", time);
   }
   try {
-    const { method, url, headers, body } = await request.json();
+    let payload;
+    try {
+      payload = await request.json();
+    } catch {
+      throw new ProxyError("bad_request");
+    }
+    const { method, url, headers, body } = payload;
     const m = String(method || "GET").toUpperCase();
-    if (!ALLOWED_METHODS.has(m)) throw new Error("Method not allowed");
-    if (typeof url !== "string" || !url.trim()) throw new Error("Missing url");
+    if (!ALLOWED_METHODS.has(m)) throw new ProxyError("bad_request");
+    if (typeof url !== "string" || !url.trim()) throw new ProxyError("bad_request");
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -107,7 +111,7 @@ export async function POST(request) {
         res = await undiciFetch(parsed.toString(), fetchOpts);
         const location = res.headers.get("location");
         if (res.status >= 300 && res.status < 400 && location) {
-          if (hop >= MAX_REDIRECTS) throw new Error("Too many redirects");
+          if (hop >= MAX_REDIRECTS) throw new ProxyError("too_many_redirects");
           target = new URL(location, parsed).toString();
           if (res.status === 303 || (res.status !== 307 && res.status !== 308)) {
             // Mirrors fetch "follow" semantics for 301/302/303.
@@ -168,7 +172,7 @@ export async function POST(request) {
       }
 
       const elapsed = Date.now() - start;
-      return Response.json({
+      return targetSuccessResponse({
         status: res.status,
         ok: res.ok,
         time: elapsed,
@@ -183,23 +187,11 @@ export async function POST(request) {
     }
   } catch (e) {
     const elapsed = Date.now() - start;
-    if (e?.source === "proxy") {
-      return Response.json(
-        {
-          error: e?.message || "Blocked by proxy",
-          source: "proxy",
-          code: e?.code || "blocked",
-          time: elapsed,
-        },
-        { status: 403 },
-      );
+    if (e?.name === "AbortError") {
+      return proxyErrorResponse("timeout", elapsed);
     }
-    return Response.json(
-      {
-        error: e?.name === "AbortError" ? "Upstream timed out" : (e?.message || "Proxy error"),
-        time: elapsed,
-      },
-      { status: 500 },
-    );
+    const proxied =
+      e?.source === "proxy" ? e : e?.cause?.source === "proxy" ? e.cause : null;
+    return proxyErrorResponse(proxied?.code || "upstream_failed", elapsed);
   }
 }

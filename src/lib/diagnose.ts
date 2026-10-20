@@ -436,7 +436,7 @@ export function stripFixes<T extends DiagnosisResult>(
   result: T,
   status: number | null | undefined,
 ): T {
-  if (status == null || !NO_FIX_STATUSES.has(status)) return result;
+  if (typeof status === "number" && !NO_FIX_STATUSES.has(status)) return result;
   return {
     ...result,
     headerFix: null,
