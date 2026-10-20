@@ -100,12 +100,18 @@ export async function consumeGlobalDaily(namespace: string, maxCount?: number): 
 }
 
 export function clientIp(request: Request): string {
+  // Only trust forwarding headers when running behind Vercel's edge, which
+  // sets and owns them. Off-Vercel there is no trusted proxy, so a
+  // client-supplied x-real-ip would let anyone pick their own rate-limit
+  // bucket — fall back to a single shared bucket instead.
   if (process.env.VERCEL) {
     const fwd = request.headers.get("x-forwarded-for");
     const first = fwd?.split(",")[0]?.trim();
     if (first) return first;
+    const real = request.headers.get("x-real-ip")?.trim();
+    if (real) return real;
   }
-  return request.headers.get("x-real-ip")?.trim() || "unknown";
+  return "unknown";
 }
 
 export async function hashKey(namespace: string, ip: string): Promise<string> {
