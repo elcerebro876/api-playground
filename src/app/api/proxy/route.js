@@ -3,6 +3,11 @@ import { isIP } from "node:net";
 import { Agent, fetch as undiciFetch } from "undici";
 import * as httpMethods from "../../../lib/http-methods";
 import { clientIp, hashKey, rateLimit } from "../../../lib/rate-limit";
+import {
+  isPrivateIpv4,
+  isPrivateIpv6,
+  withoutSensitiveHeaders,
+} from "../../../lib/proxy-hardening";
 
 const ALLOWED_METHODS = new Set(httpMethods.ALLOWED_METHODS);
 const TIMEOUT_MS = 20000;
@@ -11,58 +16,6 @@ const MAX_BODY_BYTES = 8 * 1024 * 1024;
 const PROXY_BURST_MAX = 60;
 const PROXY_BURST_WINDOW_SECS = 10 * 60;
 const PROXY_DAILY_MAX = 400;
-
-// IPv4 ranges that must never be reachable from the server: loopback,
-// private, link-local (incl. 169.254.169.254 cloud metadata), CGNAT,
-// and TEST-NET documentation ranges.
-const V4_RANGES = [
-  [0x00000000, 8], // 0.0.0.0/8
-  [0x0a000000, 8], // 10.0.0.0/8
-  [0x64400000, 10], // 100.64.0.0/10
-  [0x7f000000, 8], // 127.0.0.0/8
-  [0xa9fe0000, 16], // 169.254.0.0/16
-  [0xac100000, 12], // 172.16.0.0/12
-  [0xc0000200, 24], // 192.0.2.0/24
-  [0xc0a80000, 16], // 192.168.0.0/16
-  [0xc6120000, 15], // 198.18.0.0/15
-  [0xc6336400, 24], // 198.51.100.0/24
-  [0xcb007100, 24], // 203.0.113.0/24
-];
-
-function ipToInt(ip) {
-  const parts = ip.split(".");
-  if (parts.length !== 4) return null;
-  for (const p of parts) {
-    if (!/^\d{1,3}$/.test(p) || Number(p) > 255) return null;
-  }
-  return (
-    (((Number(parts[0]) << 24) |
-      (Number(parts[1]) << 16) |
-      (Number(parts[2]) << 8) |
-      Number(parts[3])) >>>
-      0)
-  );
-}
-
-function isPrivateIpv4(ip) {
-  const int = ipToInt(ip);
-  if (int === null) return false;
-  return V4_RANGES.some(([start, len]) => {
-    const mask = len === 0 ? 0 : (~0 << (32 - len)) >>> 0;
-    return (int & mask) === (start & mask);
-  });
-}
-
-function isPrivateIpv6(ip) {
-  const lower = ip.toLowerCase();
-  // IPv4-mapped addresses such as ::ffff:127.0.0.1 or ::127.0.0.1
-  const mapped = lower.match(/^::(?:ffff:)?((?:\d{1,3}\.){3}\d{1,3})$/);
-  if (mapped) return isPrivateIpv4(mapped[1]);
-  if (lower === "::" || lower === "::1") return true;
-  if (lower.startsWith("fc") || lower.startsWith("fd")) return true; // fc00::/7
-  const first = lower.split(":")[0];
-  return /^fe[89ab]/.test(first); // fe80::/10
-}
 
 // Connection-time DNS lookup for the outbound Agent. `assertSafeTarget`
 // validates one resolution, but a rebinding host can answer differently when
@@ -165,8 +118,20 @@ export async function POST(request) {
         dispatcher: agent,
       };
       let res;
+      let prevOrigin = null;
       for (let hop = 0; ; hop++) {
         const parsed = await assertSafeTarget(target);
+        const sentHeaders = fetchOpts.headers;
+        if (
+          prevOrigin !== null &&
+          prevOrigin !== parsed.origin &&
+          sentHeaders &&
+          typeof sentHeaders === "object" &&
+          !Array.isArray(sentHeaders)
+        ) {
+          fetchOpts.headers = withoutSensitiveHeaders(sentHeaders);
+        }
+        prevOrigin = parsed.origin;
         res = await undiciFetch(parsed.toString(), fetchOpts);
         const location = res.headers.get("location");
         if (res.status >= 300 && res.status < 400 && location) {
