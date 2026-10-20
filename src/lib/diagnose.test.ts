@@ -7,6 +7,7 @@ import {
   jsonBodyRequired,
   maskHeaderValue,
   maskUrlSecrets,
+  maskSensitiveStrings,
   maskErrorForReport,
   statusLabel,
   stripFixes,
@@ -199,4 +200,46 @@ test("D3: maskErrorForReport redacts secrets from non-Error values", () => {
   const safe = maskErrorForReport('{"token":"abc"}');
   assert.equal(safe instanceof Error, true);
   assert.equal(safe.message.includes("abc"), false);
+});
+
+test("D4: maskUrlSecrets masks jwt/code/session and userinfo", () => {
+  const u =
+    "https://user:pass@api.example.com/v1/x?jwt=eyJhbGciOiJIUzI1NiJ9.abc.def&code=ABC123&session_id=sess&normal=ok";
+  const m = maskUrlSecrets(u);
+  assert.equal(m.includes("user:pass"), false);
+  assert.equal(m.includes("****:****"), true);
+  assert.equal(m.includes("jwt=****"), true);
+  assert.equal(m.includes("code=****"), true);
+  assert.equal(m.includes("session_id=****"), true);
+  assert.equal(m.includes("eyJhbGciOiJIUzI1NiJ9"), false);
+  assert.equal(m.includes("ABC123"), false);
+  assert.equal(m.includes("session_id=sess"), false);
+  assert.ok(m.includes("normal=ok"));
+});
+
+test("D4: maskSensitiveStrings redacts JWT and long hex", () => {
+  const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U";
+  const hex = "a".repeat(40);
+  const out = maskSensitiveStrings(`{"token":"${jwt}","trace":"${hex}"}`);
+  assert.equal(out.includes(jwt), false);
+  assert.equal(out.includes(hex), false);
+  assert.equal(out.split("****").length >= 3, true);
+});
+
+test("D4: maskUrlSecrets keeps lookalike non-secret params", () => {
+  const m = maskUrlSecrets(
+    "https://api.example.com/v1/find?country_code=us&promo_code=SAVE&zipcode=10001&design=grid&monkey=1&q=hello&code=abc123&sig=xyz&api_key=k9",
+  );
+  assert.ok(m.includes("country_code=us"));
+  assert.ok(m.includes("promo_code=SAVE"));
+  assert.ok(m.includes("zipcode=10001"));
+  assert.ok(m.includes("design=grid"));
+  assert.ok(m.includes("monkey=1"));
+  assert.ok(m.includes("q=hello"));
+  assert.ok(m.includes("code=****"));
+  assert.ok(m.includes("sig=****"));
+  assert.ok(m.includes("api_key=****"));
+  assert.equal(m.includes("abc123"), false);
+  assert.equal(m.includes("xyz"), false);
+  assert.equal(m.includes("k9"), false);
 });

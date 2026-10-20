@@ -85,13 +85,17 @@ export function statusLabel(status: number | null | undefined): string | null {
 }
 
 const SECRET_QUERY_RE =
-  /key|api[-_]?key|token|secret|password|passwd|auth|signature|client[_\-]?secret|appid/i;
+  /api[-_]?key|token|secret|password|passwd|auth|signature|client[_\-]?secret|appid|jwt|sas|session[_\-]?id|(?:^|[_-])(?:key|sig)(?:$|[_-])|^code$/i;
 
 export function maskUrlSecrets(url: string): string {
   try {
     const u = new URL(url);
+    if (u.username || u.password) {
+      u.username = "****";
+      u.password = "****";
+    }
     const q = new URLSearchParams(u.search);
-    let changed = false;
+    let changed = u.username === "****" || u.password === "****";
     for (const [k, v] of q.entries()) {
       if (SECRET_QUERY_RE.test(k) && v) {
         q.set(k, "****");
@@ -106,11 +110,30 @@ export function maskUrlSecrets(url: string): string {
 }
 
 const SECRET_KEY_IN_TEXT_RE =
-  /("(?:api[-_]?key|token|secret|authorization|password|client[-_]?secret|appid|sig)"\s*[:=]\s*)"[^"]*"/gi;
+  /("(?:api[-_]?key|token|secret|authorization|password|client[-_]?secret|appid|sig|access[-_]?token|refresh[-_]?token|session|jwt|bearer)"\s*[:=]\s*)"[^"]*"/gi;
+
+// Bare secret-like values outside key/value JSON strings: JWTs, long hex/base64
+// blobs often seen in headers/cookies/urls that slip past the key-matched regex.
+const JWT_RE = /\beyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\b/g;
+const HEX_SECRET_RE = /\b[0-9a-f]{32,}\b/gi;
+const B64_SECRET_RE =
+  /\b[A-Za-z0-9+/]{40,}={0,2}\b/g;
+
+function looksLikeBase64Secret(s: string): boolean {
+  // Avoid masking short normal strings and things that look like file paths or
+  // pure identifiers that are unlikely to be secrets; be conservative.
+  if (s.length < 40) return false;
+  if (/[\/\\\.]{3,}/.test(s)) return false;
+  return /[A-Za-z]/.test(s) && /[0-9]/.test(s);
+}
 
 export function maskSensitiveStrings(text: string): string {
   if (!text) return text;
-  return text.replace(SECRET_KEY_IN_TEXT_RE, '$1"****"');
+  let out = text.replace(SECRET_KEY_IN_TEXT_RE, '$1"****"');
+  out = out.replace(JWT_RE, "****");
+  out = out.replace(HEX_SECRET_RE, (m) => (m.length >= 32 ? "****" : m));
+  out = out.replace(B64_SECRET_RE, (m) => (looksLikeBase64Secret(m) ? "****" : m));
+  return out;
 }
 
 // Redact an Error before it is logged or sent to monitoring. Keeps name and a
