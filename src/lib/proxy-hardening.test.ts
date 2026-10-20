@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   isPrivateIpv4,
   isPrivateIpv6,
+  redirectHopHeaders,
   restrictCrossOriginHeaders,
   withoutSensitiveHeaders,
 } from "@/lib/proxy-hardening";
@@ -97,5 +98,54 @@ test("restrictCrossOriginHeaders keeps only the safe allowlist", () => {
     "Accept-Language": "en",
     "Content-Type": "application/json",
     "User-Agent": "playground/1",
+  });
+});
+
+test("redirectHopHeaders passes same-origin hops through untouched", () => {
+  const headers = {
+    authorization: "Bearer sk-123",
+    cookie: "session=abc",
+    "x-api-key": "k1",
+    accept: "*/*",
+  };
+  const out = redirectHopHeaders(
+    "https://api.example.com",
+    "https://api.example.com",
+    headers,
+  );
+  assert.equal(out, headers);
+});
+
+test("redirectHopHeaders allowlists cross-origin hops", () => {
+  const out = redirectHopHeaders(
+    "https://api.example.com",
+    "https://other.example.com",
+    {
+      authorization: "Bearer sk-123",
+      cookie: "session=abc",
+      "x-api-key": "k1",
+      accept: "*/*",
+      "content-type": "application/json",
+    },
+  );
+  assert.deepEqual(out, {
+    accept: "*/*",
+    "content-type": "application/json",
+  });
+});
+
+test("redirectHopHeaders treats http to https on the same host as cross-origin", () => {
+  const out = redirectHopHeaders(
+    "http://api.example.com",
+    "https://api.example.com",
+    {
+      authorization: "Bearer sk-123",
+      cookie: "session=abc",
+      "x-api-key": "k1",
+      accept: "*/*",
+    },
+  );
+  assert.deepEqual(out, {
+    accept: "*/*",
   });
 });

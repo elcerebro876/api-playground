@@ -132,3 +132,12 @@ export function restrictCrossOriginHeaders(
   }
   return out;
 }
+
+export function redirectHopHeaders(
+  prevOrigin: string | null,
+  nextOrigin: string,
+  headers: Record<string, string>,
+): Record<string, string> {
+  if (prevOrigin === null || prevOrigin === nextOrigin) return headers;
+  return restrictCrossOriginHeaders(headers);
+}

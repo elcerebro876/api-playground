@@ -6,8 +6,7 @@ import { clientIp, hashKey, rateLimit } from "../../../lib/rate-limit";
 import {
   isPrivateIpv4,
   isPrivateIpv6,
-  restrictCrossOriginHeaders,
-  withoutSensitiveHeaders,
+  redirectHopHeaders,
 } from "../../../lib/proxy-hardening";
 
 const ALLOWED_METHODS = new Set(httpMethods.ALLOWED_METHODS);
@@ -124,15 +123,15 @@ export async function POST(request) {
         const parsed = await assertSafeTarget(target);
         const sentHeaders = fetchOpts.headers;
         if (
-          prevOrigin !== null &&
           sentHeaders &&
           typeof sentHeaders === "object" &&
           !Array.isArray(sentHeaders)
         ) {
-          fetchOpts.headers =
-            prevOrigin === parsed.origin
-              ? withoutSensitiveHeaders(sentHeaders)
-              : restrictCrossOriginHeaders(sentHeaders);
+          fetchOpts.headers = redirectHopHeaders(
+            prevOrigin,
+            parsed.origin,
+            sentHeaders,
+          );
         }
         prevOrigin = parsed.origin;
         res = await undiciFetch(parsed.toString(), fetchOpts);
