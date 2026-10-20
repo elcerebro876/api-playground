@@ -3,6 +3,7 @@ import { generateExplanation } from "@/lib/explain";
 import { isAIConfigured } from "@/lib/ai";
 import { clientIp, hashKey, rateLimit } from "@/lib/rate-limit";
 import { captureServerError } from "@/lib/error-reporter";
+import { maskErrorForReport } from "@/lib/diagnose";
 
 // Cheap deterministic signature of the request so cached explanations are not
 // reused across requests that produced different responses (e.g. different
@@ -104,11 +105,11 @@ export async function POST(request: Request) {
       responseBody,
     });
   } catch (e) {
-    const err = e as Error;
-    await captureServerError(e, { route: "explain", phase: "generate" });
+    const safe = maskErrorForReport(e);
+    await captureServerError(safe, { route: "explain", phase: "generate" });
     return Response.json(
       {
-        error: err?.message || "Couldn't generate an explanation, try again",
+        error: safe.message || "Couldn't generate an explanation, try again",
       },
       { status: 500 },
     );

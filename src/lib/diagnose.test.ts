@@ -7,6 +7,7 @@ import {
   jsonBodyRequired,
   maskHeaderValue,
   maskUrlSecrets,
+  maskErrorForReport,
   statusLabel,
   stripFixes,
   type DiagnosisInput,
@@ -183,4 +184,19 @@ test("A3: jsonBodyRequired stays silent on unrelated bodies", () => {
   assert.equal(jsonBodyRequired(null), false);
   assert.equal(jsonBodyRequired(undefined), false);
   assert.equal(jsonBodyRequired('   '), false);
+});
+
+test("D3: maskErrorForReport redacts secrets from message", () => {
+  const safe = maskErrorForReport(
+    new Error('upstream rejected {"api_key":"sk-live-1234567890"}'),
+  );
+  assert.equal(safe.message.includes("sk-live-1234567890"), false);
+  assert.equal(safe.message.includes('"****"'), true);
+  assert.ok(safe.message.length <= 500);
+});
+
+test("D3: maskErrorForReport redacts secrets from non-Error values", () => {
+  const safe = maskErrorForReport('{"token":"abc"}');
+  assert.equal(safe instanceof Error, true);
+  assert.equal(safe.message.includes("abc"), false);
 });

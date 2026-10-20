@@ -11,7 +11,7 @@ export function initPostHog(): void {
   posthog.init(key, {
     api_host:
       process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com",
-    autocapture: true,
+    autocapture: false,
     defaults: "2026-05-30",
   });
   initialized = true;

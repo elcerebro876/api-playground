@@ -113,6 +113,17 @@ export function maskSensitiveStrings(text: string): string {
   return text.replace(SECRET_KEY_IN_TEXT_RE, '$1"****"');
 }
 
+// Redact an Error before it is logged or sent to monitoring. Keeps name and a
+// (masked) stack for debugging, but masks any secrets the message or stack
+// might carry so raw request data never reaches logs or PostHog.
+export function maskErrorForReport(e: unknown): Error {
+  const err = e instanceof Error ? e : new Error(String(e ?? "Unknown error"));
+  const out = new Error(maskSensitiveStrings(err.message).slice(0, 500));
+  out.name = err.name;
+  if (err.stack) out.stack = maskSensitiveStrings(err.stack).slice(0, 4000);
+  return out;
+}
+
 export type DiagnosisInput = {
   method: string;
   url: string;

@@ -2,6 +2,7 @@ import {
   buildDiagnosisInput,
   diagnosisCacheKey,
   generateDiagnosis,
+  maskErrorForReport,
   stripFixes,
   type DiagnosisResult,
 } from "@/lib/diagnose";
@@ -103,8 +104,9 @@ export async function POST(request: Request) {
     );
     return Response.json(result);
   } catch (e) {
-    console.error("[diagnose] failed", (e as Error)?.message);
-    await captureServerError(e, { route: "diagnose", phase: "generate" });
+    const safe = maskErrorForReport(e);
+    console.error("[diagnose] failed", safe.message);
+    await captureServerError(safe, { route: "diagnose", phase: "generate" });
     return Response.json(
       { error: "Couldn't diagnose this request, try again" },
       { status: 500 },
