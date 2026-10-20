@@ -15,6 +15,7 @@ export const PROXY_ERROR_MESSAGES: Record<string, string> = {
   timeout: "Upstream timed out",
   upstream_failed: "Upstream request failed",
   too_many_redirects: "Too many redirects",
+  host_not_found: "Couldn't find that host. Check the spelling of the domain.",
 };
 
 export function proxyErrorResponse(

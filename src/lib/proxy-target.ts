@@ -26,7 +26,16 @@ export async function assertSafeTarget(currentUrl: string): Promise<URL> {
     if (isPrivateIpv6(parsed.hostname)) throw new ProxyError("blocked_target");
     return parsed;
   }
-  const addrs = await lookup(parsed.hostname, { all: true, verbatim: true });
+  let addrs;
+  try {
+    addrs = await lookup(parsed.hostname, { all: true, verbatim: true });
+  } catch (e) {
+    const dnsCode = (e as { code?: string })?.code;
+    if (dnsCode === "ENOTFOUND" || dnsCode === "EAI_AGAIN") {
+      throw new ProxyError("host_not_found");
+    }
+    throw new ProxyError("upstream_failed");
+  }
   if (!addrs.length) throw new ProxyError("upstream_failed");
   for (const { address, family } of addrs) {
     const blocked =

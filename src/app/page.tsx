@@ -22,6 +22,11 @@ import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed
 import type { ExplainPayload } from "@/lib/explain";
 import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed } from "@/lib/posthog";
+import {
+  isProxyErrorEnvelope,
+  proxyErrorCopy,
+  type ProxyErrorEnvelope,
+} from "@/lib/proxy-client";
 // Mirrors the server route's non-identifiable TTL: a genuine "nothing found" is
 // cached briefly so a repeat is instant without occupying the AI.
 const DIAGNOSIS_NOT_FOUND_TTL_MS = 2 * 60 * 1000;
@@ -207,8 +212,13 @@ export default function Home() {
     | "unavailable"
     | "capReached"
     | "rateLimited"
+    | "proxyError"
   >("idle");
   const [diag, setDiag] = useState<DiagnosisResult | null>(null);
+  const [proxyNotice, setProxyNotice] = useState<{
+    code: string;
+    copy: string;
+  } | null>(null);
   const [rateLimit, setRateLimit] = useState<{
     until: number;
     seconds: number;
@@ -460,6 +470,23 @@ export default function Home() {
     },
     [],
   );
+  const handleProxyError = useCallback((data: ProxyErrorEnvelope) => {
+    diagTokenRef.current += 1;
+    setDiag(null);
+    if (data.code === "rate_limited") {
+      const secs =
+        typeof data.retryAfterSec === "number" ? data.retryAfterSec : null;
+      setRateLimit(
+        secs != null ? { until: Date.now() + secs * 1000, seconds: secs } : null,
+      );
+      setProxyNotice(null);
+      setDiagState("rateLimited");
+      return;
+    }
+    setRateLimit(null);
+    setProxyNotice({ code: data.code, copy: proxyErrorCopy(data.code) });
+    setDiagState("proxyError");
+  }, []);
   const retryDiagnosis = useCallback(() => {
     const r = diagReqRef.current;
     if (r) runDiagnosis(r.m, r.u, r.h, r.data);
@@ -495,6 +522,7 @@ export default function Home() {
       setDiagState("idle");
       setDiag(null);
       setRateLimit(null);
+      setProxyNotice(null);
       if (!opts?.apiName) {
         setLastExplorerReq({ method: m, url: u, headers: { ...h } });
       }
@@ -515,22 +543,30 @@ export default function Home() {
           setResponseKey((k) => k + 1);
           setResponse(data);
           setHeadersFilter("common");
-          const failed =
-            data.error ||
-            (typeof data.status === "number" && data.status >= 400);
-          if (failed) {
-            runDiagnosis(m, u, h, data);
+          if (isProxyErrorEnvelope(data)) {
+            handleProxyError(data);
+          } else {
+            const failed =
+              data.error ||
+              (typeof data.status === "number" && data.status >= 400);
+            if (failed) {
+              runDiagnosis(m, u, h, data);
+            }
           }
         }
         if (opts?.apiName && !opts?.suppressExplain) {
           setResponseKey((k) => k + 1);
           setResponse(data);
           setHeadersFilter("common");
-          const failed =
-            data.error ||
-            (typeof data.status === "number" && data.status >= 400);
-          if (failed) {
-            runDiagnosis(m, u, h, data);
+          if (isProxyErrorEnvelope(data)) {
+            handleProxyError(data);
+          } else {
+            const failed =
+              data.error ||
+              (typeof data.status === "number" && data.status >= 400);
+            if (failed) {
+              runDiagnosis(m, u, h, data);
+            }
           }
         }
         const entry = {
@@ -666,6 +702,7 @@ export default function Home() {
       apisTested,
       streak,
       runDiagnosis,
+      handleProxyError,
     ],
   );
   const openExplain = useCallback(
@@ -920,6 +957,7 @@ export default function Home() {
               lastRequest={lastExplorerReq}
               onRetryDiagnosis={retryDiagnosis}
               rateLimit={rateLimit}
+              proxyNotice={proxyNotice}
             />{" "}
           </motion.div>{" "}
         </div>{" "}
@@ -5063,6 +5101,7 @@ function MainContent({
   lastRequest,
   onRetryDiagnosis,
   rateLimit,
+  proxyNotice,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -5128,7 +5167,8 @@ function MainContent({
     | "fallback"
     | "unavailable"
     | "capReached"
-    | "rateLimited";
+    | "rateLimited"
+    | "proxyError";
   diag: DiagnosisResult | null;
   lastRequest: {
     method: string;
@@ -5137,6 +5177,7 @@ function MainContent({
   } | null;
   onRetryDiagnosis: () => void;
   rateLimit: { until: number; seconds: number } | null;
+  proxyNotice: { code: string; copy: string } | null;
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
@@ -7740,6 +7781,53 @@ style={{
                                 })
                               }
                             />
+                          ) : diagState === "proxyError" && proxyNotice ? (
+                            <div style={{ padding: "16px 16px 0" }}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                }}
+                              >
+                                <svg
+                                  width="18"
+                                  height="18"
+                                  viewBox="0 0 18 18"
+                                  fill="none"
+                                  style={{ flexShrink: 0 }}
+                                >
+                                  <circle
+                                    cx="9"
+                                    cy="9"
+                                    r="7.25"
+                                    stroke={isDark ? "#9e9e9e" : "#585858"}
+                                    strokeWidth="1.4"
+                                  />
+                                  <text
+                                    x="9"
+                                    y="12.6"
+                                    textAnchor="middle"
+                                    fontSize="10.5"
+                                    fontWeight="600"
+                                    fill={isDark ? "#9e9e9e" : "#585858"}
+                                  >
+                                    !
+                                  </text>
+                                </svg>
+                                <span
+                                  style={{
+                                    fontFamily:
+                                      "Geist, var(--font-geist-sans)",
+                                    fontSize: 14,
+                                    fontWeight: 500,
+                                    color: isDark ? "#e5e5e5" : "#171717",
+                                  }}
+                                >
+                                  {proxyNotice.copy}
+                                </span>
+                              </div>
+                            </div>
                           ) : (
                               needsJsonBody ? (
                                 <JsonBodyRequiredBlock

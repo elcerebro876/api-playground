@@ -192,6 +192,13 @@ export async function POST(request) {
     }
     const proxied =
       e?.source === "proxy" ? e : e?.cause?.source === "proxy" ? e.cause : null;
-    return proxyErrorResponse(proxied?.code || "upstream_failed", elapsed);
+    if (proxied) {
+      return proxyErrorResponse(proxied.code, elapsed);
+    }
+    const dnsCode = e?.code || e?.cause?.code;
+    if (dnsCode === "ENOTFOUND" || dnsCode === "EAI_AGAIN") {
+      return proxyErrorResponse("host_not_found", elapsed);
+    }
+    return proxyErrorResponse("upstream_failed", elapsed);
   }
 }

@@ -129,6 +129,30 @@ test("proxy 500 bad_url carries source and code for malformed and unsupported UR
   }
 });
 
+test("proxy 500 host_not_found for a typo'd domain, without raw DNS text", async () => {
+  const POST = await getPost();
+  const restore = mockRpc({ ok: true, remaining: 5, retry_after: 0 });
+  try {
+    const res = await POST(
+      proxyReq({
+        method: "GET",
+        url: "https://definitely-not-a-real-host-xyzq123.invalid/",
+      }),
+    );
+    assert.equal(res.status, 500);
+    const data = await res.json();
+    assert.equal(data.source, "proxy");
+    assert.equal(data.code, "host_not_found");
+    assert.equal(
+      data.error,
+      "Couldn't find that host. Check the spelling of the domain.",
+    );
+    assert.ok(!String(data.error).includes("ENOTFOUND"));
+  } finally {
+    restore();
+  }
+});
+
 test("proxy 500 bad_request carries source and code for disallowed methods and missing urls", async () => {
   const POST = await getPost();
   const restore = mockRpc({ ok: true, remaining: 5, retry_after: 0 });

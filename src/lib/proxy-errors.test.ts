@@ -17,6 +17,7 @@ const CODES = [
   "timeout",
   "upstream_failed",
   "too_many_redirects",
+  "host_not_found",
 ] as const;
 
 test("every proxy error code carries source, code, and the fixed generic message", async () => {
