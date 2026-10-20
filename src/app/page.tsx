@@ -20,7 +20,7 @@ import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
 import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, type HistoryEntry } from "@/lib/storage";
 import type { ExplainPayload } from "@/lib/explain";
-import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, maskHeaderValue, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
+import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed } from "@/lib/posthog";
 // Mirrors the server route's non-identifiable TTL: a genuine "nothing found" is
 // cached briefly so a repeat is instant without occupying the AI.
@@ -4591,6 +4591,81 @@ function RateLimitRetryButton({
 }
 
 // Coaching card for a 429: the request was rate limited by the API.
+// Shown when the response body itself says a JSON request body was required or
+// invalid. The composer has no body field, so there is no one-click fix to
+// offer: we render fixed copy, keep the deterministic status chip, and drop all
+// model text, one-click fixes, and URL highlighting.
+function JsonBodyRequiredBlock({
+  isDark,
+  status,
+}: {
+  isDark: boolean;
+  status: number | null | undefined;
+}) {
+  return (
+    <>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "16px 16px 0",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 14,
+            fontWeight: 500,
+            color: isDark ? "#9e9e9e" : "#585858",
+          }}
+        >
+          JSON body required
+        </span>
+        {typeof status === "number" && (
+          <span
+            style={{
+              borderRadius: 6,
+              backgroundColor: isDark ? "#2b1414" : "#FFD6D6",
+              padding: "3px 6px",
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 12,
+              fontWeight: 400,
+              color: isDark ? "#ff6b6b" : "#FF1616",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {status}
+          </span>
+        )}
+      </div>
+      <div
+        style={{
+          margin: "8px 4px 4px",
+          borderRadius: 6,
+          backgroundColor: isDark ? "#161616" : "#FAFAFA",
+          border: isDark ? "0.8px solid #2d2d2d" : "0.8px solid #f2f2f2",
+          padding: 12,
+        }}
+      >
+        <div
+          style={{
+            marginTop: 0,
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 14,
+            fontWeight: 400,
+            lineHeight: "20px",
+            color: "#939393",
+          }}
+        >
+          This endpoint expects a JSON request body. The composer can&apos;t
+          send one yet, so this can&apos;t be fixed here.
+        </div>
+      </div>
+    </>
+  );
+}
+
 function RateLimitCard({
   isDark,
   rateLimit,
@@ -5089,8 +5164,14 @@ function MainContent({
     to: string;
   } | null>(null);
   const [focusSignal, setFocusSignal] = useState(0);
+  // Driven purely by response-body text: when the body says a JSON request
+  // body was required/invalid, the composer cannot help (no body field), so the
+  // card shows fixed copy, drops model text, and never highlights the URL.
+  const needsJsonBody = !response?.error
+    ? jsonBodyRequired(response?.body as string | undefined)
+    : false;
   const urlHighlightSignal =
-    diagState === "result" && diag?.highlightUrl ? diag : null;
+    diagState === "result" && diag?.highlightUrl && !needsJsonBody ? diag : null;
   const openStagedFix = () => {
     if (!diag) return;
     const mf = diag.headerFix;
@@ -7225,6 +7306,12 @@ function MainContent({
                               </span>{" "}
                             </div>
                           ) : diagState === "result" ? (
+                            needsJsonBody ? (
+                              <JsonBodyRequiredBlock
+                                isDark={isDark}
+                                status={response?.status ?? null}
+                              />
+                            ) : (
                             <>
                               {" "}
                               {(() => {
@@ -7640,6 +7727,7 @@ style={{
                                 </div>{" "}
                               </div>{" "}
                             </>
+                            )
                           ) : diagState === "rateLimited" ? (
                             <RateLimitCard
                               isDark={isDark}
@@ -7653,6 +7741,12 @@ style={{
                               }
                             />
                           ) : (
+                              needsJsonBody ? (
+                                <JsonBodyRequiredBlock
+                                  isDark={isDark}
+                                  status={response?.status ?? null}
+                                />
+                              ) : (
                               <>
                                 {" "}
                                 {(() => {
@@ -7909,6 +8003,7 @@ backgroundColor: isDark
                                   )}
                                 </div>{" "}
                               </>
+                              )
                             )}{" "}
                         </motion.div>
                       )}{" "}

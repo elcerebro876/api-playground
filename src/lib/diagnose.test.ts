@@ -4,6 +4,7 @@ import {
   applyAuthGuards,
   buildDiagnosisInput,
   diagnosisCacheKey,
+  jsonBodyRequired,
   maskHeaderValue,
   maskUrlSecrets,
   statusLabel,
@@ -155,4 +156,31 @@ test("A2: a cached 400 carrying a fix is stripped on read", () => {
 
   const untouched = stripFixes(fullResult(), 404);
   assert.ok(untouched.urlFix, "a 404 cached entry keeps its fix");
+});
+
+test("A3: jsonBodyRequired fires on missing/required body phrasing", () => {
+  assert.equal(jsonBodyRequired('{"message":"Request body is required"}'), true);
+  assert.equal(jsonBodyRequired('{"error":"Missing body"}'), true);
+  assert.equal(jsonBodyRequired('{"error":"No body provided"}'), true);
+  assert.equal(jsonBodyRequired('{"error":"A body is required"}'), true);
+});
+
+test("A3: jsonBodyRequired fires on JSON parse / media-type errors", () => {
+  assert.equal(jsonBodyRequired('{"error":"invalid JSON"}'), true);
+  assert.equal(jsonBodyRequired('{"error":"Unexpected end of JSON input"}'), true);
+  assert.equal(jsonBodyRequired('{"error":"Malformed json payload"}'), true);
+  assert.equal(jsonBodyRequired('{"error":"Unsupported media type"}'), true);
+  assert.equal(jsonBodyRequired('{"error":"Content-Type must be application/json"}'), true);
+  assert.equal(jsonBodyRequired('{"error":"Failed to parse json"}'), true);
+});
+
+test("A3: jsonBodyRequired stays silent on unrelated bodies", () => {
+  assert.equal(jsonBodyRequired('{"data":[{"id":1}]}'), false);
+  assert.equal(jsonBodyRequired('{"error":"Not found"}'), false);
+  assert.equal(jsonBodyRequired('<html><body>502 Bad Gateway</body></html>'), false);
+  assert.equal(jsonBodyRequired('See the json docs'), false);
+  assert.equal(jsonBodyRequired(''), false);
+  assert.equal(jsonBodyRequired(null), false);
+  assert.equal(jsonBodyRequired(undefined), false);
+  assert.equal(jsonBodyRequired('   '), false);
 });

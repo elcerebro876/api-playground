@@ -412,6 +412,26 @@ export function stripFixes<T extends DiagnosisResult>(
   };
 }
 
+// True when the response body itself says the failure was caused by a missing
+// or malformed JSON request body. Driven purely by response text (never by
+// headerFix, never by HTTP status) so the UI can show fixed copy and drop
+// model text and one-click fixes, which cannot help when the composer has no
+// body field. Deliberately phrase-focused, not a bare /json/ test, to avoid
+// firing on bodies that merely mention "json".
+const BODY_REQUIRED_RE =
+  /(request body|body) (is )?(required|expected)|missing (request )?body|no body (was )?provided|a body (is )?required/i;
+const BODY_PARSE_RE =
+  /(invalid|malformed|unexpected end of|failed to parse|parse error|error parsing|expected|could not (parse|decode)|could not find|unsupported|does not (match|support))[^.]{0,40}\bjson\b|\bjson\b[^.]{0,40}(parse|decode|invalid|malformed|unexpected|missing|required)/i;
+const MEDIA_TYPE_RE = /(unsupported media type|content-type[^.]{0,40}json|expected application\/json|must be (application\/)?json)/i;
+
+export function jsonBodyRequired(
+  body: string | null | undefined,
+): boolean {
+  const text = String(body ?? "").slice(0, DIAGNOSIS_BODY_LIMIT);
+  if (!text.trim()) return false;
+  return BODY_REQUIRED_RE.test(text) || BODY_PARSE_RE.test(text) || MEDIA_TYPE_RE.test(text);
+}
+
 // Rule-based checks applied after the model answers. They cannot add a fix the
 // schema cannot express, but they can remove a fix that contradicts a known
 // convention or is under-confident, so the user is never handed a one-click
