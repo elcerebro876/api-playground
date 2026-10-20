@@ -108,9 +108,7 @@ export async function POST(request: Request) {
     const safe = maskErrorForReport(e);
     await captureServerError(safe, { route: "explain", phase: "generate" });
     return Response.json(
-      {
-        error: safe.message || "Couldn't generate an explanation, try again",
-      },
+      { error: "Couldn't generate an explanation, try again" },
       { status: 500 },
     );
   }

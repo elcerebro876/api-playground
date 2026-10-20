@@ -2,11 +2,15 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { Agent, fetch as undiciFetch } from "undici";
 import * as httpMethods from "../../../lib/http-methods";
+import { clientIp, hashKey, rateLimit } from "../../../lib/rate-limit";
 
 const ALLOWED_METHODS = new Set(httpMethods.ALLOWED_METHODS);
 const TIMEOUT_MS = 20000;
 const MAX_REDIRECTS = 5;
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
+const PROXY_BURST_MAX = 60;
+const PROXY_BURST_WINDOW_SECS = 10 * 60;
+const PROXY_DAILY_MAX = 400;
 
 // IPv4 ranges that must never be reachable from the server: loopback,
 // private, link-local (incl. 169.254.169.254 cloud metadata), CGNAT,
@@ -119,6 +123,27 @@ async function assertSafeTarget(currentUrl) {
 
 export async function POST(request) {
   const start = Date.now();
+  const rl = await rateLimit(await hashKey("proxy", clientIp(request)), {
+    burstMax: PROXY_BURST_MAX,
+    burstWindowSecs: PROXY_BURST_WINDOW_SECS,
+    dailyMax: PROXY_DAILY_MAX,
+  });
+  if (!rl.ok) {
+    const time = Date.now() - start;
+    if ("retryAfter" in rl) {
+      return Response.json(
+        { error: "Too many proxy requests, try again later", time },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+      );
+    }
+    return Response.json(
+      {
+        error: "Proxy is temporarily unavailable. Please try again later.",
+        time,
+      },
+      { status: 503 },
+    );
+  }
   try {
     const { method, url, headers, body } = await request.json();
     const m = String(method || "GET").toUpperCase();

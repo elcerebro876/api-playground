@@ -38,15 +38,24 @@ type RpcResult = {
   retry_after: number;
 };
 
-async function bumpShared(key: string): Promise<RpcResult | null> {
+export type RateLimitOptions = {
+  burstMax?: number;
+  burstWindowSecs?: number;
+  dailyMax?: number;
+};
+
+async function bumpShared(
+  key: string,
+  opts?: RateLimitOptions,
+): Promise<RpcResult | null> {
   const client = getSupabase();
   if (!client) return null;
   try {
     const { data, error } = await client.rpc("bump_rate_limit", {
       k: key,
-      burst_max: BURST_MAX,
-      burst_window_secs: BURST_WINDOW_SECS,
-      daily_max: DAILY_MAX_PER_IP,
+      burst_max: opts?.burstMax ?? BURST_MAX,
+      burst_window_secs: opts?.burstWindowSecs ?? BURST_WINDOW_SECS,
+      daily_max: opts?.dailyMax ?? DAILY_MAX_PER_IP,
     });
     if (error) throw error;
     if (
@@ -62,8 +71,11 @@ async function bumpShared(key: string): Promise<RpcResult | null> {
   }
 }
 
-export async function rateLimit(key: string): Promise<RateLimitResult> {
-  const shared = await bumpShared(key);
+export async function rateLimit(
+  key: string,
+  opts?: RateLimitOptions,
+): Promise<RateLimitResult> {
+  const shared = await bumpShared(key, opts);
   if (shared) {
     return shared.ok
       ? { ok: true, remaining: Number(shared.remaining ?? 0) }
