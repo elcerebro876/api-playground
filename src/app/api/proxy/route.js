@@ -1,8 +1,8 @@
 import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import { Agent, fetch as undiciFetch } from "undici";
 import * as httpMethods from "../../../lib/http-methods";
 import { clientIp, hashKey, rateLimit } from "../../../lib/rate-limit";
+import { assertSafeTarget } from "../../../lib/proxy-target";
 import {
   isPrivateIpv4,
   isPrivateIpv6,
@@ -42,36 +42,6 @@ function safeLookup(hostname, options, callback) {
       }
     })
     .catch((err) => callback(err));
-}
-
-async function assertSafeTarget(currentUrl) {
-  let parsed;
-  try {
-    parsed = new URL(currentUrl);
-  } catch {
-    throw new Error("Invalid URL");
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("Only http/https targets are allowed");
-  }
-  if (!parsed.hostname) throw new Error("Missing host");
-  const ipVersion = isIP(parsed.hostname);
-  if (ipVersion === 4) {
-    if (isPrivateIpv4(parsed.hostname)) throw new Error("Blocked target");
-    return parsed;
-  }
-  if (ipVersion === 6) {
-    if (isPrivateIpv6(parsed.hostname)) throw new Error("Blocked target");
-    return parsed;
-  }
-  const addrs = await lookup(parsed.hostname, { all: true, verbatim: true });
-  if (!addrs.length) throw new Error("Could not resolve host");
-  for (const { address, family } of addrs) {
-    const blocked =
-      family === 4 ? isPrivateIpv4(address) : isPrivateIpv6(address);
-    if (blocked) throw new Error("Blocked target");
-  }
-  return parsed;
 }
 
 export async function POST(request) {
@@ -213,6 +183,17 @@ export async function POST(request) {
     }
   } catch (e) {
     const elapsed = Date.now() - start;
+    if (e?.source === "proxy") {
+      return Response.json(
+        {
+          error: e?.message || "Blocked by proxy",
+          source: "proxy",
+          code: e?.code || "blocked",
+          time: elapsed,
+        },
+        { status: 403 },
+      );
+    }
     return Response.json(
       {
         error: e?.name === "AbortError" ? "Upstream timed out" : (e?.message || "Proxy error"),
