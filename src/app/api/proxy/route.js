@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { Agent, fetch as undiciFetch } from "undici";
 import * as httpMethods from "../../../lib/http-methods";
 
 const ALLOWED_METHODS = new Set(httpMethods.ALLOWED_METHODS);
@@ -59,6 +60,33 @@ function isPrivateIpv6(ip) {
   return /^fe[89ab]/.test(first); // fe80::/10
 }
 
+// Connection-time DNS lookup for the outbound Agent. `assertSafeTarget`
+// validates one resolution, but a rebinding host can answer differently when
+// the socket actually connects (TOCTOU). Re-resolve here and hand back only
+// addresses that pass the same private-range checks, so the socket can never
+// be pinned to a blocked address.
+function safeLookup(hostname, options, callback) {
+  lookup(hostname, { all: true, verbatim: true })
+    .then((addrs) => {
+      const safe = addrs.filter(({ address, family }) =>
+        family === 4 ? !isPrivateIpv4(address) : !isPrivateIpv6(address),
+      );
+      if (!safe.length) {
+        callback(new Error("Blocked target"));
+        return;
+      }
+      if (options && options.all) {
+        callback(
+          null,
+          safe.map(({ address, family }) => ({ address, family })),
+        );
+      } else {
+        callback(null, safe[0].address, safe[0].family);
+      }
+    })
+    .catch((err) => callback(err));
+}
+
 async function assertSafeTarget(currentUrl) {
   let parsed;
   try {
@@ -99,6 +127,8 @@ export async function POST(request) {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    // Pin every connection to a freshly re-validated DNS answer (see safeLookup).
+    const agent = new Agent({ connect: { lookup: safeLookup } });
     try {
       let target = url.trim();
       const fetchOpts = {
@@ -107,11 +137,12 @@ export async function POST(request) {
         body: body || undefined,
         signal: controller.signal,
         redirect: "manual",
+        dispatcher: agent,
       };
       let res;
       for (let hop = 0; ; hop++) {
         const parsed = await assertSafeTarget(target);
-        res = await fetch(parsed.toString(), fetchOpts);
+        res = await undiciFetch(parsed.toString(), fetchOpts);
         const location = res.headers.get("location");
         if (res.status >= 300 && res.status < 400 && location) {
           if (hop >= MAX_REDIRECTS) throw new Error("Too many redirects");
@@ -186,6 +217,7 @@ export async function POST(request) {
       });
     } finally {
       clearTimeout(timer);
+      agent.destroy();
     }
   } catch (e) {
     const elapsed = Date.now() - start;
