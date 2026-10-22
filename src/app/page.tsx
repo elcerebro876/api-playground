@@ -18,7 +18,7 @@ import {
 } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
-import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, type HistoryEntry } from "@/lib/storage";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, loadExplainUses, saveExplainUses, type HistoryEntry } from "@/lib/storage";
 import type { ExplainResult } from "@/lib/explain";
 import { isExplainEligible, EXPLAIN_INPUT_LIMIT } from "@/lib/explain-eligibility";
 import { buildCandidates, type Candidate } from "@/lib/explain-candidates";
@@ -5136,12 +5136,17 @@ function ExplainStrip({
   const [state, setState] = useState<ExplainStripState>("idle");
   const [result, setResult] = useState<ExplainResult | null>(null);
   const [errorText, setErrorText] = useState("");
+  const [explainUses, setExplainUses] = useState(0);
 
   useEffect(() => {
     setState("idle");
     setResult(null);
     setErrorText("");
   }, [snapshotKey]);
+
+  useEffect(() => {
+    setExplainUses(loadExplainUses());
+  }, []);
 
   const analyze = async () => {
     setState("loading");
@@ -5181,6 +5186,11 @@ function ExplainStrip({
       }
       setResult(data as ExplainResult);
       setState("result");
+      if (!(data as ExplainResult).fromCache) {
+        const next = Math.min(3, loadExplainUses() + 1);
+        saveExplainUses(next);
+        setExplainUses(next);
+      }
     } catch {
       setErrorText("Couldn't explain this response, try again.");
       setState("error");
@@ -5256,6 +5266,18 @@ function ExplainStrip({
             >
               Who it&rsquo;s for, what it does, and an idea to build with it.
             </span>
+            {explainUses > 0 && explainUses < 3 && (
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 12,
+                  letterSpacing: "-0.3px",
+                  color: "#939393",
+                }}
+              >
+                {3 - explainUses} of 3 left today
+              </span>
+            )}
           </div>
           {state === "loading" ? (
             <motion.span

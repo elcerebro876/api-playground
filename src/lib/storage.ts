@@ -83,6 +83,35 @@ export type CardTestRecord = {
 };
 export type CardTestMap = Record<string, CardTestRecord>;
 
+const EXPLAIN_USES_KEY = "api-playground-explain-uses";
+
+function explainDayKey(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
+
+export function loadExplainUses(now: Date = new Date()): number {
+  try {
+    const raw = window.localStorage.getItem(EXPLAIN_USES_KEY);
+    if (!raw) return 0;
+    const parsed = JSON.parse(raw) as { day?: unknown; count?: unknown };
+    if (parsed.day !== explainDayKey(now)) return 0;
+    return typeof parsed.count === "number" && parsed.count > 0
+      ? Math.floor(parsed.count)
+      : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function saveExplainUses(count: number, now: Date = new Date()): void {
+  try {
+    window.localStorage.setItem(
+      EXPLAIN_USES_KEY,
+      JSON.stringify({ day: explainDayKey(now), count: Math.max(0, count) }),
+    );
+  } catch { /* storage unavailable - silent fallback */ }
+}
+
 const DIAGNOSIS_USES_KEY = "api-playground-diagnosis-uses";
 
 export function loadDiagnosisUses(): number {

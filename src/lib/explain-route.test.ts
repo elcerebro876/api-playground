@@ -4,6 +4,7 @@ import { handleExplain, sectionsLeakValues } from "@/lib/explain-route";
 import type { CachedExplain } from "@/lib/explain-cache";
 import type { ExplainModelInput, ExplainSections } from "@/lib/explain";
 import type { RateLimitResult } from "@/lib/rate-limit";
+import { EXPLAIN_DAILY_MAX_PER_IP, explainGlobalDailyMax } from "@/lib/rate-limit";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
 
@@ -38,6 +39,8 @@ function deps(overrides: {
   cache?: Map<string, CachedExplain>;
   generate?: (input: ExplainModelInput) => Promise<ExplainSections>;
   burst?: RateLimitResult;
+  daily?: RateLimitResult;
+  global?: RateLimitResult;
 } = {}) {
   const cache = overrides.cache ?? new Map<string, CachedExplain>();
   const clock = overrides.clock ?? { now: T0 };
@@ -46,14 +49,32 @@ function deps(overrides: {
     what: "It lists catalogue items with a page of results.",
     build: "A small inventory dashboard.",
   };
-  const calls = { generate: 0, put: 0 };
+  const calls = { generate: 0, put: 0, daily: 0, global: 0 };
+  const order: string[] = [];
   return {
     calls,
     clock,
     cache,
+    order,
     deps: {
-      burstLimit: async () => overrides.burst ?? { ok: true as const, remaining: 1 },
-      cacheGet: async (key: string) => cache.get(key) ?? null,
+      burstLimit: async () => {
+        order.push("burst");
+        return overrides.burst ?? { ok: true as const, remaining: 1 };
+      },
+      dailyLimit: async () => {
+        calls.daily += 1;
+        order.push("daily");
+        return overrides.daily ?? { ok: true as const, remaining: 2 };
+      },
+      globalLimit: async () => {
+        calls.global += 1;
+        order.push("global");
+        return overrides.global ?? { ok: true as const, remaining: 99 };
+      },
+      cacheGet: async (key: string) => {
+        order.push("cacheGet");
+        return cache.get(key) ?? null;
+      },
       cachePut: async (key: string, value: ExplainSections, ttlSecs: number) => {
         calls.put += 1;
         cache.set(key, {
@@ -66,6 +87,7 @@ function deps(overrides: {
         overrides.generate ??
         (async () => {
           calls.generate += 1;
+          order.push("generate");
           return sections;
         }),
       aiConfigured: () => true,
@@ -201,12 +223,17 @@ test("burst limits and missing AI configuration return fixed failures", async ()
   );
   assert.equal(limited.status, 429);
   assert.equal(limited.headers.get("Retry-After"), "30");
+  const limitedJson = (await limited.json()) as Record<string, unknown>;
+  assert.equal(limitedJson.code, "burst");
+  assert.equal(limitedJson.retryAfterSec, 30);
 
-  const unavailable = await handleExplain(
+  const storeDown = deps({ burst: { ok: false, unavailable: true } });
+  const unavailableBurst = await handleExplain(
     makeRequest(basePayload),
-    deps({ burst: { ok: false, unavailable: true } }).deps,
+    storeDown.deps,
   );
-  assert.equal(unavailable.status, 503);
+  assert.equal(unavailableBurst.status, 200);
+  assert.equal(storeDown.calls.generate, 1);
 
   const d = deps();
   const noAI = await handleExplain(makeRequest(basePayload), {
@@ -215,6 +242,95 @@ test("burst limits and missing AI configuration return fixed failures", async ()
   });
   assert.equal(noAI.status, 503);
   assert.equal(d.calls.generate, 0);
+});
+
+test("a fresh model call consumes one daily use and returns the cap", async () => {
+  const d = deps({ daily: { ok: true, remaining: 2 } });
+  const res = await handleExplain(makeRequest(basePayload), d.deps);
+  assert.equal(res.status, 200);
+  const json = (await res.json()) as {
+    cap?: { remaining: number };
+  };
+  assert.equal(json.cap?.remaining, 2);
+  assert.deepEqual(d.order.slice(0, 4), [
+    "burst",
+    "cacheGet",
+    "daily",
+    "global",
+  ]);
+});
+
+test("cache hits are free: no daily or global use", async () => {
+  const d = deps();
+  await handleExplain(makeRequest(basePayload), d.deps);
+  d.order.length = 0;
+  const second = await handleExplain(makeRequest(basePayload), d.deps);
+  assert.equal(second.status, 200);
+  assert.equal(d.calls.daily, 1);
+  assert.equal(d.calls.global, 1);
+  assert.deepEqual(d.order, ["burst", "cacheGet"]);
+});
+
+test("the per-IP daily cap and the global ceiling return distinct 429s", async () => {
+  const daily = await handleExplain(
+    makeRequest(basePayload),
+    deps({ daily: { ok: false, retryAfter: 900 } }).deps,
+  );
+  assert.equal(daily.status, 429);
+  const dailyJson = (await daily.json()) as Record<string, unknown>;
+  assert.equal(dailyJson.code, "cap");
+  assert.equal(dailyJson.scope, "ip");
+  assert.equal(dailyJson.retryAfterSec, 900);
+
+  const global = await handleExplain(
+    makeRequest(basePayload),
+    deps({ global: { ok: false, retryAfter: 3600 } }).deps,
+  );
+  assert.equal(global.status, 429);
+  const globalJson = (await global.json()) as Record<string, unknown>;
+  assert.equal(globalJson.code, "capacity");
+  assert.equal(globalJson.scope, "global");
+  assert.equal(globalJson.retryAfterSec, 3600);
+});
+
+test("daily and global counters fail open when the store is unavailable", async () => {
+  const d = deps({
+    daily: { ok: false, unavailable: true },
+    global: { ok: false, unavailable: true },
+  });
+  const res = await handleExplain(makeRequest(basePayload), d.deps);
+  assert.equal(res.status, 200);
+  assert.equal(d.calls.generate, 1);
+});
+
+test("the daily cap is not consumed when AI is not configured", async () => {
+  const d = deps();
+  const res = await handleExplain(makeRequest(basePayload), {
+    ...d.deps,
+    aiConfigured: () => false,
+  });
+  assert.equal(res.status, 503);
+  assert.equal(d.calls.daily, 0);
+  assert.equal(d.calls.global, 0);
+});
+
+test("the explain global daily max defaults to 100 and honors its env override", () => {
+  const previous = process.env.EXPLAIN_GLOBAL_DAILY_MAX;
+  try {
+    delete process.env.EXPLAIN_GLOBAL_DAILY_MAX;
+    assert.equal(explainGlobalDailyMax(), 100);
+    process.env.EXPLAIN_GLOBAL_DAILY_MAX = "7";
+    assert.equal(explainGlobalDailyMax(), 7);
+    process.env.EXPLAIN_GLOBAL_DAILY_MAX = "0";
+    assert.equal(explainGlobalDailyMax(), 100);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.EXPLAIN_GLOBAL_DAILY_MAX;
+    } else {
+      process.env.EXPLAIN_GLOBAL_DAILY_MAX = previous;
+    }
+  }
+  assert.equal(EXPLAIN_DAILY_MAX_PER_IP, 3);
 });
 
 test("model failures return a fixed error", async () => {

@@ -110,6 +110,7 @@ export type ExplainResult = ExplainSections & {
   createdAt: string;
   ttlSecs: number;
   truncated: boolean;
+  cap?: { remaining: number };
 };
 
 export type ExplainModelInput = {

@@ -6,6 +6,15 @@ const DAILY_MAX_PER_IP = 30;
 
 const DIAGNOSE_DAILY_MAX_DEFAULT = 300;
 
+export const EXPLAIN_DAILY_MAX_PER_IP = 3;
+const EXPLAIN_GLOBAL_DAILY_MAX_DEFAULT = 100;
+
+export function explainGlobalDailyMax(): number {
+  const override = Number(process.env.EXPLAIN_GLOBAL_DAILY_MAX);
+  if (Number.isFinite(override) && override > 0) return Math.floor(override);
+  return EXPLAIN_GLOBAL_DAILY_MAX_DEFAULT;
+}
+
 // Global daily ceiling across ALL clients, so total model spend is bounded even
 // when many distinct IPs appear. The value is derived in code (never baked into
 // SQL): DIAGNOSE_GLOBAL_DAILY_MAX wins when set, otherwise ten times the per-IP

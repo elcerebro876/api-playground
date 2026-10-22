@@ -17,7 +17,15 @@ import {
   explainCachePut,
   type CachedExplain,
 } from "@/lib/explain-cache";
-import { clientIp, hashKey, rateLimit, type RateLimitResult } from "@/lib/rate-limit";
+import {
+  EXPLAIN_DAILY_MAX_PER_IP,
+  clientIp,
+  consumeGlobalDaily,
+  explainGlobalDailyMax,
+  hashKey,
+  rateLimit,
+  type RateLimitResult,
+} from "@/lib/rate-limit";
 import { captureServerError } from "@/lib/error-reporter";
 import { maskErrorForReport, maskUrlSecrets } from "@/lib/diagnose";
 
@@ -34,6 +42,8 @@ type ExplainPayloadInput = {
 
 export type ExplainRouteDeps = {
   burstLimit?: (request: Request) => Promise<RateLimitResult>;
+  dailyLimit?: (request: Request) => Promise<RateLimitResult>;
+  globalLimit?: () => Promise<RateLimitResult>;
   cacheGet?: (key: string) => Promise<CachedExplain | null>;
   cachePut?: (
     key: string,
@@ -45,8 +55,24 @@ export type ExplainRouteDeps = {
   now?: () => number;
 };
 
+const MODEL_BURST_MAX = 1_000_000;
+
 function defaultBurstLimit(request: Request): Promise<RateLimitResult> {
   return hashKey("explain", clientIp(request)).then((key) => rateLimit(key));
+}
+
+function defaultDailyLimit(request: Request): Promise<RateLimitResult> {
+  return hashKey("explain-model", clientIp(request)).then((key) =>
+    rateLimit(key, {
+      burstMax: MODEL_BURST_MAX,
+      burstWindowSecs: 10 * 60,
+      dailyMax: EXPLAIN_DAILY_MAX_PER_IP,
+    }),
+  );
+}
+
+function defaultGlobalLimit(): Promise<RateLimitResult> {
+  return consumeGlobalDaily("explain", explainGlobalDailyMax());
 }
 
 function collectLeakValues(value: unknown, out: Set<string>): void {
@@ -103,19 +129,21 @@ export async function handleExplain(
   const generate = deps.generate ?? generateExplainSections;
   const cacheGet = deps.cacheGet ?? explainCacheGet;
   const cachePut = deps.cachePut ?? explainCachePut;
+  const dailyLimit = deps.dailyLimit ?? defaultDailyLimit;
+  const globalLimit = deps.globalLimit ?? defaultGlobalLimit;
 
   const burst = await (deps.burstLimit ?? defaultBurstLimit)(request);
   if (!burst.ok) {
     if ("retryAfter" in burst) {
       return Response.json(
-        { error: "Too many requests, try again later" },
+        {
+          error: "Too many requests, try again later",
+          code: "burst",
+          retryAfterSec: burst.retryAfter,
+        },
         { status: 429, headers: { "Retry-After": String(burst.retryAfter) } },
       );
     }
-    return Response.json(
-      { error: "Explanations aren't available right now." },
-      { status: 503 },
-    );
   }
 
   let payload: ExplainPayloadInput;
@@ -218,6 +246,37 @@ export async function handleExplain(
     );
   }
 
+  let capRemaining: number | undefined;
+  const daily = await dailyLimit(request);
+  if (!daily.ok) {
+    if ("retryAfter" in daily) {
+      return Response.json(
+        {
+          error: "You've used your 3 free explanations today.",
+          code: "cap",
+          scope: "ip",
+          retryAfterSec: daily.retryAfter,
+        },
+        { status: 429, headers: { "Retry-After": String(daily.retryAfter) } },
+      );
+    }
+  } else {
+    capRemaining = daily.remaining;
+  }
+
+  const global = await globalLimit();
+  if (!global.ok && "retryAfter" in global) {
+    return Response.json(
+      {
+        error: "Explanations are at capacity today. Try again tomorrow.",
+        code: "capacity",
+        scope: "global",
+        retryAfterSec: global.retryAfter,
+      },
+      { status: 429, headers: { "Retry-After": String(global.retryAfter) } },
+    );
+  }
+
   let sections: ExplainSections;
   try {
     sections = await generate({
@@ -247,6 +306,9 @@ export async function handleExplain(
     ttlSecs: EXPLAIN_TTL_SECS,
     truncated,
   };
+  if (capRemaining !== undefined) {
+    result.cap = { remaining: capRemaining };
+  }
 
   if (cacheKey && !sectionsLeakValues(sections, body)) {
     await cachePut(cacheKey, sections, EXPLAIN_TTL_SECS);
