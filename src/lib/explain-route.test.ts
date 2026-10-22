@@ -5,6 +5,7 @@ import type { CachedExplain } from "@/lib/explain-cache";
 import type { ExplainModelInput, ExplainSections } from "@/lib/explain";
 import type { RateLimitResult } from "@/lib/rate-limit";
 import { EXPLAIN_DAILY_MAX_PER_IP, explainGlobalDailyMax } from "@/lib/rate-limit";
+import { structureSignature } from "@/lib/explain-key";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
 
@@ -151,6 +152,51 @@ test("a secret query key also disables caching", async () => {
   assert.equal(res.status, 200);
   assert.equal(d.calls.put, 0);
   assert.equal(d.cache.size, 0);
+});
+
+test("a 16 KiB slice that cuts JSON is explained from the supplied structure", async () => {
+  const full = JSON.stringify({
+    items: Array.from({ length: 3000 }, (_, i) => ({
+      id: i,
+      name: `Item ${i}`,
+    })),
+  });
+  const slice = full.slice(0, 16 * 1024);
+  let seen!: ExplainModelInput;
+  const d = deps({
+    generate: async (input) => {
+      seen = input;
+      return { who: "a", what: "b", build: "c" };
+    },
+  });
+  const res = await handleExplain(
+    makeRequest({
+      ...basePayload,
+      body: slice,
+      structure: structureSignature(JSON.parse(full)),
+      truncated: true,
+    }),
+    d.deps,
+  );
+  assert.equal(res.status, 200);
+  assert.equal(seen.structure, "items[]|items[].id:n|items[].name:s");
+  assert.equal(seen.truncated, true);
+  assert.equal(d.calls.put, 0);
+  assert.equal(d.cache.size, 0);
+});
+
+test("a cut JSON slice without a structure is still rejected", async () => {
+  const d = deps();
+  const res = await handleExplain(
+    makeRequest({
+      ...basePayload,
+      body: '{"items":[{"id":1}',
+    }),
+    d.deps,
+  );
+  assert.equal(res.status, 400);
+  assert.equal(d.calls.generate, 0);
+  assert.equal(d.calls.daily, 0);
 });
 
 test("the model never receives raw URLs or response values", async () => {

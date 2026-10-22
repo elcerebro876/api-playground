@@ -21,6 +21,7 @@ import { Sparkle } from "@/components/icons";
 import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, loadExplainUses, saveExplainUses, type HistoryEntry } from "@/lib/storage";
 import type { ExplainResult } from "@/lib/explain";
 import { isExplainEligible, EXPLAIN_INPUT_LIMIT } from "@/lib/explain-eligibility";
+import { structureSignature } from "@/lib/explain-key";
 import { buildCandidates, type Candidate } from "@/lib/explain-candidates";
 import { DIAGNOSIS_MAX_USES, SECRET_HEADER_RE, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed, track } from "@/lib/posthog";
@@ -5155,6 +5156,12 @@ function ExplainStrip({
     setResult(null);
     setErrorText("");
     const startedAt = Date.now();
+    let structure = "";
+    try {
+      structure = structureSignature(JSON.parse(body));
+    } catch {
+      structure = "";
+    }
     track({
       name: "explain_started",
       properties: {
@@ -5176,6 +5183,7 @@ function ExplainStrip({
           contentType: contentType ?? "",
           truncated,
           credentialed,
+          structure,
         }),
       });
       let data: unknown = null;

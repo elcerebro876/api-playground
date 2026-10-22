@@ -6,6 +6,7 @@ export type ExplainEligibilityInput = {
   headers?: Record<string, string>;
   isBinary?: boolean;
   truncated?: boolean;
+  structure?: string;
   error?: string;
 };
 
@@ -52,6 +53,9 @@ export function isExplainEligible(
   try {
     parsed = JSON.parse(body);
   } catch {
+    if (resp.structure?.trim()) {
+      return { ok: true, truncated: resp.truncated === true };
+    }
     return { ok: false, reason: "json" };
   }
   if (parsed === null || typeof parsed !== "object") {

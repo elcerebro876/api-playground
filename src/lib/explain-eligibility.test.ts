@@ -112,3 +112,23 @@ test("a truncated 2xx JSON response is eligible and reports truncation", () => {
     { ok: true, truncated: true },
   );
 });
+
+test("an unparseable 16 KiB slice is eligible when its structure is supplied", () => {
+  assert.deepEqual(
+    isExplainEligible({
+      status: 200,
+      headers: jsonHeaders,
+      body: '{"items":[{"id":"1","name":"a"},{"id":"2"',
+      structure: "items[]|items[].id:s|items[].name:s",
+    }),
+    { ok: true, truncated: false },
+  );
+  assert.equal(
+    isExplainEligible({
+      status: 200,
+      headers: jsonHeaders,
+      body: '{"items":[{"id":"1","name":"a"},{"id":"2"',
+    }).ok,
+    false,
+  );
+});

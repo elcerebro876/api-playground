@@ -38,6 +38,7 @@ type ExplainPayloadInput = {
   contentType?: unknown;
   truncated?: unknown;
   credentialed?: unknown;
+  structure?: unknown;
 };
 
 export type ExplainRouteDeps = {
@@ -56,9 +57,18 @@ export type ExplainRouteDeps = {
 };
 
 const MODEL_BURST_MAX = 1_000_000;
+const EXPLAIN_BURST_MAX = 12;
+const EXPLAIN_BURST_WINDOW_SECS = 10 * 60;
+const STRUCTURE_LIMIT = 4096;
 
 function defaultBurstLimit(request: Request): Promise<RateLimitResult> {
-  return hashKey("explain", clientIp(request)).then((key) => rateLimit(key));
+  return hashKey("explain", clientIp(request)).then((key) =>
+    rateLimit(key, {
+      burstMax: EXPLAIN_BURST_MAX,
+      burstWindowSecs: EXPLAIN_BURST_WINDOW_SECS,
+      dailyMax: MODEL_BURST_MAX,
+    }),
+  );
 }
 
 function defaultDailyLimit(request: Request): Promise<RateLimitResult> {
@@ -174,6 +184,12 @@ export async function handleExplain(
   const contentType = (
     typeof payload.contentType === "string" ? payload.contentType : ""
   ).trim();
+  const clientStructure = (
+    typeof payload.structure === "string" ? payload.structure : ""
+  )
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .trim()
+    .slice(0, STRUCTURE_LIMIT);
 
   if (!endpointUrl) {
     return Response.json({ error: "Missing url" }, { status: 400 });
@@ -192,6 +208,7 @@ export async function handleExplain(
       "content-type": contentType || "application/json",
     },
     truncated,
+    structure: clientStructure,
   });
   if (!eligibility.ok) {
     return Response.json(
@@ -236,15 +253,23 @@ export async function handleExplain(
     );
   }
 
-  let parsedBody: unknown;
+  let parsedBody: unknown = null;
+  let bodyParsed = false;
   try {
     parsedBody = JSON.parse(body);
+    bodyParsed = true;
   } catch {
+    bodyParsed = false;
+  }
+  if (!bodyParsed && !clientStructure) {
     return Response.json(
       { error: "This response can't be explained." },
       { status: 400 },
     );
   }
+  const structure = bodyParsed
+    ? structureSignature(parsedBody)
+    : clientStructure;
 
   let capRemaining: number | undefined;
   const daily = await dailyLimit(request);
@@ -285,7 +310,7 @@ export async function handleExplain(
       endpointUrl: maskUrlSecrets(endpointUrl),
       status,
       contentType: contentTypeFamily(effectiveContentType),
-      structure: structureSignature(parsedBody),
+      structure,
       truncated,
     });
   } catch (e) {
@@ -310,7 +335,7 @@ export async function handleExplain(
     result.cap = { remaining: capRemaining };
   }
 
-  if (cacheKey && !sectionsLeakValues(sections, body)) {
+  if (cacheKey && bodyParsed && !sectionsLeakValues(sections, body)) {
     await cachePut(cacheKey, sections, EXPLAIN_TTL_SECS);
   }
 
