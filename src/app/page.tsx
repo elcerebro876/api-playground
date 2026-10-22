@@ -21,6 +21,7 @@ import { Sparkle } from "@/components/icons";
 import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, type HistoryEntry } from "@/lib/storage";
 import type { ExplainPayload } from "@/lib/explain";
 import { isExplainEligible } from "@/lib/explain-eligibility";
+import { buildCandidates, type Candidate } from "@/lib/explain-candidates";
 import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed } from "@/lib/posthog";
 import {
@@ -146,7 +147,7 @@ export default function Home() {
     error?: string;
     isBinary?: boolean;
     truncated?: boolean;
-    request?: { method: string; url: string };
+    request?: { method: string; url: string; key?: number };
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -309,7 +310,7 @@ export default function Home() {
         time: item.time ?? undefined,
         body: item.responseBody,
         headers: item.responseHeaders,
-        request: { method: item.method, url: item.url },
+        request: { method: item.method, url: item.url, key: responseKey },
       });
       setHeadersFilter("common");
     }
@@ -327,7 +328,7 @@ export default function Home() {
         time: item.time ?? undefined,
         body: item.responseBody,
         headers: item.responseHeaders,
-        request: { method: item.method, url: item.url },
+        request: { method: item.method, url: item.url, key: responseKey },
       });
       setHeadersFilter("common");
     }
@@ -546,7 +547,7 @@ export default function Home() {
         const data = await res.json();
         if (!opts?.apiName) {
           setResponseKey((k) => k + 1);
-          setResponse({ ...data, request: { method: m, url: u } });
+          setResponse({ ...data, request: { method: m, url: u, key: responseKey + 1 } });
           setHeadersFilter("common");
           if (isProxyErrorEnvelope(data)) {
             handleProxyError(data);
@@ -561,7 +562,7 @@ export default function Home() {
         }
         if (opts?.apiName && !opts?.suppressExplain) {
           setResponseKey((k) => k + 1);
-          setResponse({ ...data, request: { method: m, url: u } });
+          setResponse({ ...data, request: { method: m, url: u, key: responseKey + 1 } });
           setHeadersFilter("common");
           if (isProxyErrorEnvelope(data)) {
             handleProxyError(data);
@@ -699,6 +700,7 @@ export default function Home() {
     [
       method,
       url,
+      responseKey,
       headerKey,
       headerBearer,
       headerValue,
@@ -5072,9 +5074,15 @@ type ExplainStripState =
 function ExplainStrip({
   isDark,
   truncated,
+  candidates,
+  chipsDisabled,
+  onPick,
 }: {
   isDark: boolean;
   truncated: boolean;
+  candidates: Candidate[];
+  chipsDisabled: boolean;
+  onPick: (candidate: Candidate) => void;
 }) {
   const [state, setState] = useState<ExplainStripState>("idle");
   useEffect(() => {
@@ -5260,6 +5268,63 @@ function ExplainStrip({
           >
             {skeletonLine(120)}
           </div>
+          {candidates.length > 0 && (
+            <div
+              style={{
+                borderTop: isDark ? "0.8px solid #242424" : "0.8px solid #f2f2f2",
+                paddingTop: 10,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  letterSpacing: "-0.3px",
+                  color: sectionLabel,
+                }}
+              >
+                Try this next
+              </span>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {candidates.map((candidate) => (
+                  <button
+                    key={candidate.id}
+                    type="button"
+                    disabled={chipsDisabled}
+                    onClick={() => onPick(candidate)}
+                    style={{
+                      maxWidth: "100%",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      border: isDark
+                        ? "0.8px solid #2d2d2d"
+                        : "0.8px solid #e8e8e8",
+                      borderRadius: 6,
+                      padding: "5px 8px",
+                      backgroundColor: isDark ? "#161616" : "#f7f7f7",
+                      color: chipsDisabled
+                        ? "#939393"
+                        : isDark
+                          ? "#d1d1d1"
+                          : "#5a5a5a",
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 12,
+                      letterSpacing: "-0.2px",
+                      cursor: chipsDisabled ? "default" : "pointer",
+                      opacity: chipsDisabled ? 0.55 : 1,
+                    }}
+                  >
+                    {candidate.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
       {state === "unavailable" && (
@@ -5356,7 +5421,7 @@ function MainContent({
     error?: string;
     isBinary?: boolean;
     truncated?: boolean;
-    request?: { method: string; url: string };
+    request?: { method: string; url: string; key?: number };
   } | null;
   loading: boolean;
   onSend: (opts?: {
@@ -5445,6 +5510,22 @@ function MainContent({
     ? jsonBodyRequired(response?.body as string | undefined)
     : false;
   const explainEligibility = isExplainEligible(response);
+  const explainCandidates = useMemo(() => {
+    const snapshot = response?.request;
+    if (!snapshot || !response?.body) return [];
+    return buildCandidates({
+      requestUrl: snapshot.url,
+      method: snapshot.method,
+      body: response.body,
+      responseHeaders: response.headers,
+    });
+  }, [response]);
+  const chipsDisabled =
+    loading ||
+    !response?.request ||
+    response.request.method !== method ||
+    response.request.url !== url ||
+    (response.request.key != null && response.request.key !== responseKey);
   const urlHighlightSignal =
     diagState === "result" && diag?.highlightUrl && !needsJsonBody ? diag : null;
   const openStagedFix = () => {
@@ -5534,6 +5615,17 @@ function MainContent({
       to: pathnameOf(diag.urlFix.to),
     });
     setAppliedUrlFix(diag);
+    setFocusSignal((n) => n + 1);
+  };
+  const handleCandidatePick = (candidate: Candidate) => {
+    if (chipsDisabled) return;
+    const from = response?.request?.url ?? url;
+    setUrl(candidate.url);
+    setMethod("GET");
+    setPendingUrlSwitch({
+      from: pathnameOf(from),
+      to: pathnameOf(candidate.url),
+    });
     setFocusSignal((n) => n + 1);
   };
   const startFixing = () => {
@@ -7525,6 +7617,9 @@ function MainContent({
                         <ExplainStrip
                           isDark={isDark}
                           truncated={explainEligibility.truncated}
+                          candidates={explainCandidates}
+                          chipsDisabled={chipsDisabled}
+                          onPick={handleCandidatePick}
                         />
                       )}{" "}
                       {diagState !== "idle" && (
