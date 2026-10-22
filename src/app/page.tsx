@@ -20,6 +20,7 @@ import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
 import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, type HistoryEntry } from "@/lib/storage";
 import type { ExplainPayload } from "@/lib/explain";
+import { isExplainEligible } from "@/lib/explain-eligibility";
 import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed } from "@/lib/posthog";
 import {
@@ -144,6 +145,8 @@ export default function Home() {
     body?: string;
     error?: string;
     isBinary?: boolean;
+    truncated?: boolean;
+    request?: { method: string; url: string };
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -306,6 +309,7 @@ export default function Home() {
         time: item.time ?? undefined,
         body: item.responseBody,
         headers: item.responseHeaders,
+        request: { method: item.method, url: item.url },
       });
       setHeadersFilter("common");
     }
@@ -323,6 +327,7 @@ export default function Home() {
         time: item.time ?? undefined,
         body: item.responseBody,
         headers: item.responseHeaders,
+        request: { method: item.method, url: item.url },
       });
       setHeadersFilter("common");
     }
@@ -541,7 +546,7 @@ export default function Home() {
         const data = await res.json();
         if (!opts?.apiName) {
           setResponseKey((k) => k + 1);
-          setResponse(data);
+          setResponse({ ...data, request: { method: m, url: u } });
           setHeadersFilter("common");
           if (isProxyErrorEnvelope(data)) {
             handleProxyError(data);
@@ -556,7 +561,7 @@ export default function Home() {
         }
         if (opts?.apiName && !opts?.suppressExplain) {
           setResponseKey((k) => k + 1);
-          setResponse(data);
+          setResponse({ ...data, request: { method: m, url: u } });
           setHeadersFilter("common");
           if (isProxyErrorEnvelope(data)) {
             handleProxyError(data);
@@ -5057,6 +5062,232 @@ function StagedFixEditor({
   );
 }
 
+type ExplainStripState =
+  | "idle"
+  | "loading"
+  | "result"
+  | "unavailable"
+  | "capReached";
+
+function ExplainStrip({
+  isDark,
+  truncated,
+}: {
+  isDark: boolean;
+  truncated: boolean;
+}) {
+  const [state, setState] = useState<ExplainStripState>("idle");
+  useEffect(() => {
+    if (state !== "loading") return;
+    const timer = setTimeout(() => setState("result"), 650);
+    return () => clearTimeout(timer);
+  }, [state]);
+
+  const titleColor = isDark ? "#ffffff" : "#222222";
+  const skeletonColor = isDark ? "#262626" : "#ededed";
+  const sectionLabel = isDark ? "#b8b8b8" : "#6f6f6f";
+
+  const skeletonLine = (width: number | string) => (
+    <div
+      className="animate-pulse"
+      style={{
+        height: 8,
+        width,
+        borderRadius: 4,
+        backgroundColor: skeletonColor,
+      }}
+    />
+  );
+
+  return (
+    <div
+      style={{
+        margin: "4px 12px 0",
+        borderRadius: 8,
+        backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
+        border: isDark ? "0.8px solid #2d2d2d" : "0.8px solid #f2f2f2",
+        padding: 12,
+        boxSizing: "border-box",
+      }}
+    >
+      {(state === "idle" || state === "loading") && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 10,
+          }}
+        >
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: isDark ? "#181818" : "#f5f5ff",
+              flexShrink: 0,
+            }}
+          >
+            <Sparkle size={16} color="#5A5AFF" />
+          </div>
+          <div
+            style={{
+              flex: "1 1 220px",
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 14,
+                fontWeight: 500,
+                letterSpacing: "-0.4px",
+                color: titleColor,
+              }}
+            >
+              Want this explained?
+            </span>
+            <span
+              style={{
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 12,
+                letterSpacing: "-0.3px",
+                color: "#939393",
+                overflowWrap: "anywhere",
+              }}
+            >
+              Who it&rsquo;s for, what it does, and an idea to build with it.
+            </span>
+          </div>
+          {state === "loading" ? (
+            <motion.span
+              aria-label="Analyzing"
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                border: "2px solid #d9d9d9",
+                borderTopColor: "#5A5AFF",
+                flexShrink: 0,
+                marginRight: 4,
+              }}
+            />
+          ) : (
+            <RippleButton
+              className="transition-colors hover:bg-[#4a4aff]"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: 28,
+                padding: "0 8px",
+                borderRadius: 6,
+                backgroundColor: "#5A5AFF",
+                color: "#ffffff",
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 12,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+              onClick={() => setState("loading")}
+            >
+              Analyze now
+            </RippleButton>
+          )}
+        </div>
+      )}
+      {state === "result" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Sparkle size={14} color="#5A5AFF" />
+            <span
+              style={{
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 14,
+                fontWeight: 500,
+                letterSpacing: "-0.4px",
+                color: titleColor,
+              }}
+            >
+              Explained
+            </span>
+          </div>
+          {truncated && (
+            <span
+              style={{
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 12,
+                letterSpacing: "-0.3px",
+                color: "#939393",
+              }}
+            >
+              Response was truncated; the explanation may be incomplete.
+            </span>
+          )}
+          {["Who it's for", "What it does", "Build idea"].map((label) => (
+            <div
+              key={label}
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  letterSpacing: "-0.3px",
+                  color: sectionLabel,
+                }}
+              >
+                {label}
+              </span>
+              {skeletonLine("92%")}
+              {skeletonLine("68%")}
+            </div>
+          ))}
+          <div
+            style={{
+              borderTop: isDark ? "0.8px solid #242424" : "0.8px solid #f2f2f2",
+              paddingTop: 9,
+            }}
+          >
+            {skeletonLine(120)}
+          </div>
+        </div>
+      )}
+      {state === "unavailable" && (
+        <span
+          style={{
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 13,
+            color: "#939393",
+          }}
+        >
+          Explanations aren&rsquo;t available right now.
+        </span>
+      )}
+      {state === "capReached" && (
+        <span
+          style={{
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 13,
+            color: "#939393",
+          }}
+        >
+          You&rsquo;ve used your 3 free explanations today.
+        </span>
+      )}
+    </div>
+  );
+}
+
 function MainContent({
   activeTheme,
   method,
@@ -5124,6 +5355,8 @@ function MainContent({
     body?: string;
     error?: string;
     isBinary?: boolean;
+    truncated?: boolean;
+    request?: { method: string; url: string };
   } | null;
   loading: boolean;
   onSend: (opts?: {
@@ -5211,6 +5444,7 @@ function MainContent({
   const needsJsonBody = !response?.error
     ? jsonBodyRequired(response?.body as string | undefined)
     : false;
+  const explainEligibility = isExplainEligible(response);
   const urlHighlightSignal =
     diagState === "result" && diag?.highlightUrl && !needsJsonBody ? diag : null;
   const openStagedFix = () => {
@@ -7286,6 +7520,12 @@ function MainContent({
                             contentType={response.headers?.["content-type"]}
                           />{" "}
                         </motion.div>
+                      )}{" "}
+                      {!isDiscovery && explainEligibility.ok && (
+                        <ExplainStrip
+                          isDark={isDark}
+                          truncated={explainEligibility.truncated}
+                        />
                       )}{" "}
                       {diagState !== "idle" && (
                         <motion.div
