@@ -23,7 +23,8 @@ import type { ExplainResult } from "@/lib/explain";
 import { isExplainEligible, EXPLAIN_INPUT_LIMIT } from "@/lib/explain-eligibility";
 import { buildCandidates, type Candidate } from "@/lib/explain-candidates";
 import { DIAGNOSIS_MAX_USES, SECRET_HEADER_RE, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
-import { trackToolUsed } from "@/lib/posthog";
+import { trackToolUsed, track } from "@/lib/posthog";
+import { formatFreshness } from "@/lib/explain-freshness";
 import {
   isProxyErrorEnvelope,
   proxyErrorCopy,
@@ -5102,6 +5103,7 @@ type ExplainStripState =
   | "result"
   | "unavailable"
   | "capReached"
+  | "capacity"
   | "error";
 
 function ExplainStrip({
@@ -5152,6 +5154,15 @@ function ExplainStrip({
     setState("loading");
     setResult(null);
     setErrorText("");
+    const startedAt = Date.now();
+    track({
+      name: "explain_started",
+      properties: {
+        credentialed,
+        truncated,
+        has_candidates: candidates.length > 0,
+      },
+    });
     try {
       const res = await fetch("/api/explain", {
         method: "POST",
@@ -5175,7 +5186,22 @@ function ExplainStrip({
       }
       if (!res.ok) {
         if (res.status === 429) {
-          setState("capReached");
+          const failure = (data ?? {}) as {
+            code?: string;
+            retryAfterSec?: number;
+          };
+          if (failure.code === "cap" || failure.code === "capacity") {
+            const scope = failure.code === "capacity" ? "global" : "ip";
+            track({
+              name: "explain_cap_reached",
+              properties: { scope },
+            });
+            setState(scope === "global" ? "capacity" : "capReached");
+          } else {
+            const secs = Math.max(1, failure.retryAfterSec ?? 1);
+            setErrorText(`Too many requests, try again in ${secs}s.`);
+            setState("error");
+          }
         } else if (res.status === 503) {
           setState("unavailable");
         } else {
@@ -5184,9 +5210,18 @@ function ExplainStrip({
         }
         return;
       }
-      setResult(data as ExplainResult);
+      const explained = data as ExplainResult;
+      setResult(explained);
       setState("result");
-      if (!(data as ExplainResult).fromCache) {
+      track({
+        name: "explain_completed",
+        properties: {
+          from_cache: explained.fromCache,
+          latency_ms: Date.now() - startedAt,
+          candidate_count: candidates.length,
+        },
+      });
+      if (!explained.fromCache) {
         const next = Math.min(3, loadExplainUses() + 1);
         saveExplainUses(next);
         setExplainUses(next);
@@ -5474,6 +5509,30 @@ function ExplainStrip({
               </div>
             </div>
           )}
+          {result && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 11,
+                  letterSpacing: "-0.2px",
+                  color: "#939393",
+                }}
+              >
+                {formatFreshness(result.createdAt, result.fromCache)}
+              </span>
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 11,
+                  letterSpacing: "-0.2px",
+                  color: "#939393",
+                }}
+              >
+                AI-generated from this response. It can be wrong.
+              </span>
+            </div>
+          )}
         </div>
       )}
       {state === "unavailable" && (
@@ -5496,6 +5555,17 @@ function ExplainStrip({
           }}
         >
           You&rsquo;ve used your 3 free explanations today.
+        </span>
+      )}
+      {state === "capacity" && (
+        <span
+          style={{
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 13,
+            color: "#939393",
+          }}
+        >
+          Explanations are at capacity today. Try again tomorrow.
         </span>
       )}
       {state === "error" && (
@@ -5810,6 +5880,16 @@ function MainContent({
   };
   const handleCandidatePick = (candidate: Candidate) => {
     if (chipsDisabled) return;
+    track({
+      name: "try_next_clicked",
+      properties: {
+        source: candidate.source,
+        position: Math.max(
+          0,
+          explainCandidates.findIndex((c) => c.id === candidate.id),
+        ),
+      },
+    });
     const from = response?.request?.url ?? url;
     setUrl(candidate.url);
     setMethod("GET");
