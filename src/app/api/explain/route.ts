@@ -3,7 +3,7 @@ import { generateExplanation } from "@/lib/explain";
 import { isAIConfigured } from "@/lib/ai";
 import { clientIp, hashKey, rateLimit } from "@/lib/rate-limit";
 import { captureServerError } from "@/lib/error-reporter";
-import { maskErrorForReport } from "@/lib/diagnose";
+import { maskErrorForReport, maskSensitiveStrings, maskUrlSecrets } from "@/lib/diagnose";
 
 // Cheap deterministic signature of the request so cached explanations are not
 // reused across requests that produced different responses (e.g. different
@@ -67,7 +67,9 @@ export async function POST(request: Request) {
     try {
       const { data, error } = await client
         .from("explanations")
-        .select("*")
+        .select(
+          "id, call_count, target_users, problem_solved, request_action, expected_outcome, build_idea",
+        )
         .eq("endpoint_url", cacheKey)
         .maybeSingle();
       if (error) throw error;
@@ -79,7 +81,13 @@ export async function POST(request: Request) {
             last_requested_at: new Date().toISOString(),
           })
           .eq("id", data.id);
-        return Response.json({ ...data, fromCache: true });
+        return Response.json({
+          target_users: data.target_users,
+          problem_solved: data.problem_solved,
+          request_action: data.request_action,
+          expected_outcome: data.expected_outcome,
+          build_idea: data.build_idea,
+        });
       }
     } catch {
       // DB query failed: fall through to the model call rather than failing outright.
@@ -100,9 +108,9 @@ export async function POST(request: Request) {
   try {
     explanation = await generateExplanation({
       apiName,
-      endpointUrl,
+      endpointUrl: maskUrlSecrets(endpointUrl),
       status,
-      responseBody,
+      responseBody: maskSensitiveStrings(responseBody),
     });
   } catch (e) {
     const safe = maskErrorForReport(e);

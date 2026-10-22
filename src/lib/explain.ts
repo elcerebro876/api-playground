@@ -1,4 +1,7 @@
 import { callAIJson } from "@/lib/ai";
+import { maskSensitiveStrings, maskUrlSecrets } from "@/lib/diagnose";
+
+export const EXPLAIN_BODY_LIMIT = 6000;
 
 export type ExplainPayload = {
   target_users: string;
@@ -39,21 +42,29 @@ export function parseExplanation(text: string): ExplainPayload | null {
   };
 }
 
-export async function generateExplanation(opts: {
+// Builds the model prompt with the request URL and response body masked first
+// (defense in depth: the route also masks before calling). Only the masked and
+// length-capped body ever reaches the provider.
+export function buildExplainPrompt(opts: {
   apiName: string;
   endpointUrl: string;
   responseBody: string;
   status: number;
-}): Promise<ExplainPayload> {
+}): string {
   const { apiName, endpointUrl, responseBody, status } = opts;
+  const maskedUrl = maskUrlSecrets(endpointUrl);
+  const maskedBody = maskSensitiveStrings(responseBody).slice(
+    0,
+    EXPLAIN_BODY_LIMIT,
+  );
 
-  const prompt = [
+  return [
     'You explain HTTP responses from one API in plain, useful terms.',
     `API: ${apiName}`,
-    `Endpoint: ${endpointUrl}`,
+    `Endpoint: ${maskedUrl}`,
     `HTTP status: ${status}`,
     "Response body:",
-    responseBody.slice(0, 6000) || "(empty response)",
+    maskedBody || "(empty response)",
     "",
     "Return STRICT JSON with exactly these 5 string fields. Each value must be one short sentence (under 40 words):",
     '- target_users: who would realistically use this API/data',
@@ -62,6 +73,15 @@ export async function generateExplanation(opts: {
     '- expected_outcome: what the response indicates happened (ground it in the actual fields returned above)',
     '- build_idea: a concrete app or product idea that could use fields from THIS response',
   ].join("\n");
+}
+
+export async function generateExplanation(opts: {
+  apiName: string;
+  endpointUrl: string;
+  responseBody: string;
+  status: number;
+}): Promise<ExplainPayload> {
+  const prompt = buildExplainPrompt(opts);
 
   const text = await callAIJson(prompt, {
     temperature: 0.4,
