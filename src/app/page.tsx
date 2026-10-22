@@ -19,10 +19,10 @@ import {
 import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
 import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, type HistoryEntry } from "@/lib/storage";
-import type { ExplainPayload } from "@/lib/explain";
-import { isExplainEligible } from "@/lib/explain-eligibility";
+import type { ExplainResult } from "@/lib/explain";
+import { isExplainEligible, EXPLAIN_INPUT_LIMIT } from "@/lib/explain-eligibility";
 import { buildCandidates, type Candidate } from "@/lib/explain-candidates";
-import { DIAGNOSIS_MAX_USES, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
+import { DIAGNOSIS_MAX_USES, SECRET_HEADER_RE, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed } from "@/lib/posthog";
 import {
   isProxyErrorEnvelope,
@@ -184,12 +184,14 @@ export default function Home() {
   const [explainCtx, setExplainCtx] = useState<{
     apiName: string;
     url: string;
+    method: string;
+    headers: Record<string, string>;
   } | null>(null);
   const [explainPopupOpen, setExplainPopupOpen] = useState(false);
   const [explainPanelOpen, setExplainPanelOpen] = useState(false);
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainError, setExplainError] = useState(false);
-  const [explainData, setExplainData] = useState<ExplainPayload | null>(null);
+  const [explainData, setExplainData] = useState<ExplainResult | null>(null);
   const diagUsesRef = useRef(0);
   const diagTokenRef = useRef(0);
   const diagAvailableRef = useRef<boolean | null>(null);
@@ -333,7 +335,12 @@ export default function Home() {
       setHeadersFilter("common");
     }
     if (item.apiName) {
-      setExplainCtx({ apiName: item.apiName, url: item.url });
+      setExplainCtx({
+        apiName: item.apiName,
+        url: item.url,
+        method: item.method,
+        headers: item.headers ?? {},
+      });
     } else {
       setExplainCtx(null);
     }
@@ -622,7 +629,7 @@ export default function Home() {
           lastVisitDate: new Date().toDateString(),
         });
         if (opts?.apiName) {
-          setExplainCtx({ apiName: opts.apiName, url: u });
+          setExplainCtx({ apiName: opts.apiName, url: u, method: m, headers: { ...h } });
           if (!firstNoAuthPopupShown.current) {
             firstNoAuthPopupShown.current = true;
           }
@@ -713,22 +720,36 @@ export default function Home() {
     ],
   );
   const openExplain = useCallback(
-    async (override?: { status?: number; body?: string }) => {
+    async (override?: {
+      status?: number;
+      body?: string;
+      headers?: Record<string, string>;
+    }) => {
       if (!explainCtx) return;
       setExplainPopupOpen(false);
       setExplainPanelOpen(true);
       setExplainLoading(true);
       setExplainError(false);
       setExplainData(null);
+      const snapshot = response?.request;
+      const snapshotMatches = snapshot?.url === explainCtx.url;
+      const responseHeaders = override?.headers ?? response?.headers;
       try {
         const res = await fetch("/api/explain", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            method: snapshotMatches ? snapshot?.method : explainCtx.method,
             url: explainCtx.url,
             apiName: explainCtx.apiName,
             status: override?.status ?? response?.status ?? 0,
-            body: override?.body ?? response?.body ?? "",
+            body: (override?.body ?? response?.body ?? "").slice(
+              0,
+              EXPLAIN_INPUT_LIMIT,
+            ),
+            contentType: responseHeaders?.["content-type"] ?? "",
+            truncated: response?.truncated === true,
+            credentialed: hasCredentialHeader(explainCtx.headers),
           }),
         });
         const data = await res.json();
@@ -736,7 +757,7 @@ export default function Home() {
           setExplainError(true);
           return;
         }
-        setExplainData(data as ExplainPayload);
+        setExplainData(data as ExplainResult);
       } catch {
         setExplainError(true);
       } finally {
@@ -763,7 +784,11 @@ export default function Home() {
         headers: result?.headers,
       });
       setHeadersFilter("common");
-      openExplain({ status: result?.status ?? undefined, body });
+      openExplain({
+        status: result?.status ?? undefined,
+        body,
+        headers: result?.headers,
+      });
     },
     [openExplain, setHeadersFilter],
   );
@@ -4575,6 +4600,13 @@ function pathnameOf(value: string): string {
   }
 }
 
+function hasCredentialHeader(headers?: Record<string, string>): boolean {
+  if (!headers) return false;
+  return Object.keys(headers).some((key) =>
+    SECRET_HEADER_RE.test(key.toLowerCase()),
+  );
+}
+
 // Retry-After is either a delay in seconds or an HTTP-date. Returns whole
 // seconds (>= 0), or null when the header is absent/unparseable.
 function parseRetryAfter(value: string | null | undefined): number | null {
@@ -5069,43 +5101,95 @@ type ExplainStripState =
   | "loading"
   | "result"
   | "unavailable"
-  | "capReached";
+  | "capReached"
+  | "error";
 
 function ExplainStrip({
   isDark,
+  apiName,
+  method,
+  url,
+  status,
+  body,
+  contentType,
   truncated,
+  credentialed,
+  snapshotKey,
   candidates,
   chipsDisabled,
   onPick,
 }: {
   isDark: boolean;
+  apiName: string;
+  method: string;
+  url: string;
+  status?: number;
+  body: string;
+  contentType?: string;
   truncated: boolean;
+  credentialed: boolean;
+  snapshotKey: number;
   candidates: Candidate[];
   chipsDisabled: boolean;
   onPick: (candidate: Candidate) => void;
 }) {
   const [state, setState] = useState<ExplainStripState>("idle");
+  const [result, setResult] = useState<ExplainResult | null>(null);
+  const [errorText, setErrorText] = useState("");
+
   useEffect(() => {
-    if (state !== "loading") return;
-    const timer = setTimeout(() => setState("result"), 650);
-    return () => clearTimeout(timer);
-  }, [state]);
+    setState("idle");
+    setResult(null);
+    setErrorText("");
+  }, [snapshotKey]);
+
+  const analyze = async () => {
+    setState("loading");
+    setResult(null);
+    setErrorText("");
+    try {
+      const res = await fetch("/api/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          method,
+          url,
+          apiName,
+          status,
+          body: body.slice(0, EXPLAIN_INPUT_LIMIT),
+          contentType: contentType ?? "",
+          truncated,
+          credentialed,
+        }),
+      });
+      let data: unknown = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+      if (!res.ok) {
+        if (res.status === 429) {
+          setState("capReached");
+        } else if (res.status === 503) {
+          setState("unavailable");
+        } else {
+          setErrorText("Couldn't explain this response, try again.");
+          setState("error");
+        }
+        return;
+      }
+      setResult(data as ExplainResult);
+      setState("result");
+    } catch {
+      setErrorText("Couldn't explain this response, try again.");
+      setState("error");
+    }
+  };
 
   const titleColor = isDark ? "#ffffff" : "#222222";
-  const skeletonColor = isDark ? "#262626" : "#ededed";
   const sectionLabel = isDark ? "#b8b8b8" : "#6f6f6f";
-
-  const skeletonLine = (width: number | string) => (
-    <div
-      className="animate-pulse"
-      style={{
-        height: 8,
-        width,
-        borderRadius: 4,
-        backgroundColor: skeletonColor,
-      }}
-    />
-  );
+  const bodyColor = isDark ? "#c4c4c4" : "#696666";
 
   return (
     <div
@@ -5205,7 +5289,7 @@ function ExplainStrip({
                 whiteSpace: "nowrap",
                 flexShrink: 0,
               }}
-              onClick={() => setState("loading")}
+              onClick={analyze}
             >
               Analyze now
             </RippleButton>
@@ -5240,34 +5324,77 @@ function ExplainStrip({
               Response was truncated; the explanation may be incomplete.
             </span>
           )}
-          {["Who it's for", "What it does", "Build idea"].map((label) => (
-            <div
-              key={label}
-              style={{ display: "flex", flexDirection: "column", gap: 6 }}
-            >
-              <span
+          {result && (
+            <>
+              {[
+                { label: "Who it's for", text: result.who },
+                { label: "What it does", text: result.what },
+              ].map((row) => (
+                <div
+                  key={row.label}
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      letterSpacing: "-0.3px",
+                      color: sectionLabel,
+                    }}
+                  >
+                    {row.label}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 13,
+                      lineHeight: "19px",
+                      letterSpacing: "-0.2px",
+                      color: bodyColor,
+                      overflowWrap: "anywhere",
+                    }}
+                  >
+                    {row.text}
+                  </span>
+                </div>
+              ))}
+              <div
                 style={{
-                  fontFamily: "Geist, var(--font-geist-sans)",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  letterSpacing: "-0.3px",
-                  color: sectionLabel,
+                  borderRadius: 8,
+                  backgroundColor: isDark ? "#16162e" : "#f0f0ff",
+                  padding: 10,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
                 }}
               >
-                {label}
-              </span>
-              {skeletonLine("92%")}
-              {skeletonLine("68%")}
-            </div>
-          ))}
-          <div
-            style={{
-              borderTop: isDark ? "0.8px solid #242424" : "0.8px solid #f2f2f2",
-              paddingTop: 9,
-            }}
-          >
-            {skeletonLine(120)}
-          </div>
+                <span
+                  style={{
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    letterSpacing: "-0.3px",
+                    color: "#5A5AFF",
+                  }}
+                >
+                  Build idea
+                </span>
+                <span
+                  style={{
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 13,
+                    lineHeight: "19px",
+                    letterSpacing: "-0.2px",
+                    color: isDark ? "#8f8fff" : "#5A5AFF",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {result.build}
+                </span>
+              </div>
+            </>
+          )}
           {candidates.length > 0 && (
             <div
               style={{
@@ -5348,6 +5475,43 @@ function ExplainStrip({
         >
           You&rsquo;ve used your 3 free explanations today.
         </span>
+      )}
+      {state === "error" && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 10,
+          }}
+        >
+          <span
+            style={{
+              flex: "1 1 220px",
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 13,
+              color: isDark ? "#adadad" : "#636363",
+            }}
+          >
+            {errorText}
+          </span>
+          <button
+            type="button"
+            onClick={analyze}
+            style={{
+              border: "none",
+              borderRadius: 6,
+              padding: "6px 10px",
+              backgroundColor: "#5A5AFF",
+              color: "#ffffff",
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Retry
+          </button>
+        </div>
       )}
     </div>
   );
@@ -5439,14 +5603,19 @@ function MainContent({
   history: HistoryEntry[];
   activeHistoryIndex: number | null;
   onHistorySelect: (item: HistoryEntry, index: number) => void;
-  explainCtx: { apiName: string; url: string } | null;
+  explainCtx: {
+    apiName: string;
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+  } | null;
   explainPopupOpen: boolean;
   onExplainPopupSkip: () => void;
   onExplainPopupAnalyze: () => void;
   explainPanelOpen: boolean;
   explainLoading: boolean;
   explainError: boolean;
-  explainData: ExplainPayload | null;
+  explainData: ExplainResult | null;
   onOpenExplain: () => void;
   onCloseExplain: () => void;
   onAnalyze?: (result: {
@@ -7616,7 +7785,19 @@ function MainContent({
                       {!isDiscovery && explainEligibility.ok && (
                         <ExplainStrip
                           isDark={isDark}
+                          apiName="API"
+                          method={response.request?.method ?? method}
+                          url={response.request?.url ?? url}
+                          status={response.status}
+                          body={response.body ?? ""}
+                          contentType={response.headers?.["content-type"]}
                           truncated={explainEligibility.truncated}
+                          credentialed={hasCredentialHeader(
+                            response.request?.url === lastRequest?.url
+                              ? lastRequest?.headers
+                              : undefined,
+                          )}
+                          snapshotKey={response.request?.key ?? 0}
                           candidates={explainCandidates}
                           chipsDisabled={chipsDisabled}
                           onPick={handleCandidatePick}
@@ -9444,20 +9625,12 @@ backgroundColor: isDark
                   {" "}
                   {[
                     {
-                      key: "target_users",
-                      label: "Target users",
+                      key: "who",
+                      label: "Who it's for",
                     },
                     {
-                      key: "problem_solved",
-                      label: "Problem it solves",
-                    },
-                    {
-                      key: "request_action",
-                      label: "What this request did",
-                    },
-                    {
-                      key: "expected_outcome",
-                      label: "Expected outcome",
+                      key: "what",
+                      label: "What it does",
                     },
                   ].map((row) => (
                     <div
@@ -9498,7 +9671,7 @@ backgroundColor: isDark
                           alignItems: "center",
                         }}
                       >
-                        {explainData[row.key as keyof ExplainPayload]}
+                        {explainData[row.key as "who" | "what"]}
                       </span>{" "}
                     </div>
                   ))}{" "}
@@ -9543,7 +9716,7 @@ backgroundColor: isDark
                         color: isDark ? "#8f8fff" : "#5A5AFF",
                       }}
                     >
-                      {explainData.build_idea}
+                      {explainData.build}
                     </span>{" "}
                   </div>{" "}
                 </motion.div>

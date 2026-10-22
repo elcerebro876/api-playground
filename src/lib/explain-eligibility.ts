@@ -1,3 +1,5 @@
+export const EXPLAIN_INPUT_LIMIT = 16 * 1024;
+
 export type ExplainEligibilityInput = {
   status?: number;
   body?: string;

@@ -58,7 +58,7 @@ export function structureSignature(json: unknown): string {
   return entries.slice(0, MAX_SHAPE_ENTRIES).join("|");
 }
 
-function contentTypeFamily(contentType: string): string {
+export function contentTypeFamily(contentType: string): string {
   const media = contentType.split(";")[0].trim().toLowerCase();
   if (!media) return "unknown";
   if (/^application\/(?:[a-z0-9!#$&^_.+-]*\+)?json$/.test(media)) return "json";

@@ -95,3 +95,95 @@ export async function generateExplanation(opts: {
   }
   return parsed;
 }
+
+export const EXPLAIN_TTL_SECS = 30 * 24 * 60 * 60;
+export const EXPLAIN_SECTION_MAX = 300;
+
+export type ExplainSections = {
+  who: string;
+  what: string;
+  build: string;
+};
+
+export type ExplainResult = ExplainSections & {
+  fromCache: boolean;
+  createdAt: string;
+  ttlSecs: number;
+  truncated: boolean;
+};
+
+export type ExplainModelInput = {
+  apiName: string;
+  method: string;
+  endpointUrl: string;
+  status: number;
+  contentType: string;
+  structure: string;
+  truncated: boolean;
+};
+
+export function trimExplainText(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, EXPLAIN_SECTION_MAX);
+}
+
+export function parseExplainSections(text: string): ExplainSections | null {
+  let parsed: Record<string, unknown>;
+  try {
+    const cleaned = text.replace(/^```json\s*/i, "").replace(/```$/g, "").trim();
+    parsed = JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+  const fields = ["who", "what", "build"] as const;
+  for (const f of fields) {
+    if (typeof parsed?.[f] !== "string" || !(parsed[f] as string).trim()) {
+      return null;
+    }
+  }
+  return {
+    who: trimExplainText(parsed.who as string),
+    what: trimExplainText(parsed.what as string),
+    build: trimExplainText(parsed.build as string),
+  };
+}
+
+export function buildExplainSectionsPrompt(
+  opts: ExplainModelInput,
+): string {
+  const maskedUrl = maskUrlSecrets(opts.endpointUrl);
+  return [
+    "You explain what an API response is for, using only its shape.",
+    "You never see response values, only field names and types.",
+    `API: ${opts.apiName}`,
+    `Request: ${opts.method} ${maskedUrl}`,
+    `HTTP status: ${opts.status}`,
+    `Content type: ${opts.contentType || "unknown"}`,
+    opts.truncated ? "Note: the response body was truncated." : "",
+    "Response structure (field paths and leaf types; s=string, n=number, b=boolean, z=null):",
+    opts.structure || "(no structure)",
+    "",
+    "Return STRICT JSON with exactly these 3 string fields. Each value must be one short sentence (under 40 words):",
+    "- who: who would realistically use this API/data",
+    "- what: what this endpoint does for them, based on the request and response shape",
+    "- build: a concrete app or product idea that could use this endpoint",
+    "Do not quote or invent specific response values.",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+}
+
+export async function generateExplainSections(
+  opts: ExplainModelInput,
+): Promise<ExplainSections> {
+  const prompt = buildExplainSectionsPrompt(opts);
+  const text = await callAIJson(prompt, {
+    temperature: 0.4,
+    timeoutMs: 15000,
+    validate: (t) => parseExplainSections(t) !== null,
+  });
+  const parsed = parseExplainSections(text);
+  if (!parsed) {
+    return Promise.reject(new Error("AI returned invalid JSON"));
+  }
+  return parsed;
+}
