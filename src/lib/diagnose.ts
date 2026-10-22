@@ -50,7 +50,7 @@ export function maskHeaderValue(value: string): string {
   return "****";
 }
 
-const SECRET_HEADER_RE =
+export const SECRET_HEADER_RE =
   /authorization|cookie|x-(api[-_ ]?key|auth|token|key)|api[-_ ]?key|token|secret|session/i;
 
 export function maskHeaders(
@@ -84,7 +84,7 @@ export function statusLabel(status: number | null | undefined): string | null {
   }
 }
 
-const SECRET_QUERY_RE =
+export const SECRET_QUERY_RE =
   /api[-_]?key|token|secret|password|passwd|auth|signature|client[_\-]?secret|appid|jwt|sas|session[_\-]?id|(?:^|[_-])(?:key|sig)(?:$|[_-])|^code$/i;
 
 export function maskUrlSecrets(url: string): string {
