@@ -5247,7 +5247,7 @@ function ExplainStrip({
   return (
     <div
       style={{
-        margin: "4px 12px 0",
+        margin: "4px 16px 0",
         borderRadius: 8,
         backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
         border: isDark ? "0.8px solid #2d2d2d" : "0.8px solid #f2f2f2",
@@ -5260,27 +5260,47 @@ function ExplainStrip({
           style={{
             display: "flex",
             alignItems: "center",
-            flexWrap: "wrap",
-            gap: 10,
+            gap: 12,
           }}
         >
           <div
             style={{
-              width: 32,
-              height: 32,
+              width: 40,
+              height: 40,
               borderRadius: 8,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: isDark ? "#181818" : "#f5f5ff",
               flexShrink: 0,
+              overflow: "hidden",
+              position: "relative",
             }}
           >
-            <Sparkle size={16} color="#5A5AFF" />
+            <img
+              src="/explain-avatar.png"
+              alt=""
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Sparkle size={18} color="#ffffff" />
+            </div>
           </div>
           <div
             style={{
-              flex: "1 1 220px",
+              flex: 1,
               minWidth: 0,
               display: "flex",
               flexDirection: "column",
@@ -5292,7 +5312,7 @@ function ExplainStrip({
                 fontFamily: "Geist, var(--font-geist-sans)",
                 fontSize: 14,
                 fontWeight: 500,
-                letterSpacing: "-0.4px",
+                letterSpacing: "-0.5px",
                 color: titleColor,
               }}
             >
@@ -5301,8 +5321,9 @@ function ExplainStrip({
             <span
               style={{
                 fontFamily: "Geist, var(--font-geist-sans)",
-                fontSize: 12,
-                letterSpacing: "-0.3px",
+                fontSize: 14,
+                letterSpacing: "-0.4px",
+                lineHeight: "20px",
                 color: "#939393",
                 overflowWrap: "anywhere",
               }}
@@ -5363,19 +5384,72 @@ function ExplainStrip({
       )}
       {state === "result" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Sparkle size={14} color="#5A5AFF" />
-            <span
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Sparkle size={16} color="#5A5AFF" />
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 16,
+                  fontWeight: 500,
+                  letterSpacing: "-0.8px",
+                  color: isDark ? "#ffffff" : "#282828",
+                }}
+              >
+                AI Explanation
+              </span>
+            </div>
+            <div
               style={{
-                fontFamily: "Geist, var(--font-geist-sans)",
-                fontSize: 14,
-                fontWeight: 500,
-                letterSpacing: "-0.4px",
-                color: titleColor,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
               }}
             >
-              Explained
-            </span>
+              {result && (
+                <span
+                  style={{
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 14,
+                    letterSpacing: "-0.56px",
+                    color: "#939393",
+                  }}
+                >
+                  {formatFreshness(result.createdAt, result.fromCache)}
+                </span>
+              )}
+              {explainUses > 0 && (
+                <>
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      backgroundColor: "#a4a4a4",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 14,
+                      letterSpacing: "-0.56px",
+                      color: "#939393",
+                    }}
+                  >
+                    {explainUses} of 3 free explains left
+                  </span>
+                </>
+              )}
+            </div>
           </div>
           {truncated && (
             <span
@@ -5391,72 +5465,123 @@ function ExplainStrip({
           )}
           {result && (
             <>
-              {[
-                { label: "Who it's for", text: result.who },
-                { label: "What it does", text: result.what },
-              ].map((row) => (
-                <div
-                  key={row.label}
-                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
-                >
-                  <span
-                    style={{
-                      fontFamily: "Geist, var(--font-geist-sans)",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      letterSpacing: "-0.3px",
-                      color: sectionLabel,
-                    }}
-                  >
-                    {row.label}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "Geist, var(--font-geist-sans)",
-                      fontSize: 13,
-                      lineHeight: "19px",
-                      letterSpacing: "-0.2px",
-                      color: bodyColor,
-                      overflowWrap: "anywhere",
-                    }}
-                  >
-                    {row.text}
-                  </span>
-                </div>
-              ))}
               <div
                 style={{
-                  borderRadius: 8,
-                  backgroundColor: isDark ? "#16162e" : "#f0f0ff",
-                  padding: 10,
+                  borderRadius: 12,
+                  border: isDark ? "0.8px solid #2d2d2d" : "0.8px solid #f2f2f2",
+                  backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
+                  padding: 16,
                   display: "flex",
                   flexDirection: "column",
-                  gap: 6,
+                  gap: 16,
                 }}
               >
-                <span
+                {[
+                  { label: "Who it's for", text: result.who },
+                  { label: "What it does", text: result.what },
+                ].map((row) => (
+                  <div
+                    key={row.label}
+                    style={{
+                      borderRadius: 8,
+                      border: isDark ? "0.6px solid #2d2d2d" : "0.6px solid #f2f2f2",
+                      backgroundColor: isDark ? "#141414" : "#f9f9f9",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "8px 8px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: "Geist, var(--font-geist-sans)",
+                          fontSize: 14,
+                          fontWeight: 500,
+                          letterSpacing: "-0.7px",
+                          color: isDark ? "#b8b8b8" : "#585858",
+                        }}
+                      >
+                        {row.label}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        margin: "0 4px 4px",
+                        borderRadius: 6,
+                        backgroundColor: isDark ? "#1f1f1f" : "#efefef",
+                        padding: "8px",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: "Geist, var(--font-geist-sans)",
+                          fontSize: 14,
+                          lineHeight: "20px",
+                          letterSpacing: "-0.56px",
+                          color: isDark ? "#c4c4c4" : "#696666",
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        {row.text}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                <div
                   style={{
-                    fontFamily: "Geist, var(--font-geist-sans)",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    letterSpacing: "-0.3px",
-                    color: "#5A5AFF",
+                    borderRadius: 8,
+                    border: isDark ? "0.8px solid #3a3a6b" : "0.8px solid #b6b6fe",
+                    backgroundColor: isDark ? "#16162e" : "#f0f0ff",
+                    overflow: "hidden",
                   }}
                 >
-                  Build idea
-                </span>
-                <span
-                  style={{
-                    fontFamily: "Geist, var(--font-geist-sans)",
-                    fontSize: 13,
-                    lineHeight: "19px",
-                    letterSpacing: "-0.2px",
-                    color: isDark ? "#8f8fff" : "#5A5AFF",
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {result.build}
-                </span>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "8px 8px",
+                    }}
+                  >
+                    <Sparkle size={16} color="#5A5AFF" />
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        fontWeight: 500,
+                        letterSpacing: "-0.7px",
+                        color: "#5A5AFF",
+                      }}
+                    >
+                      Build Idea
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      margin: "0 4px 4px",
+                      borderRadius: 6,
+                      backgroundColor: isDark ? "#1f1f3a" : "rgba(240, 240, 255, 0.6)",
+                      padding: "8px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        lineHeight: "20px",
+                        letterSpacing: "-0.56px",
+                        color: "#5A5AFF",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {result.build}
+                    </span>
+                  </div>
+                </div>
               </div>
             </>
           )}
@@ -5522,22 +5647,12 @@ function ExplainStrip({
               <span
                 style={{
                   fontFamily: "Geist, var(--font-geist-sans)",
-                  fontSize: 11,
-                  letterSpacing: "-0.2px",
+                  fontSize: 14,
+                  letterSpacing: "-0.56px",
                   color: "#939393",
                 }}
               >
-                {formatFreshness(result.createdAt, result.fromCache)}
-              </span>
-              <span
-                style={{
-                  fontFamily: "Geist, var(--font-geist-sans)",
-                  fontSize: 11,
-                  letterSpacing: "-0.2px",
-                  color: "#939393",
-                }}
-              >
-                AI-generated from this response. It can be wrong.
+                AI-generated from this response. it can be wrong
               </span>
             </div>
           )}
