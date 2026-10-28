@@ -18,7 +18,7 @@ import {
 } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
-import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, loadExplainUses, saveExplainUses, type HistoryEntry } from "@/lib/storage";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadExplorerExplainDismissed, saveExplorerExplainDismissed, loadExplorerExplainShown, saveExplorerExplainShown, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, loadExplainUses, saveExplainUses, type HistoryEntry } from "@/lib/storage";
 import type { ExplainResult } from "@/lib/explain";
 import { isExplainEligible, EXPLAIN_INPUT_LIMIT } from "@/lib/explain-eligibility";
 import { structureSignature } from "@/lib/explain-key";
@@ -53,6 +53,7 @@ const cardItemVariants = {
 const headersPanelTransition = { duration: 0.25, ease: "easeInOut" as const };
 const HISTORY_LIMIT = 50;
 const MAX_STORED_BODY = 100_000;
+const EXPLORER_EXPLAIN_POPUP_DELAY_MS = 5_000;
 const commonKeys = [
   "content-type",
   "date",
@@ -190,6 +191,8 @@ export default function Home() {
     headers: Record<string, string>;
   } | null>(null);
   const [explainPopupOpen, setExplainPopupOpen] = useState(false);
+  const [explorerExplainPopupOpen, setExplorerExplainPopupOpen] =
+    useState(false);
   const [explainPanelOpen, setExplainPanelOpen] = useState(false);
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainError, setExplainError] = useState(false);
@@ -253,6 +256,9 @@ export default function Home() {
   }, []);
   const firstNoAuthPopupShown = useRef(false);
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const explorerExplainTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const [explorerHovered, setExplorerHovered] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
@@ -274,6 +280,9 @@ export default function Home() {
   useEffect(() => {
     return () => {
       if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
+      if (explorerExplainTimerRef.current) {
+        clearTimeout(explorerExplainTimerRef.current);
+      }
     };
   }, []);
   useEffect(() => {
@@ -522,7 +531,12 @@ export default function Home() {
           clearTimeout(popupTimerRef.current);
           popupTimerRef.current = null;
         }
+        if (explorerExplainTimerRef.current) {
+          clearTimeout(explorerExplainTimerRef.current);
+          explorerExplainTimerRef.current = null;
+        }
         setExplainPopupOpen(false);
+        setExplorerExplainPopupOpen(false);
       }
       const m = opts?.method || method;
       const u = opts?.url || url;
@@ -651,6 +665,42 @@ export default function Home() {
         } else {
           setExplainCtx(null);
           setExplainPopupOpen(false);
+          const explorerEligibility = isExplainEligible({
+            status: data.status,
+            body: typeof data.body === "string" ? data.body : undefined,
+            headers: data.headers,
+            isBinary: data.isBinary,
+            truncated: data.truncated,
+            structure: data.structure,
+          });
+          if (
+            explorerEligibility.ok &&
+            !opts?.suppressExplain &&
+            !loadExplorerExplainShown() &&
+            !loadExplorerExplainDismissed()
+          ) {
+            if (explorerExplainTimerRef.current) {
+              clearTimeout(explorerExplainTimerRef.current);
+            }
+            explorerExplainTimerRef.current = setTimeout(() => {
+              explorerExplainTimerRef.current = null;
+              // Re-check in case another tab has already seen it.
+              if (
+                loadExplorerExplainShown() ||
+                loadExplorerExplainDismissed()
+              ) {
+                return;
+              }
+              saveExplorerExplainShown(true);
+              setExplorerExplainPopupOpen(true);
+            }, EXPLORER_EXPLAIN_POPUP_DELAY_MS);
+          } else {
+            if (explorerExplainTimerRef.current) {
+              clearTimeout(explorerExplainTimerRef.current);
+              explorerExplainTimerRef.current = null;
+            }
+            setExplorerExplainPopupOpen(false);
+          }
         }
         setLoading(false);
         return data;
@@ -1247,6 +1297,33 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>{" "}
+      <ExplorerExplainPopup
+        open={explorerExplainPopupOpen}
+        body={response?.body}
+        isDark={activeTheme === "Dark"}
+        onSkip={() => {
+          saveExplorerExplainDismissed(true);
+          setExplorerExplainPopupOpen(false);
+        }}
+        onAnalyze={() => {
+          saveExplorerExplainDismissed(true);
+          setExplorerExplainPopupOpen(false);
+          const reveal = (attempts = 0) => {
+            const el = document.getElementById("explorer-ai-explainer");
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              // Start the same analysis the inline "Analyze now" button starts.
+              const trigger = Array.from(el.querySelectorAll("button")).find(
+                (button) => (button.textContent || "").trim() === "Analyze now",
+              );
+              trigger?.click();
+            } else if (attempts < 5) {
+              window.setTimeout(() => reveal(attempts + 1), 60);
+            }
+          };
+          requestAnimationFrame(() => reveal());
+        }}
+      />
     </div>
   );
 }
@@ -5246,6 +5323,7 @@ function ExplainStrip({
 
   return (
     <div
+      id="explorer-ai-explainer"
       style={{
         margin: "4px 16px 0",
         borderRadius: 8,
@@ -5253,6 +5331,7 @@ function ExplainStrip({
         border: isDark ? "0.8px solid #2d2d2d" : "0.8px solid #f2f2f2",
         padding: 12,
         boxSizing: "border-box",
+        scrollMarginTop: 24,
       }}
     >
       {(state === "idle" || state === "loading") && (
@@ -5729,6 +5808,241 @@ function ExplainStrip({
         </div>
       )}
     </div>
+  );
+}
+
+function ExplorerExplainPopup({
+  open,
+  body,
+  isDark,
+  onSkip,
+  onAnalyze,
+}: {
+  open: boolean;
+  body?: string;
+  isDark: boolean;
+  onSkip: () => void;
+  onAnalyze: () => void;
+}) {
+  return (
+    <>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="explorer-explain-backdrop"
+            className="fixed inset-0"
+            style={{
+              zIndex: 70,
+              pointerEvents: "auto",
+              backdropFilter: "blur(42px)",
+              WebkitBackdropFilter: "blur(42px)",
+              background: isDark
+                ? "linear-gradient(-23.5deg, rgba(36, 36, 36, 0.47), rgba(129, 129, 129, 0))"
+                : "linear-gradient(-23.5deg, rgba(180, 180, 180, 0.47), rgba(230, 230, 230, 0))",
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.75 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="explorer-explain-position"
+            className="fixed inset-0"
+            style={{
+              zIndex: 71,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+              padding: 16,
+              boxSizing: "border-box",
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: "easeOut", delay: 0.15 }}
+          >
+            <motion.div
+              key="explorer-explain-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="explorer-explain-title"
+              style={{
+                width: "min(467px, 100%)",
+                backgroundColor: isDark ? "#161616" : "#ffffff",
+                borderRadius: 12,
+                padding: 12,
+                display: "flex",
+                flexDirection: "column",
+                boxSizing: "border-box",
+                pointerEvents: "auto",
+                border: isDark ? "0.8px solid #2d2d2d" : "0.8px solid #f2f2f2",
+              }}
+              initial={{ opacity: 1, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 1, y: 6 }}
+              transition={{ type: "spring", stiffness: 400, damping: 28 }}
+            >
+              <div
+                style={{
+                  position: "relative",
+                  height: 200,
+                  borderRadius: 8,
+                  backgroundColor: isDark ? "#1F1F1F" : "#F7F7F7",
+                  overflow: "hidden",
+                  boxSizing: "border-box",
+                  padding: 16,
+                }}
+              >
+                <div
+                  style={{
+                    paddingRight: 52,
+                    maxHeight: 168,
+                    overflow: "hidden",
+                  }}
+                >
+                  <ExplainPopupPreview body={body} isDark={isDark} />
+                </div>
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 16,
+                    right: 16,
+                    height: 24,
+                    padding: "0 6px",
+                    borderRadius: 8,
+                    backgroundColor: isDark ? "#2A2A2A" : "#ffffff",
+                    display: "flex",
+                    alignItems: "center",
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 12,
+                    fontWeight: 400,
+                    letterSpacing: "-0.5px",
+                    color: isDark ? "#D1D1D1" : "#222222",
+                  }}
+                >
+                  Pretty
+                </span>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: 16,
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    flexShrink: 0,
+                    overflow: "hidden",
+                  }}
+                >
+                  <img
+                    src="/explain-avatar.png"
+                    alt=""
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }} />
+                <RippleButton
+                  onClick={onAnalyze}
+                  className="transition-colors hover:bg-[#4a4aff]"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: 28,
+                    padding: "0 8px",
+                    borderRadius: 6,
+                    backgroundColor: "#5A5AFF",
+                    color: "#ffffff",
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 12,
+                    letterSpacing: "-0.4px",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    cursor: "pointer",
+                  }}
+                >
+                  Analyze now
+                </RippleButton>
+              </div>
+
+              <span
+                id="explorer-explain-title"
+                style={{
+                  marginTop: 12,
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 16,
+                  fontWeight: 500,
+                  letterSpacing: "-0.5px",
+                  color: isDark ? "rgba(255,255,255,0.9)" : "#585858",
+                }}
+              >
+                There&rsquo;s more to this response
+              </span>
+
+              <span
+                style={{
+                  marginTop: 4,
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 14,
+                  fontWeight: 400,
+                  lineHeight: "20px",
+                  letterSpacing: "-0.4px",
+                  color: "#939393",
+                }}
+              >
+                Get a plain-English read on who this endpoint is for, what it
+                does, and what you could build with it.
+              </span>
+
+              <RippleButton
+                onClick={onSkip}
+                className={`transition-colors ${isDark ? "hover:bg-[#242424]" : "hover:bg-gray-50"}`}
+                style={{
+                  marginTop: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: 28,
+                  padding: "0 8px",
+                  borderRadius: 6,
+                  backgroundColor: "transparent",
+                  color: isDark ? "#cfcfcf" : "#393939",
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  letterSpacing: "-0.4px",
+                  whiteSpace: "nowrap",
+                  width: "fit-content",
+                  cursor: "pointer",
+                }}
+              >
+                Skip for now
+              </RippleButton>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
@@ -10078,6 +10392,114 @@ function jsonHighlight(body: unknown) {
     i += tok.length;
   }
   return out;
+}
+function ExplainPopupPreview({
+  body,
+  isDark,
+}: {
+  body?: string;
+  isDark: boolean;
+}) {
+  const text = typeof body === "string" ? body.trim() : "";
+  if (!text) {
+    return (
+      <span
+        style={{
+          fontFamily: "Geist, var(--font-geist-sans)",
+          fontSize: 14,
+          letterSpacing: "-0.4px",
+          color: "#939393",
+        }}
+      >
+        No response body
+      </span>
+    );
+  }
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = null;
+  }
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const entries = Object.entries(parsed as Record<string, unknown>).slice(
+      0,
+      6,
+    );
+    if (entries.length > 0) {
+      return (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 14,
+            fontWeight: 500,
+            lineHeight: "18px",
+            letterSpacing: "-0.4px",
+          }}
+        >
+          {entries.map(([key, value]) => {
+            const valueText = JSON.stringify(value) ?? String(value);
+            return (
+              <div
+                key={key}
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  minWidth: 0,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                }}
+              >
+                <span
+                  style={{
+                    flexShrink: 0,
+                    color: isDark ? "#7CB7FF" : "#1A75E1",
+                  }}
+                >
+                  {JSON.stringify(key)}:
+                </span>
+                <span
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    color:
+                      typeof value === "string"
+                        ? isDark
+                          ? "#7CD992"
+                          : "#008000"
+                        : isDark
+                          ? "#E5B567"
+                          : "#9D6900",
+                  }}
+                >
+                  {valueText},
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+  }
+  return (
+    <div
+      style={{
+        fontFamily: "Geist, var(--font-geist-sans)",
+        fontSize: 12,
+        fontWeight: 400,
+        lineHeight: "18px",
+        letterSpacing: "-0.4px",
+        color: isDark ? "#D1D1D1" : "#5E5E5E",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+      }}
+    >
+      {jsonHighlight(body)}
+    </div>
+  );
 }
 function BrowseApiSection({
   compact,

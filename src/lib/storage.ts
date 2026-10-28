@@ -77,6 +77,48 @@ export function saveExplainDismissed(dismissed: boolean): void {
   } catch { /* storage unavailable — silent fallback */ }
 }
 
+// Explorer-specific keys. The Explorer teaser is independent of the discovery
+// teaser, so dismissing one must not hide the other.
+const EXPLORER_EXPLAIN_DISMISSED_KEY =
+  "api-playground-explorer-explain-dismissed";
+const EXPLORER_EXPLAIN_SHOWN_KEY = "api-playground-explorer-explain-shown";
+
+export function loadExplorerExplainDismissed(): boolean {
+  try {
+    return window.localStorage.getItem(EXPLORER_EXPLAIN_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveExplorerExplainDismissed(dismissed: boolean): void {
+  try {
+    if (dismissed) {
+      window.localStorage.setItem(EXPLORER_EXPLAIN_DISMISSED_KEY, "1");
+    } else {
+      window.localStorage.removeItem(EXPLORER_EXPLAIN_DISMISSED_KEY);
+    }
+  } catch { /* storage unavailable — silent fallback */ }
+}
+
+export function loadExplorerExplainShown(): boolean {
+  try {
+    return window.localStorage.getItem(EXPLORER_EXPLAIN_SHOWN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function saveExplorerExplainShown(shown: boolean): void {
+  try {
+    if (shown) {
+      window.localStorage.setItem(EXPLORER_EXPLAIN_SHOWN_KEY, "1");
+    } else {
+      window.localStorage.removeItem(EXPLORER_EXPLAIN_SHOWN_KEY);
+    }
+  } catch { /* storage unavailable — silent fallback */ }
+}
+
 export type CardTestRecord = {
   key: string;
   entry: HistoryEntry;
