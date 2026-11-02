@@ -49,6 +49,14 @@ export type AnalyticsEvent =
   | {
       name: "explain_cap_reached";
       properties: { scope: "ip" | "global" };
+    }
+  | {
+      name: "explain_saved";
+      properties: { method: string; status?: number };
+    }
+  | {
+      name: "explain_unsaved";
+      properties: { method: string; status?: number };
     };
 
 export function track(event: AnalyticsEvent): void {

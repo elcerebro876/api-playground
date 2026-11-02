@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatFreshness } from "@/lib/explain-freshness";
+import { formatFreshness, formatSavedAge } from "@/lib/explain-freshness";
 
 const NOW = Date.parse("2026-10-22T12:00:00.000Z");
 const iso = (msAgo: number) => new Date(NOW - msAgo).toISOString();
@@ -33,4 +33,20 @@ test("a cache hit of a day or more reports days", () => {
 
 test("an unparseable timestamp degrades to just now", () => {
   assert.equal(formatFreshness("not a date", true, NOW), "Just now");
+});
+
+test("a saved explanation reports how long ago it was saved", () => {
+  assert.equal(formatSavedAge(NOW, NOW), "just now");
+  assert.equal(formatSavedAge(NOW - 59_999, NOW), "just now");
+  assert.equal(formatSavedAge(NOW - 60_000, NOW), "1h ago");
+  assert.equal(formatSavedAge(NOW - 5 * 3600 * 1000, NOW), "5h ago");
+  assert.equal(formatSavedAge(NOW - 24 * 3600 * 1000, NOW), "1 days ago");
+  assert.equal(
+    formatSavedAge(NOW - 3 * 24 * 3600 * 1000, NOW),
+    "3 days ago",
+  );
+});
+
+test("a saved explanation with a bad timestamp degrades to just now", () => {
+  assert.equal(formatSavedAge(Number.NaN, NOW), "just now");
 });

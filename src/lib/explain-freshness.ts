@@ -1,3 +1,18 @@
+// A saved explanation keeps its original createdAt, so it must not claim to be
+// fresh. This reports how long ago the user saved it instead.
+export function formatSavedAge(
+  savedAt: number,
+  now: number = Date.now(),
+): string {
+  if (!Number.isFinite(savedAt)) return "just now";
+  const seconds = Math.max(0, Math.floor((now - savedAt) / 1000));
+  if (seconds < 60) return "just now";
+  const hours = Math.floor(seconds / 3600);
+  if (seconds < 24 * 3600) return `${Math.max(1, hours)}h ago`;
+  const days = Math.floor(seconds / (24 * 3600));
+  return `${Math.max(1, days)} days ago`;
+}
+
 export function formatFreshness(
   createdAt: string,
   fromCache: boolean,

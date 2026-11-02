@@ -1,4 +1,5 @@
 import type { DiagnosisResult } from "@/lib/diagnose";
+import type { ExplainResult } from "@/lib/explain";
 
 const STORAGE_KEY = "api-playground-data";
 
@@ -117,6 +118,109 @@ export function saveExplorerExplainShown(shown: boolean): void {
       window.localStorage.removeItem(EXPLORER_EXPLAIN_SHOWN_KEY);
     }
   } catch { /* storage unavailable — silent fallback */ }
+}
+
+// Explanations the user chose to keep in this browser. Keyed by "METHOD url",
+// which matches how the Explorer log de-duplicates entries, so a saved
+// explanation always lines up with the row that reopens it.
+export type SavedExplain = {
+  key: string;
+  result: ExplainResult;
+  savedAt: number;
+  // Per-endpoint preference: reopen this saved explanation without asking.
+  autoShow?: boolean;
+};
+
+const SAVED_EXPLAINS_KEY = "api-playground-saved-explains";
+const SAVED_EXPLAINS_MAX = 100;
+
+export function savedExplainKey(method: string, url: string): string {
+  return `${method.trim().toUpperCase()} ${url.trim()}`;
+}
+
+export function trimSavedExplains(
+  map: Record<string, SavedExplain>,
+  max: number = SAVED_EXPLAINS_MAX,
+): Record<string, SavedExplain> {
+  const entries = Object.entries(map);
+  if (entries.length <= max) return map;
+  const kept = entries
+    .sort((a, b) => b[1].savedAt - a[1].savedAt)
+    .slice(0, Math.max(0, max));
+  return Object.fromEntries(kept);
+}
+
+export function loadSavedExplains(): Record<string, SavedExplain> {
+  try {
+    const raw = window.localStorage.getItem(SAVED_EXPLAINS_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== "object" || Array.isArray(p)) return {};
+    const map: Record<string, SavedExplain> = {};
+    for (const [key, rec] of Object.entries(
+      p as Record<string, Partial<SavedExplain>>,
+    )) {
+      if (!rec || typeof rec.key !== "string" || !rec.result) continue;
+      if (typeof rec.savedAt !== "number") continue;
+      map[key] = {
+        key: rec.key,
+        result: rec.result,
+        savedAt: rec.savedAt,
+        ...(rec.autoShow === true ? { autoShow: true } : {}),
+      };
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+export function saveSavedExplain(
+  key: string,
+  result: ExplainResult,
+): Record<string, SavedExplain> {
+  const current = loadSavedExplains();
+  const next = trimSavedExplains({
+    ...current,
+    [key]: {
+      key,
+      result,
+      savedAt: Date.now(),
+      // Re-saving the same endpoint keeps the per-endpoint reopen preference.
+      ...(current[key]?.autoShow === true ? { autoShow: true } : {}),
+    },
+  });
+  try {
+    window.localStorage.setItem(SAVED_EXPLAINS_KEY, JSON.stringify(next));
+  } catch { /* storage unavailable — silent fallback */ }
+  return next;
+}
+
+// Sets the per-endpoint "open without asking" preference. No-op when the
+// endpoint is no longer saved.
+export function setSavedExplainAutoShow(
+  key: string,
+  autoShow: boolean,
+): Record<string, SavedExplain> {
+  const current = loadSavedExplains();
+  const rec = current[key];
+  if (!rec) return current;
+  const next = { ...current, [key]: { ...rec, autoShow } };
+  try {
+    window.localStorage.setItem(SAVED_EXPLAINS_KEY, JSON.stringify(next));
+  } catch { /* storage unavailable — silent fallback */ }
+  return next;
+}
+
+export function removeSavedExplain(
+  key: string,
+): Record<string, SavedExplain> {
+  const next = { ...loadSavedExplains() };
+  delete next[key];
+  try {
+    window.localStorage.setItem(SAVED_EXPLAINS_KEY, JSON.stringify(next));
+  } catch { /* storage unavailable — silent fallback */ }
+  return next;
 }
 
 export type CardTestRecord = {

@@ -18,14 +18,14 @@ import {
 } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
-import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadExplorerExplainDismissed, saveExplorerExplainDismissed, loadExplorerExplainShown, saveExplorerExplainShown, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, loadExplainUses, saveExplainUses, type HistoryEntry } from "@/lib/storage";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadExplorerExplainDismissed, saveExplorerExplainDismissed, loadExplorerExplainShown, saveExplorerExplainShown, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, loadExplainUses, saveExplainUses, loadSavedExplains, saveSavedExplain, removeSavedExplain, setSavedExplainAutoShow, savedExplainKey, type HistoryEntry, type SavedExplain } from "@/lib/storage";
 import type { ExplainResult } from "@/lib/explain";
 import { isExplainEligible, EXPLAIN_INPUT_LIMIT } from "@/lib/explain-eligibility";
 import { structureSignature } from "@/lib/explain-key";
 import { buildCandidates, type Candidate } from "@/lib/explain-candidates";
 import { DIAGNOSIS_MAX_USES, SECRET_HEADER_RE, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed, track } from "@/lib/posthog";
-import { formatFreshness } from "@/lib/explain-freshness";
+import { formatFreshness, formatSavedAge } from "@/lib/explain-freshness";
 import {
   isProxyErrorEnvelope,
   proxyErrorCopy,
@@ -53,7 +53,7 @@ const cardItemVariants = {
 const headersPanelTransition = { duration: 0.25, ease: "easeInOut" as const };
 const HISTORY_LIMIT = 50;
 const MAX_STORED_BODY = 100_000;
-const EXPLORER_EXPLAIN_POPUP_DELAY_MS = 5_000;
+const EXPLORER_EXPLAIN_POPUP_DELAY_MS = 2_000;
 const commonKeys = [
   "content-type",
   "date",
@@ -197,6 +197,9 @@ export default function Home() {
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainError, setExplainError] = useState(false);
   const [explainData, setExplainData] = useState<ExplainResult | null>(null);
+  const [savedExplains, setSavedExplains] = useState<
+    Record<string, SavedExplain>
+  >({});
   const diagUsesRef = useRef(0);
   const diagTokenRef = useRef(0);
   const diagAvailableRef = useRef<boolean | null>(null);
@@ -309,6 +312,7 @@ export default function Home() {
       setApisTested(data.apisTestedCount);
       setStreak(updated.streak);
       setSessionCardTests((prev) => ({ ...prev, ...loadCardTests() }));
+      setSavedExplains(loadSavedExplains());
     });
     return () => cancelAnimationFrame(frame);
   }, []);
@@ -318,12 +322,15 @@ export default function Home() {
     setMethod(item.method);
     setUrl(item.url);
     if (item.responseBody) {
+      // Bump the key so the explainer strip resets for this log row instead of
+      // keeping the previous response's explanation.
+      setResponseKey((k) => k + 1);
       setResponse({
         status: item.status ?? undefined,
         time: item.time ?? undefined,
         body: item.responseBody,
         headers: item.responseHeaders,
-        request: { method: item.method, url: item.url, key: responseKey },
+        request: { method: item.method, url: item.url, key: responseKey + 1 },
       });
       setHeadersFilter("common");
     }
@@ -375,6 +382,15 @@ export default function Home() {
       (it) => it.apiName === apiName && it.url === rec.entry.url,
     );
     handleDiscoverySelect(rec.entry, idx);
+  };
+  const handleSaveExplain = (key: string, result: ExplainResult) => {
+    setSavedExplains(saveSavedExplain(key, result));
+  };
+  const handleRemoveExplain = (key: string) => {
+    setSavedExplains(removeSavedExplain(key));
+  };
+  const handleEnableAutoShow = (key: string) => {
+    setSavedExplains(setSavedExplainAutoShow(key, true));
   };
   const runDiagnosis = useCallback(
     (
@@ -1042,6 +1058,10 @@ export default function Home() {
               onRetryDiagnosis={retryDiagnosis}
               rateLimit={rateLimit}
               proxyNotice={proxyNotice}
+              savedExplains={savedExplains}
+              onSaveExplain={handleSaveExplain}
+              onRemoveExplain={handleRemoveExplain}
+              onEnableAutoShow={handleEnableAutoShow}
             />{" "}
           </motion.div>{" "}
         </div>{" "}
@@ -5178,11 +5198,48 @@ function StagedFixEditor({
 type ExplainStripState =
   | "idle"
   | "loading"
+  | "saved"
   | "result"
   | "unavailable"
   | "capReached"
   | "capacity"
   | "error";
+
+// A saved explanation only offers a refresh once it has been kept this long.
+const SAVED_EXPLAIN_REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
+
+// "Try this next" is hidden until its flow is defined. The chips and their
+// candidates stay wired so they can be switched back on with this flag.
+const SHOW_TRY_THIS_NEXT = false;
+
+// The tick-square used by the saved-explanation toggles. The same glyph is drawn
+// whether the preference is on or off; only the colour changes.
+function TickSquareIcon({ color }: { color: string }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M 5.68625 2 C 3.4205 2 2 3.60425 2 5.8745 L 2 12.0005 C 2 14.2708 3.41375 15.875 5.68625 15.875 L 12.1873 15.875 C 14.4605 15.875 15.875 14.2708 15.875 12.0005 L 15.875 5.8745 C 15.875 3.60425 14.4605 2 12.188 2 L 5.68625 2 Z"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M 6 8.77975 L 7.7805 10.5595 L 11.34 7"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function ExplainStrip({
   isDark,
@@ -5198,6 +5255,12 @@ function ExplainStrip({
   candidates,
   chipsDisabled,
   onPick,
+  savedResult,
+  savedAt,
+  savedAutoShow,
+  onSave,
+  onRemove,
+  onEnableAutoShow,
 }: {
   isDark: boolean;
   apiName: string;
@@ -5212,17 +5275,81 @@ function ExplainStrip({
   candidates: Candidate[];
   chipsDisabled: boolean;
   onPick: (candidate: Candidate) => void;
+  savedResult?: ExplainResult | null;
+  savedAt?: number | null;
+  savedAutoShow?: boolean;
+  onSave?: (result: ExplainResult) => void;
+  onRemove?: () => void;
+  onEnableAutoShow?: () => void;
 }) {
   const [state, setState] = useState<ExplainStripState>("idle");
   const [result, setResult] = useState<ExplainResult | null>(null);
   const [errorText, setErrorText] = useState("");
   const [explainUses, setExplainUses] = useState(0);
+  const [isSaved, setIsSaved] = useState(Boolean(savedResult));
+  // When the visible explanation came from a save, its age is reported instead
+  // of the freshness label, which would otherwise claim it is brand new.
+  const [savedAgeAt, setSavedAgeAt] = useState<number | null>(
+    typeof savedAt === "number" ? savedAt : null,
+  );
+  // True when a saved explanation was opened without asking, so the footer can
+  // say it is showing automatically.
+  const [autoOpened, setAutoOpened] = useState(false);
+  // Set in state rather than computed during render, because the 30-day check
+  // reads the clock and must only run when a saved explanation is shown.
+  const [canAnalyzeAgain, setCanAnalyzeAgain] = useState(false);
+
+  // Read through a ref so a saved explanation is picked up when the snapshot
+  // resets, but saving or removing never re-triggers the reset below (which
+  // would wipe the result off screen on remove).
+  const savedResultRef = useRef(savedResult);
+  useEffect(() => {
+    savedResultRef.current = savedResult;
+  }, [savedResult]);
+  const savedAtRef = useRef(savedAt);
+  useEffect(() => {
+    savedAtRef.current = savedAt;
+  }, [savedAt]);
+  const savedAutoShowRef = useRef(savedAutoShow);
+  useEffect(() => {
+    savedAutoShowRef.current = savedAutoShow;
+  }, [savedAutoShow]);
+
+  // Read the clock only from effects and handlers, never during render.
+  const savedAgedOut = (at: number | null) =>
+    at !== null && Date.now() - at >= SAVED_EXPLAIN_REFRESH_MS;
 
   useEffect(() => {
-    setState("idle");
-    setResult(null);
+    const saved = savedResultRef.current ?? null;
+    const opensAutomatically = saved !== null && savedAutoShowRef.current === true;
+    setState(saved === null ? "idle" : opensAutomatically ? "result" : "saved");
+    setResult(opensAutomatically ? saved : null);
+    setIsSaved(saved !== null);
+    setAutoOpened(opensAutomatically);
+    const at =
+      saved && typeof savedAtRef.current === "number"
+        ? savedAtRef.current
+        : null;
+    setSavedAgeAt(at);
+    setCanAnalyzeAgain(saved !== null && savedAgedOut(at));
     setErrorText("");
   }, [snapshotKey]);
+
+  // Reveals the saved explanation without asking. Used by the "View Saved
+  // explanation" button and by enabling the always-show preference.
+  const viewSaved = (openedAutomatically: boolean) => {
+    const saved = savedResultRef.current;
+    if (!saved) return;
+    const at =
+      typeof savedAtRef.current === "number" ? savedAtRef.current : null;
+    setState("result");
+    setResult(saved);
+    setIsSaved(true);
+    setAutoOpened(openedAutomatically);
+    setSavedAgeAt(at);
+    setCanAnalyzeAgain(savedAgedOut(at));
+    setErrorText("");
+  };
 
   useEffect(() => {
     setExplainUses(loadExplainUses());
@@ -5231,6 +5358,10 @@ function ExplainStrip({
   const analyze = async () => {
     setState("loading");
     setResult(null);
+    setIsSaved(false);
+    setSavedAgeAt(null);
+    setAutoOpened(false);
+    setCanAnalyzeAgain(false);
     setErrorText("");
     const startedAt = Date.now();
     let structure = "";
@@ -5461,6 +5592,155 @@ function ExplainStrip({
           )}
         </div>
       )}
+      {state === "saved" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 8,
+                flexShrink: 0,
+                overflow: "hidden",
+                position: "relative",
+                marginTop: 2,
+              }}
+            >
+              <img
+                src="/explain-avatar.png"
+                alt=""
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Sparkle size={18} color="#ffffff" />
+              </div>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  letterSpacing: "-0.5px",
+                  lineHeight: "18px",
+                  color: isDark ? "#ffffff" : "#222222",
+                }}
+              >
+                You saved an explanation for this
+              </span>
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 14,
+                  letterSpacing: "-0.4px",
+                  lineHeight: "20px",
+                  color: "#939393",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                Saved{" "}
+                {savedAgeAt !== null ? formatSavedAge(savedAgeAt) : "just now"}.
+                Opens instantly and doesn&rsquo;t use an explain.
+              </span>
+            </div>
+            <RippleButton
+              className="transition-colors hover:bg-[#4a4aff]"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: 28,
+                padding: "0 8px",
+                borderRadius: 6,
+                backgroundColor: "#5B5BFF",
+                color: "#ffffff",
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 12,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+              onClick={() => viewSaved(false)}
+            >
+              View Saved explanation
+            </RippleButton>
+          </div>
+          <div
+            style={{
+              height: 34,
+              display: "flex",
+              alignItems: "center",
+              padding: "0 8px",
+              borderRadius: 8,
+              boxSizing: "border-box",
+              backgroundColor: isDark ? "#161616" : "#FAFAFA",
+              border: isDark
+                ? "0.8px solid #2d2d2d"
+                : "0.6px solid #F2F2F2",
+            }}
+          >
+            <span
+              style={{
+                flex: 1,
+                minWidth: 0,
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 14,
+                letterSpacing: "-0.5px",
+                color: isDark ? "#b8b8b8" : "#585858",
+              }}
+            >
+              Always show saved explanations
+            </span>
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={false}
+              aria-label="Always show saved explanations"
+              onClick={() => {
+                onEnableAutoShow?.();
+                viewSaved(true);
+              }}
+              style={{
+                width: 18,
+                height: 18,
+                padding: 0,
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <TickSquareIcon color={isDark ? "#939393" : "#222222"} />
+            </button>
+          </div>
+        </div>
+      )}
       {state === "result" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div
@@ -5503,8 +5783,28 @@ function ExplainStrip({
                     color: "#939393",
                   }}
                 >
-                  {formatFreshness(result.createdAt, result.fromCache)}
+                  {savedAgeAt !== null
+                    ? `Saved ${formatSavedAge(savedAgeAt)}`
+                    : formatFreshness(result.createdAt, result.fromCache)}
                 </span>
+              )}
+              {result && canAnalyzeAgain && (
+                <button
+                  type="button"
+                  onClick={analyze}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    padding: 0,
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 14,
+                    letterSpacing: "-0.56px",
+                    color: isDark ? "#7C7CFF" : "#5B5BFF",
+                    cursor: "pointer",
+                  }}
+                >
+                  Analyze again
+                </button>
               )}
               {explainUses > 0 && (
                 <>
@@ -5664,7 +5964,7 @@ function ExplainStrip({
               </div>
             </>
           )}
-          {candidates.length > 0 && (
+          {SHOW_TRY_THIS_NEXT && candidates.length > 0 && (
             <div
               style={{
                 borderTop: isDark ? "0.8px solid #242424" : "0.8px solid #f2f2f2",
@@ -5734,6 +6034,31 @@ function ExplainStrip({
                 AI-generated from this response. it can be wrong
               </span>
             </div>
+          )}
+          {result && (
+            <KeepExplainBlock
+              isDark={isDark}
+              saved={isSaved}
+              auto={autoOpened}
+              onSave={() => {
+                onSave?.(result);
+                setIsSaved(true);
+                setAutoOpened(false);
+                setSavedAgeAt(Date.now());
+                // A fresh save is never old enough to offer a refresh.
+                setCanAnalyzeAgain(false);
+              }}
+              onRemove={() => {
+                onRemove?.();
+                setIsSaved(false);
+                setAutoOpened(false);
+                setCanAnalyzeAgain(false);
+              }}
+              onEnableAutoShow={() => {
+                onEnableAutoShow?.();
+                setAutoOpened(true);
+              }}
+            />
           )}
         </div>
       )}
@@ -5807,6 +6132,172 @@ function ExplainStrip({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// The save affordance under the Explorer explanation: an invitation to keep the
+// explanation, a saved row that offers the always-show toggle, and the enabled
+// row with a way to remove it.
+function KeepExplainBlock({
+  isDark,
+  saved,
+  auto,
+  onSave,
+  onRemove,
+  onEnableAutoShow,
+}: {
+  isDark: boolean;
+  saved: boolean;
+  auto: boolean;
+  onSave: () => void;
+  onRemove: () => void;
+  onEnableAutoShow: () => void;
+}) {
+  const titleColor = isDark ? "#b8b8b8" : "#585858";
+  const subtitleColor = isDark ? "#939393" : "#6A6767";
+  const actionColor = isDark ? "#7C7CFF" : "#5B5BFF";
+  const removeColor = "#FE2525";
+  const surface = isDark ? "#161616" : "#FAFAFA";
+  const border = isDark ? "0.8px solid #2d2d2d" : "0.6px solid #F2F2F2";
+  const actionStyle: React.CSSProperties = {
+    border: "none",
+    background: "transparent",
+    padding: 0,
+    width: "fit-content",
+    fontFamily: "Geist, var(--font-geist-sans)",
+    fontSize: 14,
+    fontWeight: 500,
+    letterSpacing: "-0.7px",
+    color: actionColor,
+    cursor: "pointer",
+  };
+
+  if (saved) {
+    return (
+      <div
+        style={{
+          marginTop: 16,
+          height: 34,
+          borderRadius: 6,
+          backgroundColor: surface,
+          border,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: 8,
+          boxSizing: "border-box",
+        }}
+      >
+        {!auto && (
+          <span
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 14,
+              fontWeight: 500,
+              letterSpacing: "-0.7px",
+              color: titleColor,
+            }}
+          >
+            Always show saved explanation
+          </span>
+        )}
+        {auto && (
+          <span
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 14,
+              fontWeight: 500,
+              letterSpacing: "-0.7px",
+              color: titleColor,
+            }}
+          >
+            Showing saved explanation automatically
+          </span>
+        )}
+        {auto ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            style={{ ...actionStyle, color: removeColor }}
+          >
+            Remove
+          </button>
+        ) : (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={false}
+            aria-label="Always show saved explanation"
+            onClick={onEnableAutoShow}
+            style={{
+              width: 18,
+              height: 18,
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <TickSquareIcon color={isDark ? "#939393" : "#818181"} />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 16,
+        borderRadius: 8,
+        backgroundColor: surface,
+        border,
+        padding: 8,
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: "Geist, var(--font-geist-sans)",
+          fontSize: 14,
+          fontWeight: 500,
+          letterSpacing: "-0.7px",
+          color: titleColor,
+        }}
+      >
+        Keep this explanation
+      </span>
+      <span
+        style={{
+          fontFamily: "Geist, var(--font-geist-sans)",
+          fontSize: 14,
+          fontWeight: 400,
+          letterSpacing: "-0.7px",
+          color: subtitleColor,
+        }}
+      >
+        Saved in this browser, so you can reopen it without using another AI
+        explainer
+      </span>
+      <button
+        type="button"
+        onClick={onSave}
+        style={{ ...actionStyle, marginTop: 4 }}
+      >
+        Save
+      </button>
     </div>
   );
 }
@@ -6091,6 +6582,10 @@ function MainContent({
   onRetryDiagnosis,
   rateLimit,
   proxyNotice,
+  savedExplains,
+  onSaveExplain,
+  onRemoveExplain,
+  onEnableAutoShow,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -6174,6 +6669,10 @@ function MainContent({
   onRetryDiagnosis: () => void;
   rateLimit: { until: number; seconds: number } | null;
   proxyNotice: { code: string; copy: string } | null;
+  savedExplains: Record<string, SavedExplain>;
+  onSaveExplain: (key: string, result: ExplainResult) => void;
+  onRemoveExplain: (key: string) => void;
+  onEnableAutoShow: (key: string) => void;
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
@@ -6344,6 +6843,10 @@ function MainContent({
     setStagedFix((s) => (s ? { ...s, fixValue: value } : s));
   };
   const isDiscovery = explainCtx !== null;
+  const explainSaveKey = response?.request
+    ? savedExplainKey(response.request.method, response.request.url)
+    : null;
+  const savedExplain = explainSaveKey ? savedExplains[explainSaveKey] : null;
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const todayKey = new Date().toDateString();
   const isTodayItem = (t: number) => new Date(t).toDateString() === todayKey;
@@ -8340,6 +8843,37 @@ function MainContent({
                           candidates={explainCandidates}
                           chipsDisabled={chipsDisabled}
                           onPick={handleCandidatePick}
+                          savedResult={savedExplain?.result ?? null}
+                          savedAt={savedExplain?.savedAt ?? null}
+                          savedAutoShow={savedExplain?.autoShow === true}
+                          onEnableAutoShow={() => {
+                            if (!explainSaveKey) return;
+                            onEnableAutoShow(explainSaveKey);
+                          }}
+                          onSave={(result) => {
+                            if (!explainSaveKey) return;
+                            onSaveExplain(explainSaveKey, result);
+                            track({
+                              name: "explain_saved",
+                              properties: {
+                                method:
+                                  response.request?.method ?? method,
+                                status: response.status,
+                              },
+                            });
+                          }}
+                          onRemove={() => {
+                            if (!explainSaveKey) return;
+                            onRemoveExplain(explainSaveKey);
+                            track({
+                              name: "explain_unsaved",
+                              properties: {
+                                method:
+                                  response.request?.method ?? method,
+                                status: response.status,
+                              },
+                            });
+                          }}
                         />
                       )}{" "}
                       {diagState !== "idle" && (
