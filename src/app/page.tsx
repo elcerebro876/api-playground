@@ -3725,13 +3725,16 @@ function Sidebar({
 
   // A saved row reopens the request it came from, exactly like its log row
   // would have.
-  const openSavedEndpoint = (endpoint: SavedFolderEndpoint) => {
-    const index = history.findIndex(
+  const historyIndexOf = (endpoint: SavedFolderEndpoint) =>
+    history.findIndex(
       (item) =>
         item.method.trim().toUpperCase() ===
           endpoint.method.trim().toUpperCase() &&
         item.url.trim() === endpoint.url.trim(),
     );
+
+  const openSavedEndpoint = (endpoint: SavedFolderEndpoint) => {
+    const index = historyIndexOf(endpoint);
     if (index < 0) return;
     onSelect(history[index], index);
   };
@@ -3999,6 +4002,10 @@ function Sidebar({
                         const badge =
                           methodBadgeColors[endpoint.method] ??
                           methodBadgeColors.GET;
+                        const endpointIndex = historyIndexOf(endpoint);
+                        const active =
+                          endpointIndex >= 0 &&
+                          endpointIndex === activeHistoryIndex;
                         return (
                           <div
                             key={`${endpoint.method} ${endpoint.url} ${index}`}
@@ -4011,6 +4018,14 @@ function Sidebar({
                               alignItems: "center",
                               gap: 8,
                               cursor: "pointer",
+                              backgroundColor:
+                                activeTheme === "Dark"
+                                  ? active
+                                    ? "#0f0f0f"
+                                    : "transparent"
+                                  : active
+                                    ? "#ffffff"
+                                    : "transparent",
                             }}
                           >
                             <span
