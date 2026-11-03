@@ -18,7 +18,7 @@ import {
 } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
-import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadExplorerExplainDismissed, saveExplorerExplainDismissed, loadExplorerExplainShown, saveExplorerExplainShown, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, loadExplainUses, saveExplainUses, loadSavedExplains, saveSavedExplain, removeSavedExplain, setSavedExplainAutoShow, savedExplainKey, type HistoryEntry, type SavedExplain } from "@/lib/storage";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadExplorerExplainDismissed, saveExplorerExplainDismissed, loadExplorerExplainShown, saveExplorerExplainShown, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, loadExplainUses, saveExplainUses, loadSavedExplains, saveSavedExplain, removeSavedExplain, setSavedExplainAutoShow, savedExplainKey, loadSavedFolders, saveSavedFolders, type HistoryEntry, type SavedExplain, type SavedFolder, type SavedFolderEndpoint } from "@/lib/storage";
 import type { ExplainResult } from "@/lib/explain";
 import { isExplainEligible, EXPLAIN_INPUT_LIMIT } from "@/lib/explain-eligibility";
 import { structureSignature } from "@/lib/explain-key";
@@ -154,6 +154,8 @@ export default function Home() {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [folders, setFolders] = useState<SavedFolder[]>([]);
+  const foldersLoadedRef = useRef(false);
   const [discoveryHistory, setDiscoveryHistory] = useState<HistoryEntry[]>([]);
   const [sessionCardTests, setSessionCardTests] = useState<
     Record<string, { key: string; entry: HistoryEntry }>
@@ -316,6 +318,17 @@ export default function Home() {
     });
     return () => cancelAnimationFrame(frame);
   }, []);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      setFolders(loadSavedFolders());
+      foldersLoadedRef.current = true;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  useEffect(() => {
+    if (!foldersLoadedRef.current) return;
+    saveSavedFolders(folders);
+  }, [folders]);
   const handleHistorySelect = (item: HistoryEntry, index: number) => {
     setActiveHistoryIndex(index);
     setActiveDiscoveryIndex(null);
@@ -984,6 +997,7 @@ export default function Home() {
               discoveryHistory={discoveryHistory}
               activeDiscoveryIndex={activeDiscoveryIndex}
               onDiscoverySelect={handleDiscoverySelect}
+              folders={folders}
               compact={isCompact}
             />{" "}
           </motion.div>{" "}
@@ -1062,6 +1076,8 @@ export default function Home() {
               onSaveExplain={handleSaveExplain}
               onRemoveExplain={handleRemoveExplain}
               onEnableAutoShow={handleEnableAutoShow}
+              folders={folders}
+              setFolders={setFolders}
             />{" "}
           </motion.div>{" "}
         </div>{" "}
@@ -3672,6 +3688,7 @@ function Sidebar({
   discoveryHistory,
   activeDiscoveryIndex,
   onDiscoverySelect,
+  folders,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -3683,13 +3700,51 @@ function Sidebar({
   discoveryHistory: HistoryEntry[];
   activeDiscoveryIndex: number | null;
   onDiscoverySelect: (item: HistoryEntry, index: number) => void;
+  folders: SavedFolder[];
 }) {
+  const [expandedFolders, setExpandedFolders] = useState<
+    Record<string, boolean>
+  >({});
+
+  const toggleFolder = (id: string) =>
+    setExpandedFolders((current) => ({
+      ...current,
+      [id]: !current[id],
+    }));
+
+  // Saved endpoints live in their folder, so the request log below does not
+  // repeat them.
+  const savedEndpointKeys = new Set(
+    folders.flatMap((folder) =>
+      folder.endpoints.map(
+        (endpoint) =>
+          `${endpoint.method.trim().toUpperCase()} ${endpoint.url.trim()}`,
+      ),
+    ),
+  );
+
+  // A saved row reopens the request it came from, exactly like its log row
+  // would have.
+  const openSavedEndpoint = (endpoint: SavedFolderEndpoint) => {
+    const index = history.findIndex(
+      (item) =>
+        item.method.trim().toUpperCase() ===
+          endpoint.method.trim().toUpperCase() &&
+        item.url.trim() === endpoint.url.trim(),
+    );
+    if (index < 0) return;
+    onSelect(history[index], index);
+  };
+
   return (
     <div
       className={`flex h-full ${compact ? "w-[196px]" : "w-[212px]"} shrink-0 flex-col`}
     >
       {" "}
-      <div className="flex shrink-0 items-center px-4 pt-4">
+      <div
+        className="flex shrink-0 items-center px-4 pt-4"
+        style={{ paddingBottom: 10 }}
+      >
         {" "}
         <span
           className={`text-sm font-medium ${activeTheme === "Dark" ? "text-white" : "text-[#585858]"}`}
@@ -3736,10 +3791,276 @@ function Sidebar({
         </div>{" "}
       </div>{" "}
       <div
+        aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          height: 1,
+          marginLeft: 16,
+          marginRight: 16,
+          backgroundColor: activeTheme === "Dark" ? "#2d2d2d" : "#F2F2F2",
+        }}
+      />{" "}
+      <div
+        style={{
+          flexShrink: 0,
+          height: 18,
+          margin: "12px 16px 4px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        {" "}
+        <span
+          className={`text-sm font-medium ${activeTheme === "Dark" ? "text-white" : "text-[#585858]"}`}
+          style={{
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontWeight: 500,
+            letterSpacing: "-0.7px",
+          }}
+        >
+          {" "}
+          Folders{" "}
+        </span>{" "}
+        <span
+          aria-hidden="true"
+          style={{
+            width: 16,
+            height: 16,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect
+              x="1.33"
+              y="1.33"
+              width="13.34"
+              height="13.34"
+              rx="3.54"
+              stroke="#5B5BFF"
+              strokeWidth="1.4"
+            />
+            <path
+              d="M8 5.2v5.6M5.2 8h5.6"
+              stroke="#5B5BFF"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
+          </svg>
+        </span>{" "}
+      </div>{" "}
+      <div
         className="flex flex-1 flex-col overflow-y-auto"
         style={{ minHeight: 0 }}
       >
         {" "}
+        {folders.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              padding: "8px 8px 0",
+            }}
+          >
+            {folders.map((folder) => {
+              const expanded = Boolean(expandedFolders[folder.id]);
+              return (
+                <div
+                  key={folder.id}
+                  style={{ display: "flex", flexDirection: "column", gap: 4 }}
+                >
+                  <div
+                    style={{
+                      height: 18,
+                      padding: "0 8px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      aria-label={`${expanded ? "Hide" : "Show"} endpoints in ${folder.name}`}
+                      aria-expanded={expanded}
+                      onClick={() => toggleFolder(folder.id)}
+                      style={{
+                        width: 16,
+                        height: 16,
+                        padding: 0,
+                        border: "none",
+                        background: "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        aria-hidden="true"
+                        style={{
+                          transform: expanded ? "rotate(90deg)" : "none",
+                          transition: "transform 0.18s ease",
+                        }}
+                      >
+                        <path
+                          d="M 6 3.5 L 10.5 8 L 6 12.5"
+                          stroke={
+                            activeTheme === "Dark" ? "#b8b8b8" : "#585858"
+                          }
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        letterSpacing: "-0.56px",
+                        color: activeTheme === "Dark" ? "#f7f7f7" : "#585858",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {folder.name}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        letterSpacing: "-0.56px",
+                        color: activeTheme === "Dark" ? "#f7f7f7" : "#585858",
+                      }}
+                    >
+                      {folder.endpoints.length}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        marginLeft: "auto",
+                        display: "flex",
+                        alignItems: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                      >
+                        <circle
+                          cx="3.6"
+                          cy="8"
+                          r="0.9"
+                          fill={
+                            activeTheme === "Dark" ? "#7a7a7a" : "#9e9e9e"
+                          }
+                        />
+                        <circle
+                          cx="8"
+                          cy="8"
+                          r="0.9"
+                          fill={
+                            activeTheme === "Dark" ? "#7a7a7a" : "#9e9e9e"
+                          }
+                        />
+                        <circle
+                          cx="12.4"
+                          cy="8"
+                          r="0.9"
+                          fill={
+                            activeTheme === "Dark" ? "#7a7a7a" : "#9e9e9e"
+                          }
+                        />
+                      </svg>
+                    </span>
+                  </div>
+                  {expanded && folder.endpoints.length > 0 && (
+                    <div
+                      style={{
+                        marginLeft: 12,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      {folder.endpoints.map((endpoint, index) => {
+                        const badge =
+                          methodBadgeColors[endpoint.method] ??
+                          methodBadgeColors.GET;
+                        return (
+                          <div
+                            key={`${endpoint.method} ${endpoint.url} ${index}`}
+                            onClick={() => openSavedEndpoint(endpoint)}
+                            style={{
+                              height: 37,
+                              borderRadius: 8,
+                              padding: "0 8px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              cursor: "pointer",
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 34,
+                                height: 21,
+                                borderRadius: 6,
+                                backgroundColor:
+                                  activeTheme === "Dark"
+                                    ? badge.darkBg
+                                    : badge.lightBg,
+                                color:
+                                  activeTheme === "Dark"
+                                    ? badge.darkText
+                                    : badge.lightText,
+                                fontFamily: "Geist, var(--font-geist-sans)",
+                                fontSize: 10,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              {endpoint.method}
+                            </span>
+                            <span
+                              style={{
+                                fontFamily: "Geist, var(--font-geist-sans)",
+                                fontSize: 12,
+                                color:
+                                  activeTheme === "Dark"
+                                    ? "#f7f7f7"
+                                    : "#585858",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {endpoint.url}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}{" "}
         {history.length === 0 ? (
           discoveryHistory.length > 0 ? null : (
           <div className="flex flex-1 flex-col items-center justify-center">
@@ -4048,23 +4369,32 @@ function Sidebar({
             style={{ padding: "8px 8px", gap: 16 }}
           >
             {" "}
-            {history.slice(0, 50).map((item, i) => (
+            {history
+              .map((item, index) => ({ item, index }))
+              .filter(
+                ({ item }) =>
+                  !savedEndpointKeys.has(
+                    `${item.method.trim().toUpperCase()} ${item.url.trim()}`,
+                  ),
+              )
+              .slice(0, 50)
+              .map(({ item, index }) => (
               <div
-                key={i}
+                key={index}
                 style={{
                   borderRadius: 6,
                   padding: "6px 8px",
                   cursor: "pointer",
                   backgroundColor:
                     activeTheme === "Dark"
-                      ? i === activeHistoryIndex
+                      ? index === activeHistoryIndex
                         ? "#0f0f0f"
                         : "#161616"
-                      : i === activeHistoryIndex
+                      : index === activeHistoryIndex
                         ? "#ffffff"
                         : "transparent",
                 }}
-                onClick={() => onSelect(item, i)}
+                onClick={() => onSelect(item, index)}
               >
                 {" "}
                 <div className="flex items-center" style={{ gap: 6 }}>
@@ -6586,6 +6916,8 @@ function MainContent({
   onSaveExplain,
   onRemoveExplain,
   onEnableAutoShow,
+  folders,
+  setFolders,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -6673,6 +7005,8 @@ function MainContent({
   onSaveExplain: (key: string, result: ExplainResult) => void;
   onRemoveExplain: (key: string) => void;
   onEnableAutoShow: (key: string) => void;
+  folders: SavedFolder[];
+  setFolders: React.Dispatch<React.SetStateAction<SavedFolder[]>>;
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
@@ -9809,22 +10143,31 @@ backgroundColor: isDark
                     width: "100%",
                   }}
                 >
-                  <UrlInputBar
-                    glass
-                    activeTheme={activeTheme}
-                    method={method}
-                    setMethod={setMethod}
-                    url={url}
-                    setUrl={setUrl}
-                    loading={loading}
-                    onSend={onSend}
-                    pendingMethodSwitch={pendingMethodSwitch}
-                    onClearPendingSwitch={() => setPendingMethodSwitch(null)}
-                    pendingUrlSwitch={pendingUrlSwitch}
-                    onClearPendingUrlSwitch={() => setPendingUrlSwitch(null)}
-                    focusSignal={focusSignal}
-                    highlightSignal={urlHighlightSignal}
-                  />
+                  <div style={{ position: "relative" }}>
+                    <UrlInputBar
+                      glass
+                      activeTheme={activeTheme}
+                      method={method}
+                      setMethod={setMethod}
+                      url={url}
+                      setUrl={setUrl}
+                      loading={loading}
+                      onSend={onSend}
+                      pendingMethodSwitch={pendingMethodSwitch}
+                      onClearPendingSwitch={() => setPendingMethodSwitch(null)}
+                      pendingUrlSwitch={pendingUrlSwitch}
+                      onClearPendingUrlSwitch={() => setPendingUrlSwitch(null)}
+                      focusSignal={focusSignal}
+                      highlightSignal={urlHighlightSignal}
+                    />
+                    <SaveToFolderButton
+                      isDark={isDark}
+                      folders={folders}
+                      setFolders={setFolders}
+                      method={method}
+                      url={url}
+                    />
+                  </div>
                   <StagedFixEditor
                     stagedFix={stagedFix}
                     isDark={isDark}
@@ -9938,22 +10281,31 @@ backgroundColor: isDark
                   </RippleButton>
                 </motion.div>
               ) : explainCtx ? null : (
-                <UrlInputBar
-                  glass
-                  activeTheme={activeTheme}
-                  method={method}
-                  setMethod={setMethod}
-                  url={url}
-                  setUrl={setUrl}
-                  loading={loading}
-                  onSend={onSend}
-                  pendingMethodSwitch={pendingMethodSwitch}
-                  onClearPendingSwitch={() => setPendingMethodSwitch(null)}
-                  pendingUrlSwitch={pendingUrlSwitch}
-                  onClearPendingUrlSwitch={() => setPendingUrlSwitch(null)}
-                  focusSignal={focusSignal}
-                  highlightSignal={urlHighlightSignal}
-                />
+                <div style={{ position: "relative" }}>
+                  <UrlInputBar
+                    glass
+                    activeTheme={activeTheme}
+                    method={method}
+                    setMethod={setMethod}
+                    url={url}
+                    setUrl={setUrl}
+                    loading={loading}
+                    onSend={onSend}
+                    pendingMethodSwitch={pendingMethodSwitch}
+                    onClearPendingSwitch={() => setPendingMethodSwitch(null)}
+                    pendingUrlSwitch={pendingUrlSwitch}
+                    onClearPendingUrlSwitch={() => setPendingUrlSwitch(null)}
+                    focusSignal={focusSignal}
+                    highlightSignal={urlHighlightSignal}
+                  />
+                  <SaveToFolderButton
+                    isDark={isDark}
+                    folders={folders}
+                    setFolders={setFolders}
+                    method={method}
+                    url={url}
+                  />
+                </div>
               )}{" "}
             </div>{" "}
           </>
@@ -14074,6 +14426,625 @@ function BrowseApiSection({
     </motion.div>
   );
 }
+// The save-to-folder affordance beside the composer. The label is only a hint:
+// it shows for a few seconds so people learn what the bookmark does, then the
+// button settles into its compact icon-only form.
+const SAVE_TO_FOLDER_HINT_MS = 5_000;
+const SAVE_TO_FOLDER_TOAST_MS = 5_000;
+
+function BookmarkIcon({
+  color,
+  filled = false,
+}: {
+  color: string;
+  filled?: boolean;
+}) {
+  if (filled) {
+    return (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        fill="none"
+        aria-hidden="true"
+        style={{ flexShrink: 0 }}
+      >
+        <g transform="translate(2.85 1.33)">
+          <path
+            d="M 3.02846 5.312 C 2.75246 5.312 2.52846 5.088 2.52846 4.812 C 2.52846 4.536 2.75246 4.312 3.02846 4.312 L 7.59847 4.312 C 7.87447 4.312 8.09847 4.536 8.09847 4.812 C 8.09847 5.088 7.87447 5.312 7.59847 5.312 L 3.02846 5.312 Z M 10.6245 5.95267 C 10.6245 0.89 9.83047 0 5.3138 0 C 0.79713 0 0.00312964 0.89 0.00312964 5.95267 L 0.00112979 7.32667 C -0.00487041 11.0767 -0.00753689 12.4807 0.56513 13.0533 C 0.750463 13.2393 0.996463 13.3333 1.2958 13.3333 C 1.93246 13.3333 2.64046 12.7287 3.39046 12.088 C 4.05447 11.5207 4.80714 10.878 5.3138 10.878 C 5.82047 10.878 6.57314 11.5207 7.23714 12.088 C 7.98714 12.7287 8.69514 13.3333 9.3318 13.3333 C 9.63114 13.3333 9.87714 13.2393 10.0625 13.0533 C 10.6351 12.4807 10.6325 11.0767 10.6265 7.32667 L 10.6245 5.95267 Z"
+            fill={color}
+            fillRule="evenodd"
+          />
+        </g>
+      </svg>
+    );
+  }
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+      style={{ flexShrink: 0 }}
+    >
+      <path
+        d="M 10.10025 1.53 L 5.86099 1.53 C 4.11128 1.53 2.8 2.21505 2.8 3.97678 L 2.8 13.7927 C 2.8 14.2765 3.32064 14.5813 3.74236 14.3447 L 7.99699 11.9581 L 12.21487 14.3407 C 12.63726 14.5786 13.1592 14.2739 13.1592 13.7893 L 13.1592 4.09909 C 13.1592 2.26517 11.90543 1.53 10.10025 1.53 Z"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M 5.52 6.02 L 10.4 6.02"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function SaveToFolderButton({
+  isDark,
+  folders,
+  setFolders,
+  method,
+  url,
+}: {
+  isDark: boolean;
+  folders: SavedFolder[];
+  setFolders: React.Dispatch<React.SetStateAction<SavedFolder[]>>;
+  method: string;
+  url: string;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [folderName, setFolderName] = useState("");
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => setExpanded(false), SAVE_TO_FOLDER_HINT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const closePopover = useCallback(() => {
+    setOpen(false);
+    setCreating(false);
+    setFolderName("");
+  }, []);
+
+  const savedFolder =
+    folders.find((folder) =>
+      folder.endpoints.some(
+        (endpoint) =>
+          endpoint.method.trim().toUpperCase() ===
+            method.trim().toUpperCase() && endpoint.url.trim() === url.trim(),
+      ),
+    ) ?? null;
+  const saved = savedFolder !== null;
+  const separator = isDark ? "#2d2d2d" : "#F2F2F2";
+  const rows = [
+    { id: "unsorted", name: "Unsorted", count: 0 },
+    ...folders.map((folder) => ({
+      id: folder.id,
+      name: folder.name,
+      count: folder.endpoints.length,
+    })),
+  ];
+
+  const showToast = (name: string) => {
+    setToast(name);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(
+      () => setToast(null),
+      SAVE_TO_FOLDER_TOAST_MS,
+    );
+  };
+
+  const createFolder = () => {
+    const name = folderName.trim();
+    if (!name) return;
+    const now = Date.now();
+    const id = `folder-${now}`;
+    setFolders((current) => [
+      ...current,
+      {
+        id,
+        name,
+        createdAt: now,
+        endpoints: [{ method, url, savedAt: now }],
+      },
+    ]);
+    closePopover();
+    showToast(name);
+  };
+
+  const removeFolder = () => {
+    const folder = savedFolder;
+    if (!folder) return;
+    setFolders((current) =>
+      current.filter((entry) => entry.id !== folder.id),
+    );
+  };
+
+  const undoToast = () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(null);
+    removeFolder();
+  };
+
+  useEffect(() => {
+    if (creating) nameInputRef.current?.focus();
+  }, [creating]);
+
+  useEffect(() => {
+    if (!open) return;
+    const dismissOnPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (buttonRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      closePopover();
+    };
+    const dismissOnKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (creating) {
+        setCreating(false);
+        setFolderName("");
+        return;
+      }
+      closePopover();
+    };
+    document.addEventListener("mousedown", dismissOnPointerDown);
+    document.addEventListener("keydown", dismissOnKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", dismissOnPointerDown);
+      document.removeEventListener("keydown", dismissOnKeyDown);
+    };
+  }, [open, creating, closePopover]);
+
+  const surface = isDark ? "#161616" : "#ffffff";
+  const line = isDark ? "0.8px solid #2d2d2d" : "0.8px solid #F2F2F2";
+  const listSurface = isDark ? "#1b1b1b" : "#FAFAFA";
+  const rowText = isDark ? "#b8b8b8" : "#585858";
+  const countText = isDark ? "#939393" : "#585858";
+  const titleColor = isDark ? "#ffffff" : "#222222";
+  const linkColor = isDark ? "#7C7CFF" : "#5B5BFF";
+  const quietColor = isDark ? "#7a7a7a" : "#9E9E9E";
+  const radioStroke = isDark ? "#3a3a3a" : "#E6E6E6";
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        aria-label="Save to Folder"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => {
+          if (open) {
+            closePopover();
+            return;
+          }
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          setToast(null);
+          setOpen(true);
+        }}
+        style={{
+          position: "absolute",
+          left: "100%",
+          top: "50%",
+          transform: "translateY(-50%)",
+          marginLeft: 16,
+          width: expanded ? 122 : 32,
+          height: expanded ? 32 : 28,
+          boxSizing: "border-box",
+          padding: 0,
+          paddingLeft: 8,
+          border: "none",
+          borderRadius: 6,
+          backgroundColor: isDark ? "#242424" : "#E8E8E8",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          overflow: "hidden",
+          cursor: "pointer",
+          flexShrink: 0,
+          transition:
+            "width 0.32s ease, height 0.32s ease, background-color 0.4s ease",
+        }}
+      >
+        <BookmarkIcon
+          color={saved ? "#5B5BFF" : "#939393"}
+          filled={saved}
+        />
+        <span
+          style={{
+            fontFamily: "Geist, var(--font-geist-sans)",
+            fontSize: 14,
+            lineHeight: "20px",
+            letterSpacing: "-0.56px",
+            color: "#939393",
+            whiteSpace: "nowrap",
+            opacity: expanded ? 1 : 0,
+            transition: "opacity 0.2s ease",
+          }}
+        >
+          Save to Folder
+        </span>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            ref={popoverRef}
+            role="dialog"
+            aria-label="Save to folder"
+            initial={{ opacity: 0, y: 8, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.99 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+            layout
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: "calc(100% + 16px)",
+              zIndex: 40,
+              boxSizing: "border-box",
+              padding: 12,
+              display: "flex",
+              flexDirection: "column",
+              backgroundColor: surface,
+              border: line,
+              borderRadius: 8,
+              transformOrigin: "bottom center",
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, delay: 0.05, ease: "easeOut" }}
+              style={{ display: "flex", flexDirection: "column" }}
+            >
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  lineHeight: "18px",
+                  letterSpacing: "-0.56px",
+                  color: titleColor,
+                }}
+              >
+                Save to folder
+              </span>
+              <div
+                style={{
+                  marginTop: 8,
+                  border: line,
+                  borderRadius: 6,
+                  backgroundColor: listSurface,
+                  overflow: "hidden",
+                }}
+              >
+                {rows.map((row, index) => {
+                  const ticked = row.id === savedFolder?.id;
+                  return (
+                    <div
+                      key={row.id}
+                      style={{
+                        height: 42,
+                        boxSizing: "border-box",
+                        padding: "0 12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        borderTop: index === 0 ? undefined : `1px solid ${separator}`,
+                      }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          width: 16,
+                          height: 16,
+                          boxSizing: "border-box",
+                          borderRadius: "50%",
+                          border: `1px solid ${ticked ? "#5B5BFF" : radioStroke}`,
+                          backgroundColor: listSurface,
+                          flexShrink: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {ticked && (
+                          <span
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              backgroundColor: "#5B5BFF",
+                            }}
+                          />
+                        )}
+                      </span>
+                      <span
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          fontFamily: "Geist, var(--font-geist-sans)",
+                          fontSize: 14,
+                          letterSpacing: "-0.56px",
+                          color: rowText,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {row.name}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "Geist, var(--font-geist-sans)",
+                          fontSize: 14,
+                          letterSpacing: "-0.56px",
+                          color: countText,
+                        }}
+                      >
+                        {row.count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {saved ? (
+                <div
+                  style={{
+                    marginTop: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 14,
+                      letterSpacing: "-0.56px",
+                      color: quietColor,
+                    }}
+                  >
+                    Saved in this browser
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removeFolder}
+                    style={{
+                      padding: 0,
+                      border: "none",
+                      background: "transparent",
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 14,
+                      fontWeight: 500,
+                      letterSpacing: "-0.56px",
+                      color: "#FE2525",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : creating ? (
+                <div
+                  style={{
+                    marginTop: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <input
+                    ref={nameInputRef}
+                    value={folderName}
+                    onChange={(event) => setFolderName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") createFolder();
+                    }}
+                    placeholder="Enter the name of your folder"
+                    aria-label="Folder name"
+                    className={
+                      isDark
+                        ? "placeholder:text-[#7a7a7a]"
+                        : "placeholder:text-[#9E9E9E]"
+                    }
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      height: 42,
+                      boxSizing: "border-box",
+                      padding: "0 12px",
+                      borderRadius: 8,
+                      border: isDark
+                        ? "1px solid #2d2d2d"
+                        : "1px solid #F2F2F2",
+                      backgroundColor: isDark ? "#121212" : "#FCFCFC",
+                      color: isDark ? "#d1d1d1" : "#585858",
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 14,
+                      letterSpacing: "-0.56px",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={createFolder}
+                    style={{
+                      height: 30,
+                      flexShrink: 0,
+                      padding: "0 8px",
+                      border: "none",
+                      borderRadius: 6,
+                      backgroundColor: "#5B5BFF",
+                      color: "#ffffff",
+                      fontFamily: "Geist, var(--font-geist-sans)",
+                      fontSize: 14,
+                      letterSpacing: "-0.56px",
+                      whiteSpace: "nowrap",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Create and save
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCreating(true)}
+                  style={{
+                    marginTop: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: 0,
+                    border: "none",
+                    background: "transparent",
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    letterSpacing: "-0.56px",
+                    color: linkColor,
+                    cursor: "pointer",
+                  }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <rect
+                      x="1.33"
+                      y="1.33"
+                      width="13.34"
+                      height="13.34"
+                      rx="3.54"
+                      stroke={linkColor}
+                      strokeWidth="1.4"
+                    />
+                    <path
+                      d="M8 5.2v5.6M5.2 8h5.6"
+                      stroke={linkColor}
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  Create new folder
+                </button>
+              )}
+              {!saved && (
+                <span
+                  style={{
+                    marginTop: 8,
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 14,
+                    letterSpacing: "-0.56px",
+                    color: quietColor,
+                  }}
+                >
+                  {creating
+                    ? "Create the folder and saves this endpoint in it"
+                    : "Auth headers aren’t saved"}
+                </span>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {toast && (
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: "calc(100% + 8px)",
+              display: "flex",
+              justifyContent: "center",
+              pointerEvents: "none",
+              zIndex: 30,
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              style={{
+                height: 34,
+                boxSizing: "border-box",
+                padding: "0 8px",
+                display: "flex",
+                alignItems: "center",
+                gap: 24,
+                borderRadius: 6,
+                backgroundColor: isDark ? "#161616" : "#FAFAFA",
+                border: isDark
+                  ? "0.6px solid #2d2d2d"
+                  : "0.6px solid #F2F2F2",
+                pointerEvents: "auto",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 14,
+                  letterSpacing: "-0.56px",
+                  color: isDark ? "#b8b8b8" : "#585858",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Saved to {toast}
+              </span>
+              <button
+                type="button"
+                onClick={undoToast}
+                style={{
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  letterSpacing: "-0.56px",
+                  color: "#FE2525",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Undo
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
 function UrlInputBar({
   compact,
   glass,

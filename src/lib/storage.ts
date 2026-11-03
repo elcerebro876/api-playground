@@ -223,6 +223,83 @@ export function removeSavedExplain(
   return next;
 }
 
+// Endpoints the user filed into folders in this browser. A folder is a curated
+// shelf, independent of the request log and of saved explanations.
+export type SavedFolderEndpoint = {
+  method: string;
+  url: string;
+  savedAt: number;
+};
+
+export type SavedFolder = {
+  id: string;
+  name: string;
+  createdAt: number;
+  endpoints: SavedFolderEndpoint[];
+};
+
+const SAVED_FOLDERS_KEY = "api-playground-folders";
+const SAVED_FOLDERS_MAX = 50;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readFolderEndpoint(value: unknown): SavedFolderEndpoint | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.method !== "string" || typeof value.url !== "string") {
+    return null;
+  }
+  return {
+    method: value.method,
+    url: value.url,
+    savedAt: typeof value.savedAt === "number" ? value.savedAt : Date.now(),
+  };
+}
+
+export function loadSavedFolders(): SavedFolder[] {
+  try {
+    const raw = window.localStorage.getItem(SAVED_FOLDERS_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const folders: SavedFolder[] = [];
+    for (const value of parsed) {
+      if (!isRecord(value)) continue;
+      if (typeof value.id !== "string" || typeof value.name !== "string") {
+        continue;
+      }
+      const endpoints = Array.isArray(value.endpoints)
+        ? value.endpoints
+            .map(readFolderEndpoint)
+            .filter((entry): entry is SavedFolderEndpoint => entry !== null)
+        : [];
+      folders.push({
+        id: value.id,
+        name: value.name,
+        createdAt:
+          typeof value.createdAt === "number" ? value.createdAt : Date.now(),
+        endpoints,
+      });
+      if (folders.length >= SAVED_FOLDERS_MAX) break;
+    }
+    return folders;
+  } catch {
+    return [];
+  }
+}
+
+export function saveSavedFolders(folders: SavedFolder[]): void {
+  try {
+    window.localStorage.setItem(
+      SAVED_FOLDERS_KEY,
+      JSON.stringify(folders.slice(0, SAVED_FOLDERS_MAX)),
+    );
+  } catch {
+    /* storage unavailable — silent fallback to in-memory */
+  }
+}
+
 export type CardTestRecord = {
   key: string;
   entry: HistoryEntry;
