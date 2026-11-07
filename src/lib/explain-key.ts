@@ -72,6 +72,9 @@ function templateSegment(segment: string): string {
   if (DATE_RE.test(segment)) return ":x";
   if (NUMBER_RE.test(segment)) return ":x";
   if (LONG_HEX_RE.test(segment)) return ":x";
+  // Slugs and opaque ids with a digit collapse too. Version prefixes (`v1`)
+  // are kept so different API versions never share a cache entry.
+  if (/\d/.test(segment) && !/^v\d+$/i.test(segment)) return ":x";
   return segment;
 }
 

@@ -9,8 +9,8 @@ export function formatSavedAge(
   if (seconds < 60) return "just now";
   const hours = Math.floor(seconds / 3600);
   if (seconds < 24 * 3600) return `${Math.max(1, hours)}h ago`;
-  const days = Math.floor(seconds / (24 * 3600));
-  return `${Math.max(1, days)} days ago`;
+  const days = Math.max(1, Math.floor(seconds / (24 * 3600)));
+  return `${days} ${days === 1 ? "day" : "days"} ago`;
 }
 
 export function formatFreshness(
@@ -25,6 +25,6 @@ export function formatFreshness(
   if (seconds < 60) return "Just now";
   const hours = Math.floor(seconds / 3600);
   if (seconds < 24 * 3600) return `from cache ${Math.max(1, hours)}h ago`;
-  const days = Math.floor(seconds / (24 * 3600));
-  return `from cache ${Math.max(1, days)} days ago`;
+  const days = Math.max(1, Math.floor(seconds / (24 * 3600)));
+  return `from cache ${days} ${days === 1 ? "day" : "days"} ago`;
 }

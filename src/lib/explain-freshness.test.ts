@@ -24,7 +24,7 @@ test("a cache hit under a day reports hours", () => {
 });
 
 test("a cache hit of a day or more reports days", () => {
-  assert.equal(formatFreshness(iso(24 * 3600 * 1000), true, NOW), "from cache 1 days ago");
+  assert.equal(formatFreshness(iso(24 * 3600 * 1000), true, NOW), "from cache 1 day ago");
   assert.equal(
     formatFreshness(iso(3 * 24 * 3600 * 1000), true, NOW),
     "from cache 3 days ago",
@@ -40,7 +40,7 @@ test("a saved explanation reports how long ago it was saved", () => {
   assert.equal(formatSavedAge(NOW - 59_999, NOW), "just now");
   assert.equal(formatSavedAge(NOW - 60_000, NOW), "1h ago");
   assert.equal(formatSavedAge(NOW - 5 * 3600 * 1000, NOW), "5h ago");
-  assert.equal(formatSavedAge(NOW - 24 * 3600 * 1000, NOW), "1 days ago");
+  assert.equal(formatSavedAge(NOW - 24 * 3600 * 1000, NOW), "1 day ago");
   assert.equal(
     formatSavedAge(NOW - 3 * 24 * 3600 * 1000, NOW),
     "3 days ago",

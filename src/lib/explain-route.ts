@@ -32,7 +32,6 @@ import { maskErrorForReport, maskUrlSecrets } from "@/lib/diagnose";
 type ExplainPayloadInput = {
   method?: unknown;
   url?: unknown;
-  apiName?: unknown;
   status?: unknown;
   body?: unknown;
   contentType?: unknown;
@@ -83,6 +82,23 @@ function defaultDailyLimit(request: Request): Promise<RateLimitResult> {
 
 function defaultGlobalLimit(): Promise<RateLimitResult> {
   return consumeGlobalDaily("explain", explainGlobalDailyMax());
+}
+
+const UNAVAILABLE_ERROR = "Explanations aren't available right now.";
+
+function unavailableExplain(): Response {
+  return Response.json({ error: UNAVAILABLE_ERROR }, { status: 503 });
+}
+
+// The API name is derived from the request host, never from the client payload,
+// so crafted text cannot reach the prompt that feeds the shared cache.
+function apiNameFromUrl(rawUrl: string): string {
+  try {
+    const host = new URL(rawUrl).hostname.replace(/^www\./i, "");
+    return host || "API";
+  } catch {
+    return "API";
+  }
 }
 
 function collectLeakValues(value: unknown, out: Set<string>): void {
@@ -142,20 +158,6 @@ export async function handleExplain(
   const dailyLimit = deps.dailyLimit ?? defaultDailyLimit;
   const globalLimit = deps.globalLimit ?? defaultGlobalLimit;
 
-  const burst = await (deps.burstLimit ?? defaultBurstLimit)(request);
-  if (!burst.ok) {
-    if ("retryAfter" in burst) {
-      return Response.json(
-        {
-          error: "Too many requests, try again later",
-          code: "burst",
-          retryAfterSec: burst.retryAfter,
-        },
-        { status: 429, headers: { "Retry-After": String(burst.retryAfter) } },
-      );
-    }
-  }
-
   let payload: ExplainPayloadInput;
   try {
     payload = await request.json();
@@ -165,10 +167,7 @@ export async function handleExplain(
 
   const rawUrl = typeof payload.url === "string" ? payload.url.trim() : "";
   const endpointUrl = rawUrl.slice(0, 500);
-  const apiName =
-    typeof payload.apiName === "string" && payload.apiName.trim()
-      ? payload.apiName.trim().slice(0, 100)
-      : "API";
+  const apiName = apiNameFromUrl(endpointUrl);
   const status = Number(payload.status);
   const body = (typeof payload.body === "string" ? payload.body : "").slice(
     0,
@@ -247,10 +246,7 @@ export async function handleExplain(
   }
 
   if (!aiConfigured()) {
-    return Response.json(
-      { error: "Explanations aren't available right now." },
-      { status: 503 },
-    );
+    return unavailableExplain();
   }
 
   let parsedBody: unknown = null;
@@ -271,26 +267,39 @@ export async function handleExplain(
     ? structureSignature(parsedBody)
     : clientStructure;
 
-  let capRemaining: number | undefined;
-  const daily = await dailyLimit(request);
-  if (!daily.ok) {
-    if ("retryAfter" in daily) {
-      return Response.json(
-        {
-          error: "You've used your 3 free explanations today.",
-          code: "cap",
-          scope: "ip",
-          retryAfterSec: daily.retryAfter,
-        },
-        { status: 429, headers: { "Retry-After": String(daily.retryAfter) } },
-      );
-    }
-  } else {
-    capRemaining = daily.remaining;
+  // Burst runs after the cache so cache hits never consume it. A store outage
+  // must fail closed: without the counters there is no cap on model spend.
+  const burst = await (deps.burstLimit ?? defaultBurstLimit)(request);
+  if (!burst.ok) {
+    if ("unavailable" in burst) return unavailableExplain();
+    return Response.json(
+      {
+        error: "Too many requests, try again later",
+        code: "burst",
+        retryAfterSec: burst.retryAfter,
+      },
+      { status: 429, headers: { "Retry-After": String(burst.retryAfter) } },
+    );
   }
 
+  const daily = await dailyLimit(request);
+  if (!daily.ok) {
+    if ("unavailable" in daily) return unavailableExplain();
+    return Response.json(
+      {
+        error: "You've used your 3 free explanations today.",
+        code: "cap",
+        scope: "ip",
+        retryAfterSec: daily.retryAfter,
+      },
+      { status: 429, headers: { "Retry-After": String(daily.retryAfter) } },
+    );
+  }
+  const capRemaining = daily.remaining;
+
   const global = await globalLimit();
-  if (!global.ok && "retryAfter" in global) {
+  if (!global.ok) {
+    if ("unavailable" in global) return unavailableExplain();
     return Response.json(
       {
         error: "Explanations are at capacity today. Try again tomorrow.",
@@ -331,9 +340,7 @@ export async function handleExplain(
     ttlSecs: EXPLAIN_TTL_SECS,
     truncated,
   };
-  if (capRemaining !== undefined) {
-    result.cap = { remaining: capRemaining };
-  }
+  result.cap = { remaining: capRemaining };
 
   if (cacheKey && bodyParsed && !sectionsLeakValues(sections, body)) {
     await cachePut(cacheKey, sections, EXPLAIN_TTL_SECS);

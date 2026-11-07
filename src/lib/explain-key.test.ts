@@ -60,6 +60,22 @@ test("ids, dates, uuids and long hex segments collapse to :x", () => {
   assert.ok(first?.includes("/v1/items/:x/:x/:x/:x"));
 });
 
+test("slug segments with a digit collapse, version prefixes do not", () => {
+  const first = key({
+    url: "https://api.example.com/v1/orgs/acme-corp-2",
+  });
+  const second = key({
+    url: "https://api.example.com/v1/orgs/globex-7",
+  });
+  assert.equal(first, second);
+  assert.ok(first?.includes("/v1/orgs/:x"));
+
+  assert.notEqual(
+    key({ url: "https://api.example.com/v1/items" }),
+    key({ url: "https://api.example.com/v2/items" }),
+  );
+});
+
 test("credentialed requests return null", () => {
   assert.equal(key({ credentialed: true }), null);
   assert.equal(

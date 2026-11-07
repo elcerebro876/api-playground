@@ -23,7 +23,7 @@ import type { ExplainResult } from "@/lib/explain";
 import { isExplainEligible, EXPLAIN_INPUT_LIMIT } from "@/lib/explain-eligibility";
 import { structureSignature } from "@/lib/explain-key";
 import { buildCandidates, type Candidate } from "@/lib/explain-candidates";
-import { DIAGNOSIS_MAX_USES, SECRET_HEADER_RE, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
+import { DIAGNOSIS_MAX_USES, SECRET_HEADER_RE, SECRET_QUERY_RE, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed, track } from "@/lib/posthog";
 import { formatFreshness, formatSavedAge } from "@/lib/explain-freshness";
 import {
@@ -141,6 +141,14 @@ export default function Home() {
   const [headerKey, setHeaderKey] = useState("");
   const [headerBearer, setHeaderBearer] = useState("");
   const [headerValue, setHeaderValue] = useState("");
+  const [composerTab, setComposerTab] = useState<"headers" | "body">("headers");
+  const [bodyMode, setBodyMode] = useState<"json" | "form" | "text">("json");
+  const [bodyText, setBodyText] = useState("");
+  const [formFields, setFormFields] = useState<
+    { key: string; value: string }[]
+  >([{ key: "", value: "" }]);
+  const [deleteBody, setDeleteBody] = useState(false);
+  const [showBrowseApi, setShowBrowseApi] = useState(false);
   const [response, setResponse] = useState<{
     status?: number;
     ok?: boolean;
@@ -576,6 +584,46 @@ export default function Home() {
         if (headerKey && headerValue) h[headerKey] = headerValue;
         if (headerBearer) h["Authorization"] = `Bearer ${headerBearer}`;
       }
+      // The composer draft only goes with a direct send, never a history
+      // replay or a Discovery request.
+      const includeDraftBody = !opts?.headers && !opts?.apiName;
+      const upperMethod = m.toUpperCase();
+      const bodyAllowed =
+        includeDraftBody &&
+        upperMethod !== "GET" &&
+        upperMethod !== "HEAD" &&
+        (upperMethod !== "DELETE" || deleteBody);
+      let requestBody: string | undefined;
+      let autoContentType = "";
+      if (bodyAllowed) {
+        if (bodyMode === "json") {
+          if (bodyText.trim()) {
+            requestBody = bodyText;
+            autoContentType = "application/json";
+          }
+        } else if (bodyMode === "text") {
+          if (bodyText) {
+            requestBody = bodyText;
+            autoContentType = "text/plain";
+          }
+        } else {
+          const params = new URLSearchParams();
+          for (const field of formFields) {
+            if (field.key.trim()) params.append(field.key, field.value);
+          }
+          if (params.toString()) {
+            requestBody = params.toString();
+            autoContentType = "application/x-www-form-urlencoded";
+          }
+        }
+      }
+      if (
+        requestBody !== undefined &&
+        autoContentType &&
+        !Object.keys(h).some((key) => key.toLowerCase() === "content-type")
+      ) {
+        h["Content-Type"] = autoContentType;
+      }
       diagTokenRef.current += 1;
       setDiagState("idle");
       setDiag(null);
@@ -593,7 +641,7 @@ export default function Home() {
             method: m,
             url: u,
             headers: h,
-            body: undefined,
+            body: requestBody,
           }),
         });
         const data = await res.json();
@@ -792,6 +840,10 @@ export default function Home() {
       headerKey,
       headerBearer,
       headerValue,
+      bodyMode,
+      bodyText,
+      formFields,
+      deleteBody,
       history,
       discoveryHistory,
       apisTested,
@@ -830,7 +882,10 @@ export default function Home() {
             ),
             contentType: responseHeaders?.["content-type"] ?? "",
             truncated: response?.truncated === true,
-            credentialed: hasCredentialHeader(explainCtx.headers),
+            credentialed: hasCredentialInput(
+              explainCtx.url,
+              explainCtx.headers,
+            ),
           }),
         });
         const data = await res.json();
@@ -999,6 +1054,14 @@ export default function Home() {
               onDiscoverySelect={handleDiscoverySelect}
               folders={folders}
               compact={isCompact}
+              showBrowseApi={showBrowseApi}
+              onOpenBrowse={() => {
+                setShowBrowseApi(true);
+                setLoading(false);
+                setResponse(null);
+                setActiveHistoryIndex(null);
+                setActiveDiscoveryIndex(null);
+              }}
             />{" "}
           </motion.div>{" "}
           {!isCompact && (
@@ -1028,6 +1091,16 @@ export default function Home() {
               setHeaderBearer={setHeaderBearer}
               headerValue={headerValue}
               setHeaderValue={setHeaderValue}
+              composerTab={composerTab}
+              setComposerTab={setComposerTab}
+              bodyMode={bodyMode}
+              setBodyMode={setBodyMode}
+              bodyText={bodyText}
+              setBodyText={setBodyText}
+              formFields={formFields}
+              setFormFields={setFormFields}
+              deleteBody={deleteBody}
+              setDeleteBody={setDeleteBody}
               response={response}
               loading={loading}
               onSend={(opts) => sendRequest(opts)}
@@ -1041,6 +1114,11 @@ export default function Home() {
                 setHeaderKey("");
                 setHeaderBearer("");
                 setHeaderValue("");
+                setComposerTab("headers");
+                setBodyMode("json");
+                setBodyText("");
+                setFormFields([{ key: "", value: "" }]);
+                setDeleteBody(false);
               }}
               onEditRequest={() => setResponse(null)}
               responseKey={responseKey}
@@ -1051,6 +1129,8 @@ export default function Home() {
               onHistorySelect={handleHistorySelect}
               compact={isCompact}
               w1440={is1440}
+              showBrowseApi={showBrowseApi}
+              setShowBrowseApi={setShowBrowseApi}
               explainCtx={explainCtx}
               explainPopupOpen={explainPopupOpen}
               
@@ -3689,6 +3769,8 @@ function Sidebar({
   activeDiscoveryIndex,
   onDiscoverySelect,
   folders,
+  showBrowseApi,
+  onOpenBrowse,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -3701,6 +3783,8 @@ function Sidebar({
   activeDiscoveryIndex: number | null;
   onDiscoverySelect: (item: HistoryEntry, index: number) => void;
   folders: SavedFolder[];
+  showBrowseApi: boolean;
+  onOpenBrowse: () => void;
 }) {
   const [expandedFolders, setExpandedFolders] = useState<
     Record<string, boolean>
@@ -4593,6 +4677,77 @@ function Sidebar({
           </>
         )}{" "}
       </div>{" "}
+      <div style={{ flexShrink: 0, padding: "0 10px 12px" }}>
+        <div
+          style={{
+            borderRadius: 8,
+            backgroundColor: activeTheme === "Dark" ? "#161616" : "#ffffff",
+            border:
+              activeTheme === "Dark"
+                ? "0.8px solid #2d2d2d"
+                : "0.8px solid #f2f2f2",
+            padding: 16,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          <div
+            style={{
+              width: 45,
+              height: 45,
+              borderRadius: 8,
+              background:
+                "url('/browse-api-icon.png') center/cover no-repeat",
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 16,
+              fontWeight: 500,
+              letterSpacing: "-0.8px",
+              color: activeTheme === "Dark" ? "#ffffff" : "#222222",
+            }}
+          >
+            {showBrowseApi ? "Browsing API" : "Browse API"}
+          </span>
+          <span
+            style={{
+              fontFamily: "Geist, var(--font-geist-sans)",
+              fontSize: 12,
+              lineHeight: "16px",
+              letterSpacing: "-0.48px",
+              color: activeTheme === "Dark" ? "#adadad" : "#939393",
+            }}
+          >
+            Pick a use case, test a real API in seconds, Stripe, OpenAI, and 13
+            more — ready to poke at.
+          </span>
+          {!showBrowseApi && (
+            <button
+              type="button"
+              onClick={onOpenBrowse}
+              style={{
+                width: 53,
+                height: 28,
+                borderRadius: 6,
+                border: "none",
+                backgroundColor: "#5b5bff",
+                color: "#ffffff",
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 12,
+                letterSpacing: "-0.48px",
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              Search
+            </button>
+          )}
+        </div>
+      </div>{" "}
       <div className="shrink-0 px-3 pb-3">
         {" "}
         <ThemeToggle
@@ -5044,11 +5199,26 @@ function pathnameOf(value: string): string {
   }
 }
 
-function hasCredentialHeader(headers?: Record<string, string>): boolean {
-  if (!headers) return false;
-  return Object.keys(headers).some((key) =>
-    SECRET_HEADER_RE.test(key.toLowerCase()),
-  );
+function hasCredentialInput(
+  url?: string,
+  headers?: Record<string, string>,
+): boolean {
+  if (
+    headers &&
+    Object.keys(headers).some((key) => SECRET_HEADER_RE.test(key.toLowerCase()))
+  ) {
+    return true;
+  }
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.username || parsed.password) return true;
+    return [...parsed.searchParams.keys()].some((key) =>
+      SECRET_QUERY_RE.test(key),
+    );
+  } catch {
+    return false;
+  }
 }
 
 // Retry-After is either a delay in seconds or an HTTP-date. Returns whole
@@ -6376,7 +6546,7 @@ function ExplainStrip({
                   color: "#939393",
                 }}
               >
-                AI-generated from this response. it can be wrong
+                AI-generated from this response. It can be wrong.
               </span>
             </div>
           )}
@@ -6894,6 +7064,16 @@ function MainContent({
   setHeaderBearer,
   headerValue,
   setHeaderValue,
+  composerTab,
+  setComposerTab,
+  bodyMode,
+  setBodyMode,
+  bodyText,
+  setBodyText,
+  formFields,
+  setFormFields,
+  deleteBody,
+  setDeleteBody,
   response,
   loading,
   onSend,
@@ -6933,6 +7113,8 @@ function MainContent({
   onEnableAutoShow,
   folders,
   setFolders,
+  showBrowseApi,
+  setShowBrowseApi,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -6947,6 +7129,18 @@ function MainContent({
   setHeaderBearer: (v: string) => void;
   headerValue: string;
   setHeaderValue: (v: string) => void;
+  composerTab: "headers" | "body";
+  setComposerTab: (v: "headers" | "body") => void;
+  bodyMode: "json" | "form" | "text";
+  setBodyMode: (v: "json" | "form" | "text") => void;
+  bodyText: string;
+  setBodyText: (v: string) => void;
+  formFields: { key: string; value: string }[];
+  setFormFields: React.Dispatch<
+    React.SetStateAction<{ key: string; value: string }[]>
+  >;
+  deleteBody: boolean;
+  setDeleteBody: (v: boolean) => void;
   response: {
     status?: number;
     ok?: boolean;
@@ -7022,10 +7216,11 @@ function MainContent({
   onEnableAutoShow: (key: string) => void;
   folders: SavedFolder[];
   setFolders: React.Dispatch<React.SetStateAction<SavedFolder[]>>;
+  showBrowseApi: boolean;
+  setShowBrowseApi: (value: boolean) => void;
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
-  const [showBrowseApi, setShowBrowseApi] = useState(false);
   const [stagedFix, setStagedFix] = useState<StagedFix | null>(null);
   const [fixingNow, setFixingNow] = useState(false);
   const fixTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -7282,6 +7477,36 @@ function MainContent({
     Record<string, boolean>
   >({});
   const [headersCollapsed, setHeadersCollapsed] = useState(false);
+  const supportsBody = method !== "GET" && method !== "HEAD";
+  const showBodyTab =
+    supportsBody && (method !== "DELETE" || deleteBody);
+  const activeComposerTab: "headers" | "body" = showBodyTab
+    ? composerTab
+    : "headers";
+  const autoContentType =
+    bodyMode === "json"
+      ? "application/json"
+      : bodyMode === "form"
+        ? "application/x-www-form-urlencoded"
+        : "text/plain";
+  const bodyFootnote =
+    method === "POST"
+      ? "POST creates a new resource. Send the data for it."
+      : method === "PUT"
+        ? "PUT replaces the whole resource. Send the full object"
+        : method === "PATCH"
+          ? "PATCH updates part of a resource. Send only the field to change"
+          : "A few APIs expect a body on DELETE. Most don’t";
+  const expandedCardHeight =
+    activeComposerTab === "body"
+      ? bodyMode === "form"
+        ? 407 + (Math.max(1, formFields.length) - 1) * 56
+        : 467
+      : method === "DELETE" && !deleteBody
+        ? 395
+        : method === "GET" || method === "HEAD"
+          ? 340
+          : 363;
   const resultContentRef = useRef<HTMLDivElement>(null);
   const [resultHeight, setResultHeight] = useState<number | "auto">("auto");
   useEffect(() => {
@@ -7389,7 +7614,11 @@ function MainContent({
                     className="relative shrink-0"
                     initial={false}
                     animate={{
-                      height: headerExpanded ? 340 : compact ? 191 : 193,
+                      height: headerExpanded
+                        ? expandedCardHeight
+                        : compact
+                          ? 191
+                          : 193,
                     }}
                     transition={headersPanelTransition}
                     style={{
@@ -7566,21 +7795,59 @@ function MainContent({
                                   height: 44,
                                   paddingLeft: 16,
                                   paddingRight: 16,
+                                  position: "relative",
                                 }}
                               >
                                 {" "}
                                 <span
+                                  onClick={() => setComposerTab("headers")}
                                   style={{
                                     fontFamily: "Geist, var(--font-geist-sans)",
                                     fontSize: 12,
                                     fontWeight: 500,
                                     letterSpacing: "-0.6px",
-                                    color: isDark ? "#f7f7f7" : "#585858",
+                                    color:
+                                      activeComposerTab === "headers"
+                                        ? isDark
+                                          ? "#f7f7f7"
+                                          : "#585858"
+                                        : "#9e9e9e",
+                                    cursor: "pointer",
                                   }}
                                 >
                                   {" "}
                                   Headers{" "}
                                 </span>{" "}
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    left: 16,
+                                    bottom: 6,
+                                    width: 64,
+                                    height: 1,
+                                    backgroundColor: isDark
+                                      ? "#d1d1d1"
+                                      : "#585858",
+                                    opacity:
+                                      activeComposerTab === "headers" ? 1 : 0,
+                                  }}
+                                />
+                                {showBodyTab && (
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      left: 96,
+                                      bottom: 6,
+                                      width: 32,
+                                      height: 1,
+                                      backgroundColor: isDark
+                                        ? "#d1d1d1"
+                                        : "#585858",
+                                      opacity:
+                                        activeComposerTab === "body" ? 1 : 0,
+                                    }}
+                                  />
+                                )}{" "}
                                 <div
                                   style={{
                                     position: "relative",
@@ -7683,9 +7950,38 @@ function MainContent({
                                     )}{" "}
                                   </AnimatePresence>{" "}
                                 </div>{" "}
+                                {showBodyTab && (
+                                  <span
+                                    onClick={() => setComposerTab("body")}
+                                    style={{
+                                      marginLeft: 12,
+                                      fontFamily:
+                                        "Geist, var(--font-geist-sans)",
+                                      fontSize: 12,
+                                      fontWeight: 500,
+                                      letterSpacing: "-0.6px",
+                                      color:
+                                        activeComposerTab === "body"
+                                          ? isDark
+                                            ? "#f7f7f7"
+                                            : "#585858"
+                                          : "#9e9e9e",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    {" "}
+                                    Body{" "}
+                                  </span>
+                                )}{" "}
                                 <div
                                   className="ml-auto flex items-center"
-                                  style={{ gap: 4 }}
+                                  style={{
+                                    gap: 4,
+                                    display:
+                                      activeComposerTab === "headers"
+                                        ? "flex"
+                                        : "none",
+                                  }}
                                 >
                                   {" "}
                                   <div style={{ width: 15, height: 16 }}>
@@ -7762,7 +8058,69 @@ function MainContent({
                                     </span>{" "}
                                   </div>{" "}
                                 </div>{" "}
+                                <div
+                                  className="ml-auto flex items-center"
+                                  style={{
+                                    gap: 4,
+                                    display:
+                                      activeComposerTab === "body"
+                                        ? "flex"
+                                        : "none",
+                                  }}
+                                >
+                                  {bodyMode === "json" && (
+                                    <span
+                                      onClick={() => {
+                                        try {
+                                          setBodyText(
+                                            JSON.stringify(
+                                              JSON.parse(bodyText),
+                                              null,
+                                              2,
+                                            ),
+                                          );
+                                        } catch {
+                                          /* keep invalid JSON as typed */
+                                        }
+                                      }}
+                                      style={{
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        letterSpacing: "-0.48px",
+                                        color: "#5b5bff",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      Prettify
+                                    </span>
+                                  )}
+                                  {bodyMode === "form" && (
+                                    <>
+                                      <IconlyPlus size={15} color="#5b5bff" />
+                                      <span
+                                        onClick={() =>
+                                          setFormFields((rows) => [
+                                            ...rows,
+                                            { key: "", value: "" },
+                                          ])
+                                        }
+                                        style={{
+                                          fontFamily:
+                                            "Geist, var(--font-geist-sans)",
+                                          fontSize: 12,
+                                          letterSpacing: "-0.48px",
+                                          color: "#5b5bff",
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        Add field
+                                      </span>
+                                    </>
+                                  )}
+                                </div>{" "}
                               </div>{" "}
+                                {activeComposerTab === "headers" ? (
                                 <>
                                   <div
                                     className="flex"
@@ -7940,7 +8298,466 @@ function MainContent({
                                   </div>{" "}
                                 </div>{" "}
                               </div>{" "}
+                              {method === "DELETE" && !deleteBody && (
+                                <div
+                                  className="flex items-center"
+                                  style={{
+                                    gap: 4,
+                                    padding: "0 16px 10px",
+                                    cursor: "pointer",
+                                  }}
+                                  onClick={() => {
+                                    setDeleteBody(true);
+                                    setComposerTab("body");
+                                  }}
+                                >
+                                  <IconlyPlus size={15} color="#5b5bff" />
+                                  <span
+                                    style={{
+                                      fontFamily:
+                                        "Geist, var(--font-geist-sans)",
+                                      fontSize: 12,
+                                      letterSpacing: "-0.48px",
+                                      color: "#5b5bff",
+                                    }}
+                                  >
+                                    Add body
+                                  </span>
+                                </div>
+                              )}
+                              {method !== "GET" && method !== "HEAD" && (
+                                <div
+                                  style={{
+                                    padding: "0 16px 12px",
+                                    fontFamily: "Geist, var(--font-geist-sans)",
+                                    fontSize: 12,
+                                    letterSpacing: "-0.48px",
+                                    color: "#939393",
+                                  }}
+                                >
+                                  {method === "DELETE"
+                                    ? "A few APIs expect a body on DELETE. Most don’t"
+                                    : "Content-Type is added automatically from the Body type."}
+                                </div>
+                              )}
                                 </>
+                                ) : (
+                                <div
+                                  style={{
+                                    padding: "0 16px 16px",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: 8,
+                                      marginTop: 4,
+                                    }}
+                                  >
+                                    {(
+                                      [
+                                        ["json", "JSON"],
+                                        ["form", "Form"],
+                                        ["text", "Text"],
+                                      ] as const
+                                    ).map(([value, label]) => {
+                                      const active = bodyMode === value;
+                                      return (
+                                        <button
+                                          key={value}
+                                          onClick={() => setBodyMode(value)}
+                                          style={{
+                                            height: 28,
+                                            padding: "0 9px",
+                                            borderRadius: 6,
+                                            fontFamily:
+                                              "Geist, var(--font-geist-sans)",
+                                            fontSize: 12,
+                                            letterSpacing: "-0.48px",
+                                            cursor: "pointer",
+                                            backgroundColor: active
+                                              ? isDark
+                                                ? "#16162e"
+                                                : "#e6e6ff"
+                                              : isDark
+                                                ? "#161616"
+                                                : "#ffffff",
+                                            border: `1px solid ${
+                                              active
+                                                ? isDark
+                                                  ? "#3a3a6b"
+                                                  : "#c9c9ff"
+                                                : isDark
+                                                  ? "#2d2d2d"
+                                                  : "#f2f2f2"
+                                            }`,
+                                            color: active
+                                              ? "#5b5bff"
+                                              : "#9e9e9e",
+                                          }}
+                                        >
+                                          {label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  {bodyMode === "json" && (
+                                    <textarea
+                                      value={bodyText}
+                                      onChange={(e) =>
+                                        setBodyText(e.target.value)
+                                      }
+                                      spellCheck={false}
+                                      placeholder={
+                                        '{\n  "key": "value"\n}'
+                                      }
+                                      style={{
+                                        marginTop: 16,
+                                        width: "100%",
+                                        height: 100,
+                                        resize: "none",
+                                        borderRadius: 8,
+                                        border: isDark
+                                          ? "1px solid #312f2f"
+                                          : "1px solid #f2f2f2",
+                                        backgroundColor: isDark
+                                          ? "#0c0c0c"
+                                          : "#ffffff",
+                                        padding: "10px 12px",
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        lineHeight: "24px",
+                                        letterSpacing: "-0.48px",
+                                        color: isDark ? "#c7c7c7" : "#6e6d6d",
+                                        outline: "none",
+                                        boxSizing: "border-box",
+                                        scrollbarWidth: "none",
+                                        msOverflowStyle: "none",
+                                      }}
+                                    />
+                                  )}
+                                  {bodyMode === "text" && (
+                                    <>
+                                    <div
+                                      style={{
+                                        marginTop: 16,
+                                        height: 76,
+                                        borderRadius: 8,
+                                        border: isDark
+                                          ? "1px solid #312f2f"
+                                          : "1px solid #f2f2f2",
+                                        backgroundColor: isDark
+                                          ? "#0c0c0c"
+                                          : "#ffffff",
+                                        overflow: "hidden",
+                                      }}
+                                    >
+                                      <textarea
+                                        value={bodyText}
+                                        onChange={(e) =>
+                                          setBodyText(e.target.value)
+                                        }
+                                        spellCheck={false}
+                                        placeholder="Type or paste plain text"
+                                        style={{
+                                          width: "100%",
+                                          height: "100%",
+                                          resize: "none",
+                                          border: "none",
+                                          backgroundColor: "transparent",
+                                          padding: "10px 12px",
+                                          fontFamily:
+                                            "Geist, var(--font-geist-sans)",
+                                          fontSize: 12,
+                                          lineHeight: "24px",
+                                          letterSpacing: "-0.48px",
+                                          color: isDark
+                                            ? "#c7c7c7"
+                                            : "#6e6d6d",
+                                          outline: "none",
+                                          boxSizing: "border-box",
+                                          scrollbarWidth: "none",
+                                          msOverflowStyle: "none",
+                                        }}
+                                      />
+                                    </div>
+                                    <span
+                                      style={{
+                                        display: "block",
+                                        marginTop: 8,
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        letterSpacing: "-0.48px",
+                                        color: "#9e9e9e",
+                                      }}
+                                    >
+                                      {bodyText.length} characters
+                                    </span>
+                                    </>
+                                  )}
+                                  {bodyMode === "form" && (
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 16,
+                                        marginTop: 16,
+                                      }}
+                                    >
+                                      {formFields.map((field, index) => (
+                                        <div
+                                          key={index}
+                                          className="flex items-center"
+                                          style={{ gap: 16 }}
+                                        >
+                                          <input
+                                            type="text"
+                                            placeholder="Key"
+                                            value={field.key}
+                                            onChange={(e) =>
+                                              setFormFields((rows) =>
+                                                rows.map((row, i) =>
+                                                  i === index
+                                                    ? {
+                                                        ...row,
+                                                        key: e.target.value,
+                                                      }
+                                                    : row,
+                                                ),
+                                              )
+                                            }
+                                            className="placeholder:text-[#6e6d6d]"
+                                            style={{
+                                              width: compact ? 166 : 203,
+                                              height: 40,
+                                              borderRadius: 8,
+                                              border: isDark
+                                                ? "1px solid #312f2f"
+                                                : "1px solid #f2f2f2",
+                                              backgroundColor: isDark
+                                                ? "#212121"
+                                                : "#ffffff",
+                                              padding: "0 12px",
+                                              fontFamily:
+                                                "Geist, var(--font-geist-sans)",
+                                              fontSize: 12,
+                                              letterSpacing: "-0.48px",
+                                              color: isDark
+                                                ? "#c7c7c7"
+                                                : "#6e6d6d",
+                                              outline: "none",
+                                              boxSizing: "border-box",
+                                            }}
+                                          />
+                                          <div
+                                            style={{
+                                              position: "relative",
+                                              width: compact ? 179 : 216,
+                                            }}
+                                          >
+                                            <input
+                                              type="text"
+                                              placeholder="Value"
+                                              value={field.value}
+                                              onChange={(e) =>
+                                                setFormFields((rows) =>
+                                                  rows.map((row, i) =>
+                                                    i === index
+                                                      ? {
+                                                          ...row,
+                                                          value:
+                                                            e.target.value,
+                                                        }
+                                                      : row,
+                                                  ),
+                                                )
+                                              }
+                                              className="placeholder:text-[#6e6d6d]"
+                                              style={{
+                                                width: 216,
+                                                height: 40,
+                                                borderRadius: 8,
+                                                border: isDark
+                                                  ? "1px solid #312f2f"
+                                                  : "1px solid #f2f2f2",
+                                                backgroundColor: isDark
+                                                  ? "#212121"
+                                                  : "#ffffff",
+                                                padding: "0 32px 0 12px",
+                                                fontFamily:
+                                                  "Geist, var(--font-geist-sans)",
+                                                fontSize: 12,
+                                                letterSpacing: "-0.48px",
+                                                color: isDark
+                                                  ? "#c7c7c7"
+                                                  : "#6e6d6d",
+                                                outline: "none",
+                                                boxSizing: "border-box",
+                                              }}
+                                            />
+                                            <span
+                                              onClick={() =>
+                                                setFormFields((rows) => {
+                                                  const next = rows.filter(
+                                                    (_, i) => i !== index,
+                                                  );
+                                                  return next.length
+                                                    ? next
+                                                    : [{ key: "", value: "" }];
+                                                })
+                                              }
+                                              style={{
+                                                position: "absolute",
+                                                right: 10,
+                                                top: 12,
+                                                fontSize: 14,
+                                                lineHeight: "16px",
+                                                color: "#9e9e9e",
+                                                cursor: "pointer",
+                                              }}
+                                            >
+                                              ×
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: 12,
+                                      marginTop: 16,
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        width: compact ? 150 : 184,
+                                        height: 40,
+                                        borderRadius: 8,
+                                        border: isDark
+                                          ? "1px solid #312f2f"
+                                          : "1px solid #f2f2f2",
+                                        backgroundColor: isDark
+                                          ? "#0c0c0c"
+                                          : "#fafafa",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        padding: "0 12px",
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        letterSpacing: "-0.48px",
+                                        color: isDark
+                                          ? "#8c8c8c"
+                                          : "#5b5b5b",
+                                        boxSizing: "border-box",
+                                      }}
+                                    >
+                                      Content-Type
+                                    </div>
+                                    <div
+                                      style={{
+                                        flex: 1,
+                                        height: 40,
+                                        position: "relative",
+                                        borderRadius: 8,
+                                        border: isDark
+                                          ? "1px solid #312f2f"
+                                          : "1px solid #f2f2f2",
+                                        backgroundColor: isDark
+                                          ? "#0c0c0c"
+                                          : "#fafafa",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        padding: "0 60px 0 12px",
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        letterSpacing: "-0.48px",
+                                        color: isDark
+                                          ? "#8c8c8c"
+                                          : "#5b5b5b",
+                                        boxSizing: "border-box",
+                                        overflow: "hidden",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                        }}
+                                      >
+                                        {autoContentType}
+                                      </span>
+                                      <span
+                                        style={{
+                                          position: "absolute",
+                                          right: 12,
+                                          top: 8,
+                                          height: 24,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          borderRadius: 6,
+                                          padding: "0 8px",
+                                          backgroundColor: isDark
+                                            ? "#1c1c1c"
+                                            : "#eeeeee",
+                                          fontSize: 12,
+                                          letterSpacing: "-0.48px",
+                                          color: "#9e9e9e",
+                                        }}
+                                      >
+                                        Auto
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div
+                                    className="flex items-center"
+                                    style={{
+                                      justifyContent: "space-between",
+                                      gap: 8,
+                                      marginTop: 8,
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        letterSpacing: "-0.48px",
+                                        color: "#939393",
+                                      }}
+                                    >
+                                      {bodyFootnote}
+                                    </span>
+                                    {method === "DELETE" && deleteBody && (
+                                      <span
+                                        onClick={() => {
+                                          setDeleteBody(false);
+                                          setComposerTab("headers");
+                                        }}
+                                        style={{
+                                          fontFamily:
+                                            "Geist, var(--font-geist-sans)",
+                                          fontSize: 12,
+                                          letterSpacing: "-0.48px",
+                                          color: "#5b5bff",
+                                          cursor: "pointer",
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        Remove body
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                )}
                             </div>{" "}
                           </motion.div>{" "}
                           <motion.div
@@ -9183,7 +10000,8 @@ function MainContent({
                           body={response.body ?? ""}
                           contentType={response.headers?.["content-type"]}
                           truncated={explainEligibility.truncated}
-                          credentialed={hasCredentialHeader(
+                          credentialed={hasCredentialInput(
+                            response.request?.url ?? url,
                             response.request?.url === lastRequest?.url
                               ? lastRequest?.headers
                               : undefined,
@@ -10709,128 +11527,7 @@ backgroundColor: isDark
           )}{" "}
         </AnimatePresence>{" "}
       </div>{" "}
-      {!response && !loading && !showBrowseApi && (
-        <motion.div
-          variants={cardItemVariants}
-          initial="hidden"
-          animate="visible"
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 16,
-            display: "flex",
-            justifyContent: "center",
-            zIndex: 10,
-          }}
-        >
-          {" "}
-          <div
-            style={{
-              width: compact ? 423 : 528,
-              backgroundColor: isDark ? "#161616" : "#fcfcfc",
-              borderRadius: 10,
-              display: "flex",
-              alignItems: "flex-start",
-              padding: 12,
-              gap: 16,
-              cursor: "pointer",
-              boxSizing: "border-box",
-            }}
-            onClick={() => setShowBrowseApi(true)}
-          >
-            {" "}
-            <div
-              style={{
-                width: 69,
-                height: 69,
-                borderRadius: 8,
-                background:
-                  "url('/browse-api-icon.png') center/cover no-repeat",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              {" "}
-              <span
-                style={{
-                  fontFamily: "Geist, var(--font-geist-sans)",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: "white",
-                }}
-              >
-                {"{ }"}
-              </span>{" "}
-            </div>{" "}
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-                minWidth: 0,
-              }}
-            >
-              {" "}
-              <span
-                style={{
-                  fontFamily: "Geist, var(--font-geist-sans)",
-                  fontSize: 16,
-                  fontWeight: 500,
-                  letterSpacing: "-0.8px",
-                  color: isDark ? "#ffffff" : "#222",
-                }}
-              >
-                Browse API
-              </span>{" "}
-              <span
-                style={{
-                  fontFamily: "Geist, var(--font-geist-sans)",
-                  fontSize: 14,
-                  letterSpacing: "-0.56px",
-                  lineHeight: "20px",
-                  color: isDark ? "#adadad" : "#939393",
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
-              >
-                Pick a use case, test a real API in seconds, Stripe, OpenAI, and
-                13 more â€” ready to poke at.
-              </span>{" "}
-            </div>{" "}
-            <RippleButton
-              style={{
-                flexShrink: 0,
-                alignSelf: "flex-start",
-                display: "flex",
-                alignItems: "center",
-                borderRadius: 6,
-                backgroundColor: "#5a5aff",
-                padding: "6px 12px",
-                cursor: "pointer",
-              }}
-            >
-              {" "}
-              <span
-                style={{
-                  fontFamily: "Geist, var(--font-geist-sans)",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  color: "white",
-                  textAlign: "center",
-                }}
-              >
-                Search
-              </span>{" "}
-            </RippleButton>{" "}
-          </div>{" "}
-        </motion.div>
-      )}{" "}
+
       <AnimatePresence>
         {" "}
         {explainPanelOpen && (
@@ -11704,6 +12401,7 @@ function BrowseApiSection({
     },
   ];
   const [activeFilter, setActiveFilter] = useState("Everything");
+  const [searchQuery, setSearchQuery] = useState("");
   const [hoveredApi, setHoveredApi] = useState<string | null>(null);
   const [selectedApi, setSelectedApi] = useState<(typeof apis)[number] | null>(
     null,
@@ -11979,12 +12677,19 @@ function BrowseApiSection({
     "Comms",
     "Quick wins",
   ];
-  const filteredApis =
+  const filteredApis = (
     activeFilter === "Everything"
       ? apis
       : activeFilter === "Quick wins"
         ? apis.filter((a) => a.tag === "No auth")
-        : apis.filter((a) => a.category === activeFilter);
+        : apis.filter((a) => a.category === activeFilter)
+  ).filter((api) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    return `${api.name} ${api.desc} ${api.category}`
+      .toLowerCase()
+      .includes(query);
+  });
   const comingSoon = ["Auth", "AI", "Data", "Comms"];
   const nextCategories =
     activeFilter && comingSoon.includes(activeFilter)
@@ -12150,10 +12855,10 @@ function BrowseApiSection({
                 <h1
                   style={{
                     fontFamily: "Geist, var(--font-geist-sans)",
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: 500,
-                    letterSpacing: "-1px",
-                    color: isDark ? "#ffffff" : "#222222",
+                    letterSpacing: "-0.8px",
+                    color: isDark ? "#ffffff" : "#585858",
                     margin: 0,
                     marginBottom: 4,
                   }}
@@ -12163,7 +12868,8 @@ function BrowseApiSection({
                 <p
                   style={{
                     fontFamily: "Geist, var(--font-geist-sans)",
-                    fontSize: 14,
+                    fontSize: 12,
+                    letterSpacing: "-0.48px",
                     color: isDark ? "#adadad" : "#939393",
                     margin: 0,
                   }}
@@ -12177,13 +12883,11 @@ function BrowseApiSection({
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
-                  borderRadius: 8,
-                  border: isDark
+                  width: 344,
+                  borderBottom: isDark
                     ? "0.8px solid #2d2d2d"
                     : "0.8px solid #f2f2f2",
-                  backgroundColor: isDark ? undefined : "#ffffff",
-                  padding: "8px 12px",
-                  minWidth: 200,
+                  paddingBottom: 8,
                   marginTop: 4,
                 }}
               >
@@ -12207,60 +12911,27 @@ function BrowseApiSection({
                     strokeLinejoin="round"
                   />{" "}
                 </svg>{" "}
-                <span
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search...."
+                  className="placeholder:text-[#999999]"
                   style={{
-                    fontFamily: "Geist, var(--font-geist-sans)",
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color: "#999999",
-                  }}
-                >
-                  Search....
-                </span>{" "}
-              </div>{" "}
-            </div>{" "}
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                marginTop: 16,
-                flexWrap: "wrap",
-              }}
-            >
-              {" "}
-              {filters.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setActiveFilter(f)}
-                  style={{
-                    fontFamily: "Geist, var(--font-geist-sans)",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    color:
-                      activeFilter === f
-                        ? isDark
-                          ? "#F7F7F7"
-                          : "#656363"
-                        : isDark
-                          ? "#9e9e9e"
-                          : "#818181",
-                    backgroundColor:
-                      activeFilter === f
-                        ? isDark
-                          ? "#2F2F2F"
-                          : "#efefef"
-                        : isDark
-                          ? "transparent"
-                          : "#fcfcfc",
-                    borderRadius: 4,
+                    flex: 1,
+                    minWidth: 0,
                     border: "none",
-                    padding: "4px 10px",
-                    cursor: "pointer",
+                    outline: "none",
+                    background: "transparent",
+                    padding: 0,
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 16,
+                    fontWeight: 500,
+                    letterSpacing: "-0.64px",
+                    color: isDark ? "#f7f7f7" : "#222222",
                   }}
-                >
-                  {f}
-                </button>
-              ))}{" "}
+                />{" "}
+              </div>{" "}
             </div>{" "}
           </motion.div>{" "}
         </div>{" "}
@@ -12279,6 +12950,58 @@ function BrowseApiSection({
           }}
         >
           {" "}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              marginBottom: 16,
+              flexShrink: 0,
+            }}
+          >
+            {" "}
+            {filters.map((f) => (
+              <button
+                key={f}
+                onClick={() => setActiveFilter(f)}
+                style={{
+                  fontFamily: "Geist, var(--font-geist-sans)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color:
+                    activeFilter === f
+                      ? isDark
+                        ? "#F7F7F7"
+                        : "#666363"
+                      : isDark
+                        ? "#9e9e9e"
+                        : "#939393",
+                  backgroundColor:
+                    activeFilter === f
+                      ? isDark
+                        ? "#2F2F2F"
+                        : "#efefef"
+                      : isDark
+                        ? "transparent"
+                        : "#fcfcfc",
+                  borderRadius: 4,
+                  border:
+                    activeFilter === f
+                      ? "none"
+                      : isDark
+                        ? "0.8px solid #2d2d2d"
+                        : "0.8px solid #f2f2f2",
+                  height: 24,
+                  padding: "0 8px",
+                  display: "flex",
+                  alignItems: "center",
+                  cursor: "pointer",
+                }}
+              >
+                {f}
+              </button>
+            ))}{" "}
+          </div>{" "}
           <div
             ref={scrollRef}
             onScroll={handleScroll}
@@ -12330,12 +13053,7 @@ function BrowseApiSection({
                     padding: 12,
                     display: "flex",
                     flexDirection: "column",
-                    height:
-                      api.tag === "No auth"
-                        ? compact || w1440
-                          ? 203
-                          : 210
-                        : (api.height ?? 205),
+                    height: 205,
                     transition: "background-color 0.15s ease",
                     cursor: "pointer",
                   }}
@@ -12400,9 +13118,9 @@ function BrowseApiSection({
                       <span
                         style={{
                           fontFamily: "Geist, var(--font-geist-sans)",
-                          fontSize: w1440 ? 12 : 14,
-                          letterSpacing: w1440 ? "-0.6px" : "-0.7px",
-                          color: isDark ? "#E5E5E5" : "#656363",
+                          fontSize: 12,
+                          letterSpacing: "-0.48px",
+                          color: isDark ? "#E5E5E5" : "#666363",
                           cursor: "pointer",
                         }}
                       >
@@ -12432,11 +13150,11 @@ function BrowseApiSection({
                   <span
                     style={{
                       fontFamily: "Geist, var(--font-geist-sans)",
-                      fontSize: compact || w1440 ? 14 : 16,
+                      fontSize: 16,
                       fontWeight: 600,
-                      letterSpacing: compact || w1440 ? "-0.7px" : "-0.8px",
+                      letterSpacing: "-0.8px",
                       color: isDark ? "#FFFFFF" : "#585858",
-                      marginTop: w1440 ? 10 : 11,
+                      marginTop: 12,
                     }}
                   >
                     {api.name}
@@ -12444,11 +13162,11 @@ function BrowseApiSection({
                   <span
                     style={{
                       fontFamily: "Geist, var(--font-geist-sans)",
-                      fontSize: compact || w1440 ? 12 : 14,
-                      letterSpacing: compact || w1440 ? "-0.48px" : "-0.56px",
+                      fontSize: 14,
+                      letterSpacing: "-0.56px",
                       color: isDark ? "#F7F7F7" : "#939393",
                       lineHeight: "20px",
-                      marginTop: w1440 ? 4 : 3,
+                      marginTop: 2,
                     }}
                   >
                     {api.desc}
@@ -12583,7 +13301,7 @@ function BrowseApiSection({
                         display: "flex",
                         flexDirection: "column",
                         gap: 4,
-                        marginTop: compact || w1440 ? 8 : "auto",
+                        marginTop: "auto",
                       }}
                     >
                       {" "}
@@ -12605,13 +13323,9 @@ function BrowseApiSection({
                         <span
                           style={{
                             fontFamily: "Geist, var(--font-geist-sans)",
-                            fontSize: compact ? 14 : w1440 ? 12 : 16,
+                            fontSize: 16,
                             fontWeight: 500,
-                            letterSpacing: compact
-                              ? "-0.7px"
-                              : w1440
-                                ? "-0.6px"
-                                : "-0.8px",
+                            letterSpacing: "-0.8px",
                             color: isDark
                               ? "#DC7800"
                               : (api.labelColor ?? "#DC7800"),
@@ -12633,9 +13347,8 @@ function BrowseApiSection({
                                 <span
                                   style={{
                                     fontFamily: "Geist, var(--font-geist-sans)",
-                                    fontSize: compact || w1440 ? 12 : 14,
-                                    letterSpacing:
-                                      compact || w1440 ? "-0.48px" : "-0.56px",
+                                    fontSize: 14,
+                                    letterSpacing: "-0.56px",
                                     color: "#DC7800",
                                     lineHeight: "20px",
                                   }}
@@ -12650,9 +13363,8 @@ function BrowseApiSection({
                               <span
                                 style={{
                                   fontFamily: "Geist, var(--font-geist-sans)",
-                                  fontSize: compact || w1440 ? 12 : 14,
-                                  letterSpacing:
-                                    compact || w1440 ? "-0.48px" : "-0.56px",
+                                  fontSize: 14,
+                                  letterSpacing: "-0.56px",
                                   color: "#DC7800",
                                   lineHeight: "20px",
                                 }}
