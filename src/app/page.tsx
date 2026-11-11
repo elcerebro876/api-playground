@@ -7318,6 +7318,28 @@ function MainContent({
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
+  // Edit flow: the request pill expands into an inline editor while a frosted
+  // layer covers the response answers behind it.
+  const [editing, setEditing] = useState(false);
+  const [editMenuOpen, setEditMenuOpen] = useState(false);
+  const editUrlRef = useRef<HTMLInputElement | null>(null);
+  const editMethods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+  useEffect(() => {
+    if (!editing) return;
+    const timer = setTimeout(() => {
+      const input = editUrlRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(0, 0);
+      input.scrollLeft = 0;
+    }, 160);
+    return () => clearTimeout(timer);
+  }, [editing]);
+  // A new response (send, log row, retry) leaves the editor.
+  useEffect(() => {
+    setEditing(false);
+    setEditMenuOpen(false);
+  }, [responseKey]);
   const [stagedFix, setStagedFix] = useState<StagedFix | null>(null);
   const [fixingNow, setFixingNow] = useState(false);
   const fixTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -7837,6 +7859,28 @@ function MainContent({
       }}
     >
       {" "}
+      <motion.div
+        aria-hidden="true"
+        initial={false}
+        animate={{ opacity: editing ? 1 : 0 }}
+        transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+        onClick={() => {
+          setEditing(false);
+          setEditMenuOpen(false);
+        }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 4,
+          borderRadius: 14,
+          backdropFilter: "blur(8px) saturate(0.45)",
+          WebkitBackdropFilter: "blur(8px) saturate(0.45)",
+          background: isDark
+            ? "linear-gradient(135deg, rgba(120,120,120,0.34), rgba(60,60,60,0.05))"
+            : "linear-gradient(135deg, rgba(180,180,180,0.4), rgba(230,230,230,0.05))",
+          pointerEvents: editing ? "auto" : "none",
+        }}
+      />{" "}
       <div
         className={`flex flex-1 flex-col ${showBrowseApi ? "w-full" : "items-center"}`}
         style={{ flexShrink: 0, minHeight: 0 }}
@@ -9530,25 +9574,37 @@ function MainContent({
               }}
             >
               {" "}
-              <div
+              <motion.div
+                layout
+                transition={{
+                  type: "spring",
+                  stiffness: 420,
+                  damping: 38,
+                  mass: 0.9,
+                }}
                 className="flex flex-col"
                 style={{
+                  position: "relative",
+                  zIndex: 5,
                   marginRight: 24,
                   marginTop: 24,
                   marginLeft: "auto",
-                  width: "fit-content",
+                  width: editing ? 310 : "fit-content",
                   maxWidth: "calc(100% - 48px)",
                   boxSizing: "border-box",
                   borderRadius: 10,
                   backgroundColor: isDark ? "#0f0f0f" : "#fcfcfc",
-                  padding: "14px 16px 12px",
-                  gap: 10,
+                  padding: editing ? 16 : "14px 16px 12px",
+                  gap: editing ? 16 : 10,
                 }}
               >
                 {" "}
                 <div
                   className="flex items-center"
-                  style={{ gap: 12, alignItems: urlWrapped ? "flex-start" : "center" }}
+                  style={{
+                    gap: 12,
+                    alignItems: editing || !urlWrapped ? "center" : "flex-start",
+                  }}
                 >
                   {" "}
                   <div
@@ -9558,45 +9614,249 @@ function MainContent({
                       borderRadius: "50%",
                       backgroundColor: methodColors[method] ?? methodColors.GET,
                       flexShrink: 0,
-                      marginTop: urlWrapped ? 6 : undefined,
+                      marginTop: !editing && urlWrapped ? 6 : undefined,
                     }}
                   />{" "}
-                  <span
-                    ref={pillUrlRef}
+                  {editing ? (
+                    <input
+                      ref={editUrlRef}
+                      value={url}
+                      onChange={(event) => setUrl(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          setEditing(false);
+                          setEditMenuOpen(false);
+                          onSend();
+                        } else if (event.key === "Escape") {
+                          setEditing(false);
+                          setEditMenuOpen(false);
+                        }
+                      }}
+                      placeholder="Paste an API endpoint..."
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        border: "none",
+                        outline: "none",
+                        background: "transparent",
+                        padding: 0,
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        color: isDark ? "#d1d1d1" : "#5a5a5a",
+                      }}
+                    />
+                  ) : (
+                    <span
+                      ref={pillUrlRef}
+                      style={{
+                        display: "block",
+                        maxWidth: 375,
+                        whiteSpace: "normal",
+                        overflowWrap: "anywhere",
+                        wordBreak: "break-word",
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        color: isDark ? "#d1d1d1" : "#5a5a5a",
+                      }}
+                    >
+                      {url || "/v1/nodes/status"}
+                    </span>
+                  )}
+                  {editing && (
+                    <button
+                      onClick={() => setEditMenuOpen((open) => !open)}
+                      aria-label="Choose method"
+                      aria-expanded={editMenuOpen}
+                      className="flex items-center"
+                      style={{
+                        gap: 4,
+                        flexShrink: 0,
+                        border: "none",
+                        background: "transparent",
+                        padding: 0,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: "Geist, var(--font-geist-sans)",
+                          fontSize: 12,
+                          fontWeight: 500,
+                          letterSpacing: "-0.6px",
+                          color: methodColors[method] ?? methodColors.GET,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {method}
+                      </span>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                      >
+                        <path
+                          d="M4 6l4 4 4-4"
+                          stroke={isDark ? "#9e9e9e" : "#5a5a5a"}
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>{" "}
+                {editing ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.22,
+                      ease: [0.25, 0.1, 0.25, 1],
+                    }}
                     style={{
-                      display: "block",
-                      maxWidth: 375,
-                      whiteSpace: "normal",
-                      overflowWrap: "anywhere",
-                      wordBreak: "break-word",
-                      fontFamily: "Geist, var(--font-geist-sans)",
-                      fontSize: 14,
-                      color: isDark ? "#d1d1d1" : "#5a5a5a",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 16,
                     }}
                   >
-                    {url || "/v1/nodes/status"}
-                  </span>{" "}
-                </div>{" "}
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  {" "}
-                  <span
-                    style={{
-                      fontFamily: "Geist, var(--font-geist-sans)",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      letterSpacing: "-0.6px",
-                      color: methodColors[method] ?? methodColors.GET,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {method}
-                  </span>{" "}
-                </div>{" "}
-              </div>{" "}
+                    <AnimatePresence initial={false}>
+                      {editMenuOpen && (
+                        <motion.div
+                          key="edit-methods"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{
+                            duration: 0.2,
+                            ease: [0.25, 0.1, 0.25, 1],
+                          }}
+                          style={{ overflow: "hidden" }}
+                        >
+                          <div
+                            style={{
+                              borderRadius: 8,
+                              border: `0.8px solid ${isDark ? "#2d2d2d" : "#f2f2f2"}`,
+                              backgroundColor: isDark ? "#161616" : "#fcfcfc",
+                              padding: 12,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 12,
+                            }}
+                          >
+                            {editMethods.map((m) => (
+                              <button
+                                key={m}
+                                onClick={() => {
+                                  setMethod(m);
+                                  setEditMenuOpen(false);
+                                }}
+                                className="flex items-center"
+                                style={{
+                                  height: 32,
+                                  gap: 16,
+                                  borderRadius: 6,
+                                  border: "none",
+                                  padding: "0 12px",
+                                  cursor: "pointer",
+                                  textAlign: "left",
+                                  backgroundColor:
+                                    m === method
+                                      ? isDark
+                                        ? "#1f1f1f"
+                                        : "#f7f7f7"
+                                      : "transparent",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: "50%",
+                                    backgroundColor:
+                                      methodColors[m] ?? methodColors.GET,
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    fontFamily:
+                                      "Geist, var(--font-geist-sans)",
+                                    fontSize: 12,
+                                    letterSpacing: "-0.48px",
+                                    color: isDark ? "#d1d1d1" : "#5a5a5a",
+                                  }}
+                                >
+                                  {m}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    <button
+                      onClick={() => {
+                        setEditing(false);
+                        setEditMenuOpen(false);
+                        onSend();
+                      }}
+                      style={{
+                        alignSelf: "flex-start",
+                        border: "none",
+                        background: "transparent",
+                        padding: 0,
+                        cursor: "pointer",
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 14,
+                        fontWeight: 500,
+                        letterSpacing: "-0.7px",
+                        color: "#5b5bff",
+                      }}
+                    >
+                      Send
+                    </button>
+                  </motion.div>
+                ) : (
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    {" "}
+                    <span
+                      style={{
+                        fontFamily: "Geist, var(--font-geist-sans)",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        letterSpacing: "-0.6px",
+                        color: methodColors[method] ?? methodColors.GET,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {method}
+                    </span>{" "}
+                  </div>
+                )}{" "}
+              </motion.div>{" "}
               {!isDiscovery && (
               <div
                 className="flex items-center"
+                role="button"
+                tabIndex={0}
+                aria-pressed={editing}
+                onClick={() => {
+                  const next = !editing;
+                  setEditing(next);
+                  setEditMenuOpen(next);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    const next = !editing;
+                    setEditing(next);
+                    setEditMenuOpen(next);
+                  }
+                }}
                 style={{
+                  position: "relative",
+                  zIndex: 5,
                   marginRight: 24,
                   marginTop: 12,
                   marginLeft: "auto",
