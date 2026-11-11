@@ -17701,8 +17701,6 @@ function PostmanImportModal({
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
       style={{
@@ -17716,16 +17714,20 @@ function PostmanImportModal({
         boxSizing: "border-box",
       }}
     >
-      <div
+      <motion.div
         onClick={onClose}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.75 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
         style={{
           position: "absolute",
           inset: 0,
-          backdropFilter: "blur(42px)",
-          WebkitBackdropFilter: "blur(42px)",
+          backdropFilter: "blur(36.75px)",
+          WebkitBackdropFilter: "blur(36.75px)",
           background: isDark
-            ? "linear-gradient(-23.5deg, rgba(36, 36, 36, 0.55), rgba(129, 129, 129, 0))"
-            : "linear-gradient(-23.5deg, rgba(180, 180, 180, 0.55), rgba(230, 230, 230, 0))",
+            ? "linear-gradient(-23.5deg, rgba(36,36,36,0.47), rgba(129,129,129,0))"
+            : "linear-gradient(-23.5deg, rgba(180,180,180,0.47), rgba(230,230,230,0))",
         }}
       />
       <motion.div
