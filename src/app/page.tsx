@@ -7323,7 +7323,16 @@ function MainContent({
   const [editing, setEditing] = useState(false);
   const [editMenuOpen, setEditMenuOpen] = useState(false);
   const editUrlRef = useRef<HTMLInputElement | null>(null);
+  const urlMeasureRef = useRef<HTMLSpanElement | null>(null);
+  const [urlTextWidth, setUrlTextWidth] = useState(0);
   const editMethods = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+  // The editor grows just enough for the URL to stay on one line instead of
+  // clipping it mid-word; 310px (the design width) is the floor.
+  useLayoutEffect(() => {
+    const el = urlMeasureRef.current;
+    if (!el) return;
+    setUrlTextWidth(el.getBoundingClientRect().width);
+  }, [url, editing, isDark]);
   useEffect(() => {
     if (!editing) return;
     const timer = setTimeout(() => {
@@ -7842,6 +7851,19 @@ function MainContent({
     range.selectNodeContents(el);
     setUrlWrapped(range.getClientRects().length > 1);
   }, [url, loading, response, isDark, compact]);
+  // Animate the pill/editor box itself (width + height), never a layout scale:
+  // scaling is what stretched the text while the dropdown closed.
+  const collapsedCardWidth = 56 + Math.min(375, Math.ceil(urlTextWidth));
+  const editingCardWidth = Math.max(310, Math.ceil(urlTextWidth) + 132);
+  const cardWidth = editing ? editingCardWidth : collapsedCardWidth;
+  // The collapsed URL wraps inside its 375px cap, so derive the line count
+  // from the measured text width instead of measuring a shrinking box.
+  const collapsedUrlLines = Math.max(1, Math.ceil(urlTextWidth / 375));
+  const cardHeight = editing
+    ? editMenuOpen
+      ? 340
+      : 90
+    : 54 + collapsedUrlLines * 21;
   return (
     <div
       className="flex flex-1 flex-col"
@@ -9575,7 +9597,8 @@ function MainContent({
             >
               {" "}
               <motion.div
-                layout
+                initial={false}
+                animate={{ width: cardWidth, height: cardHeight }}
                 transition={{
                   type: "spring",
                   stiffness: 420,
@@ -9589,9 +9612,9 @@ function MainContent({
                   marginRight: 24,
                   marginTop: 24,
                   marginLeft: "auto",
-                  width: editing ? 310 : "fit-content",
                   maxWidth: "calc(100% - 48px)",
                   boxSizing: "border-box",
+                  overflow: "hidden",
                   borderRadius: 10,
                   backgroundColor: isDark ? "#0f0f0f" : "#fcfcfc",
                   padding: editing ? 16 : "14px 16px 12px",
@@ -9599,6 +9622,20 @@ function MainContent({
                 }}
               >
                 {" "}
+                <span
+                  ref={urlMeasureRef}
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    visibility: "hidden",
+                    pointerEvents: "none",
+                    whiteSpace: "nowrap",
+                    fontFamily: "Geist, var(--font-geist-sans)",
+                    fontSize: 14,
+                  }}
+                >
+                  {url || "/v1/nodes/status"}
+                </span>{" "}
                 <div
                   className="flex items-center"
                   style={{
@@ -9724,14 +9761,10 @@ function MainContent({
                       {editMenuOpen && (
                         <motion.div
                           key="edit-methods"
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{
-                            duration: 0.2,
-                            ease: [0.25, 0.1, 0.25, 1],
-                          }}
-                          style={{ overflow: "hidden" }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.16, ease: "easeOut" }}
                         >
                           <div
                             style={{
@@ -9802,7 +9835,9 @@ function MainContent({
                         onSend();
                       }}
                       style={{
-                        alignSelf: "flex-start",
+                        position: "absolute",
+                        left: 16,
+                        bottom: 16,
                         border: "none",
                         background: "transparent",
                         padding: 0,
