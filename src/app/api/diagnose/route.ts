@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         error:
-          "AI diagnosis is not configured yet. Add CEREBRAS_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY to enable it.",
+          "AI diagnosis is not configured yet. Add CEREBRAS_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY to enable it.",
       },
       { status: 503 },
     );

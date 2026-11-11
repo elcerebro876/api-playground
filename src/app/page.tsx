@@ -31,6 +31,28 @@ import {
   proxyErrorCopy,
   type ProxyErrorEnvelope,
 } from "@/lib/proxy-client";
+import {
+  MAX_REQUEST_BODY_BYTES,
+  formatByteSize,
+  utf8ByteLength,
+} from "@/lib/request-body";
+import {
+  curlHeader,
+  looksLikeCurlCommand,
+  parseCurlCommand,
+  type CurlParseFailure,
+} from "@/lib/curl";
+import {
+  POSTMAN_MAX_ENDPOINTS,
+  POSTMAN_MAX_FILE_BYTES,
+  POSTMAN_MAX_FOLDERS,
+  folderFits,
+  hasUnresolvedVariables,
+  isSecretVariable,
+  parsePostmanCollection,
+  resolveVariables,
+  type PostmanImport,
+} from "@/lib/postman";
 // Mirrors the server route's non-identifiable TTL: a genuine "nothing found" is
 // cached briefly so a repeat is instant without occupying the AI.
 const DIAGNOSIS_NOT_FOUND_TTL_MS = 2 * 60 * 1000;
@@ -51,6 +73,54 @@ const cardItemVariants = {
   exit: { opacity: 0, y: 10, transition: cardTextSpring },
 };
 const headersPanelTransition = { duration: 0.25, ease: "easeInOut" as const };
+
+type CurlState =
+  | { kind: "detected"; command: string }
+  | {
+      kind: "filled";
+      command: string;
+      url: string;
+      auth: boolean;
+      body: boolean;
+      bodyLabel: string;
+      skippedCookies: boolean;
+      skippedInsecure: boolean;
+      skippedBody: boolean;
+    }
+  | { kind: "error"; title: string; detail: string };
+
+function curlErrorCopy(reason: CurlParseFailure): {
+  title: string;
+  detail: string;
+} {
+  switch (reason) {
+    case "multiple":
+      return {
+        title: "More than one command found",
+        detail: "Paste one command at a time",
+      };
+    case "no_url":
+      return {
+        title: "No URL found",
+        detail: "Add a URL to the curl command and try again.",
+      };
+    case "bad_quote":
+      return {
+        title: "Couldn't read that command",
+        detail: "Check the quotes and try again.",
+      };
+    case "empty":
+      return {
+        title: "Couldn't read that command",
+        detail: "Paste a curl command to fill the request.",
+      };
+    default:
+      return {
+        title: "Couldn't read that command",
+        detail: "Only methods, headers, and a request body are supported.",
+      };
+  }
+}
 const HISTORY_LIMIT = 50;
 const MAX_STORED_BODY = 100_000;
 const EXPLORER_EXPLAIN_POPUP_DELAY_MS = 2_000;
@@ -149,6 +219,7 @@ export default function Home() {
   >([{ key: "", value: "" }]);
   const [deleteBody, setDeleteBody] = useState(false);
   const [showBrowseApi, setShowBrowseApi] = useState(false);
+  const [showPostmanImport, setShowPostmanImport] = useState(false);
   const [response, setResponse] = useState<{
     status?: number;
     ok?: boolean;
@@ -337,6 +408,31 @@ export default function Home() {
     if (!foldersLoadedRef.current) return;
     saveSavedFolders(folders);
   }, [folders]);
+  const handlePostmanImport = (
+    newFolders: SavedFolder[],
+    entries: HistoryEntry[],
+  ) => {
+    setFolders((current) => [...current, ...newFolders]);
+    const seen = new Set(
+      historyRef.current.map((item) => `${item.method} ${item.url}`),
+    );
+    const fresh = entries.filter((entry) => {
+      const key = `${entry.method} ${entry.url}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const nextHistory = [...fresh, ...historyRef.current];
+    historyRef.current = nextHistory;
+    setHistory(nextHistory);
+    saveStoredData({
+      history: nextHistory,
+      discoveryHistory: discoveryHistoryRef.current,
+      apisTestedCount: apisTestedRef.current,
+      streak: streakRef.current,
+      lastVisitDate: new Date().toDateString(),
+    });
+  };
   const handleHistorySelect = (item: HistoryEntry, index: number) => {
     setActiveHistoryIndex(index);
     setActiveDiscoveryIndex(null);
@@ -1158,6 +1254,7 @@ export default function Home() {
               onEnableAutoShow={handleEnableAutoShow}
               folders={folders}
               setFolders={setFolders}
+              onOpenPostmanImport={() => setShowPostmanImport(true)}
             />{" "}
           </motion.div>{" "}
         </div>{" "}
@@ -1440,6 +1537,16 @@ export default function Home() {
           requestAnimationFrame(() => reveal());
         }}
       />
+      <AnimatePresence>
+        {showPostmanImport && (
+          <PostmanImportModal
+            isDark={activeTheme === "Dark"}
+            folders={folders}
+            onClose={() => setShowPostmanImport(false)}
+            onImport={handlePostmanImport}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -4503,30 +4610,15 @@ function Sidebar({
                       display: "inline-flex",
                       alignItems: "center",
                       borderRadius: 6,
-                      backgroundColor:
-                        activeTheme === "Dark"
-                          ? (
-                              methodBadgeColors[item.method] ??
-                              methodBadgeColors.GET
-                            ).darkBg
-                          : (
-                              methodBadgeColors[item.method] ??
-                              methodBadgeColors.GET
-                            ).lightBg,
                       padding: "2px 6px",
                       fontFamily: "Geist, var(--font-geist-sans)",
                       fontSize: 12,
                       fontWeight: 500,
-                      color:
-                        activeTheme === "Dark"
-                          ? (
-                              methodBadgeColors[item.method] ??
-                              methodBadgeColors.GET
-                            ).darkText
-                          : (
-                              methodBadgeColors[item.method] ??
-                              methodBadgeColors.GET
-                            ).lightText,
+                      ...methodBadgeStyle(
+                        item.method,
+                        index === activeHistoryIndex,
+                        activeTheme === "Dark",
+                      ),
                     }}
                   >
                     {item.method}
@@ -4629,30 +4721,15 @@ function Sidebar({
                         display: "inline-flex",
                         alignItems: "center",
                         borderRadius: 6,
-                        backgroundColor:
-                          activeTheme === "Dark"
-                            ? (
-                                methodBadgeColors[item.method] ??
-                                methodBadgeColors.GET
-                              ).darkBg
-                            : (
-                                methodBadgeColors[item.method] ??
-                                methodBadgeColors.GET
-                              ).lightBg,
                         padding: "2px 6px",
                         fontFamily: "Geist, var(--font-geist-sans)",
                         fontSize: 12,
                         fontWeight: 500,
-                        color:
-                          activeTheme === "Dark"
-                            ? (
-                                methodBadgeColors[item.method] ??
-                                methodBadgeColors.GET
-                              ).darkText
-                            : (
-                                methodBadgeColors[item.method] ??
-                                methodBadgeColors.GET
-                              ).lightText,
+                        ...methodBadgeStyle(
+                          item.method,
+                          i === activeDiscoveryIndex,
+                          activeTheme === "Dark",
+                        ),
                       }}
                     >
                       {item.method}
@@ -5105,48 +5182,66 @@ const demoRequests: Record<
   },
   "Simulate an error": { method: "GET", url: "https://httpstat.us/404" },
 };
-const methodBadgeColors: Record<
-  string,
-  { lightBg: string; lightText: string; darkBg: string; darkText: string }
-> = {
-  GET: {
-    lightBg: "#caffca",
-    lightText: "#008000",
-    darkBg: "#003b00",
-    darkText: "#7ef97e",
-  },
-  POST: {
-    lightBg: "#fff0dd",
-    lightText: "#ff8c00",
-    darkBg: "#603500",
-    darkText: "#ffc47d",
-  },
-  PUT: {
-    lightBg: "#e2e2ff",
-    lightText: "#6565ff",
-    darkBg: "#00006a",
-    darkText: "#c7c7ff",
-  },
-  PATCH: {
-    lightBg: "#ffd5ff",
-    lightText: "#ff25ff",
-    darkBg: "#930093",
-    darkText: "#ffb8ff",
-  },
-  DELETE: {
-    lightBg: "#ffdddd",
-    lightText: "#ff4e4e",
-    darkBg: "#7d0000",
-    darkText: "#ffa4a4",
-  },
-};
-const methodDots: Record<string, string> = {
+const methodColors: Record<string, string> = {
   GET: "#008000",
   POST: "#ff8c00",
   PUT: "#6565ff",
   PATCH: "#ff25ff",
   DELETE: "#ff4e4e",
 };
+const methodBadgeColors: Record<
+  string,
+  { lightBg: string; lightText: string; darkBg: string; darkText: string }
+> = {
+  GET: {
+    lightBg: "#caffca",
+    lightText: methodColors.GET,
+    darkBg: "#003b00",
+    darkText: "#7ef97e",
+  },
+  POST: {
+    lightBg: "#fff0dd",
+    lightText: methodColors.POST,
+    darkBg: "#603500",
+    darkText: "#ffc47d",
+  },
+  PUT: {
+    lightBg: "#e2e2ff",
+    lightText: methodColors.PUT,
+    darkBg: "#00006a",
+    darkText: "#c7c7ff",
+  },
+  PATCH: {
+    lightBg: "#ffd5ff",
+    lightText: methodColors.PATCH,
+    darkBg: "#930093",
+    darkText: "#ffb8ff",
+  },
+  DELETE: {
+    lightBg: "#ffdddd",
+    lightText: methodColors.DELETE,
+    darkBg: "#7d0000",
+    darkText: "#ffa4a4",
+  },
+};
+// Response tags in the logs keep their method color only while selected/active;
+// every other response tag is greyed out.
+function methodBadgeStyle(
+  method: string,
+  active: boolean,
+  isDark: boolean,
+): { backgroundColor: string; color: string } {
+  if (!active) {
+    return isDark
+      ? { backgroundColor: "#1f1f1f", color: "#9e9e9e" }
+      : { backgroundColor: "#f0f0f0", color: "#585858" };
+  }
+  const badge = methodBadgeColors[method] ?? methodBadgeColors.GET;
+  return isDark
+    ? { backgroundColor: badge.darkBg, color: badge.darkText }
+    : { backgroundColor: badge.lightBg, color: badge.lightText };
+}
+const methodDots = methodColors;
 function fallbackHintText(
   response: {
     status?: number;
@@ -7115,6 +7210,7 @@ function MainContent({
   setFolders,
   showBrowseApi,
   setShowBrowseApi,
+  onOpenPostmanImport,
 }: {
   activeTheme: string;
   compact: boolean;
@@ -7218,6 +7314,7 @@ function MainContent({
   setFolders: React.Dispatch<React.SetStateAction<SavedFolder[]>>;
   showBrowseApi: boolean;
   setShowBrowseApi: (value: boolean) => void;
+  onOpenPostmanImport: () => void;
 }) {
   const isDark = activeTheme === "Dark";
   const [showHistory, setShowHistory] = useState(false);
@@ -7470,6 +7567,7 @@ function MainContent({
     </div>
   );
   const [headerExpanded, setHeaderExpanded] = useState(false);
+  const [curlState, setCurlState] = useState<CurlState | null>(null);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [dismissedCheatSheet, setDismissedCheatSheet] = useState(false);
@@ -7497,16 +7595,185 @@ function MainContent({
         : method === "PATCH"
           ? "PATCH updates part of a resource. Send only the field to change"
           : "A few APIs expect a body on DELETE. Most don’t";
+  const formDraftBody = useMemo(() => {
+    const params = new URLSearchParams();
+    for (const field of formFields) {
+      if (field.key.trim()) params.append(field.key, field.value);
+    }
+    return params.toString();
+  }, [formFields]);
+  const bodyDraftBody =
+    bodyMode === "json"
+      ? bodyText.trim()
+        ? bodyText
+        : ""
+      : bodyMode === "text"
+        ? bodyText
+        : formDraftBody;
+  const bodyDraftBytes = useMemo(
+    () => utf8ByteLength(bodyDraftBody),
+    [bodyDraftBody],
+  );
+  const bodyTooLarge = bodyDraftBytes > MAX_REQUEST_BODY_BYTES;
+  const invalidJson = useMemo(() => {
+    if (bodyMode !== "json" || !bodyText.trim()) return false;
+    try {
+      JSON.parse(bodyText);
+      return false;
+    } catch {
+      return true;
+    }
+  }, [bodyMode, bodyText]);
+  const bodyWarningHeight = (invalidJson ? 26 : 0) + (bodyTooLarge ? 26 : 0);
   const expandedCardHeight =
     activeComposerTab === "body"
       ? bodyMode === "form"
-        ? 407 + (Math.max(1, formFields.length) - 1) * 56
-        : 467
+        ? 407 + (Math.max(1, formFields.length) - 1) * 56 + bodyWarningHeight
+        : 467 + bodyWarningHeight
       : method === "DELETE" && !deleteBody
         ? 395
         : method === "GET" || method === "HEAD"
           ? 340
           : 363;
+  const curlFilledMetrics = useMemo(() => {
+    if (curlState?.kind !== "filled") return null;
+    const importedRows = [
+      16,
+      ...(curlState.auth ? [38] : []),
+      ...(curlState.body ? [38] : []),
+    ];
+    const importedBox =
+      16 +
+      importedRows.reduce((total, row) => total + row, 0) +
+      12 * (importedRows.length - 1);
+    const notImportedCount =
+      Number(curlState.skippedCookies) +
+      Number(curlState.skippedInsecure) +
+      Number(curlState.skippedBody);
+    const notImportedBox = notImportedCount
+      ? 16 + notImportedCount * 42 + 12 * (notImportedCount - 1)
+      : 0;
+    const summaryHeight =
+      12 +
+      18 +
+      12 +
+      importedBox +
+      (notImportedCount ? 12 + 18 + 12 + notImportedBox : 0) +
+      12;
+    return { summaryHeight, cardHeight: 229 + summaryHeight + 51 };
+  }, [curlState]);
+  const curlCardHeight =
+    curlState?.kind === "detected"
+      ? 285
+      : curlState?.kind === "error"
+        ? 249
+        : (curlFilledMetrics?.cardHeight ?? null);
+  const keepCurlAsText = () => setCurlState(null);
+  const fillCurlRequest = () => {
+    const result = parseCurlCommand(url);
+    if (!result.ok) {
+      const copy = curlErrorCopy(result.reason);
+      setCurlState({ kind: "error", ...copy });
+      return;
+    }
+    const value = result.value;
+    const contentType = curlHeader(value.headers, "content-type") ?? "";
+    const auth = curlHeader(value.headers, "authorization");
+    let authImported = false;
+    if (auth) {
+      const bearer = /^Bearer\s+(.+)$/i.exec(auth);
+      if (bearer) {
+        setHeaderBearer(bearer[1].trim());
+        setHeaderKey("");
+        setHeaderValue("");
+      } else {
+        setHeaderBearer("");
+        setHeaderKey("Authorization");
+        setHeaderValue(auth);
+      }
+      authImported = true;
+    } else {
+      setHeaderBearer("");
+      const custom = Object.entries(value.headers).find(
+        ([name]) =>
+          name.toLowerCase() !== "authorization" &&
+          name.toLowerCase() !== "content-type",
+      );
+      setHeaderKey(custom?.[0] ?? "");
+      setHeaderValue(custom?.[1] ?? "");
+    }
+
+    const bodyAllowedForMethod =
+      value.method !== "GET" && value.method !== "HEAD";
+    const hasBody = value.body !== null && value.body !== "";
+    let bodyLabel = "";
+    if (hasBody && bodyAllowedForMethod) {
+      let parsedJson = false;
+      try {
+        JSON.parse(value.body as string);
+        parsedJson = true;
+      } catch {
+        parsedJson = false;
+      }
+      if (/json/i.test(contentType) || parsedJson) {
+        setBodyMode("json");
+        setBodyText(value.body as string);
+        bodyLabel = "JSON body";
+      } else if (/x-www-form-urlencoded/i.test(contentType)) {
+        const params = new URLSearchParams(value.body as string);
+        setBodyMode("form");
+        setFormFields(
+          Array.from(params.entries()).map(([key, fieldValue]) => ({
+            key,
+            value: fieldValue,
+          })),
+        );
+        bodyLabel = "Form body";
+      } else {
+        setBodyMode("text");
+        setBodyText(value.body as string);
+        bodyLabel = "Body";
+      }
+      if (value.method === "DELETE") setDeleteBody(true);
+    } else {
+      setBodyText("");
+      setFormFields([{ key: "", value: "" }]);
+    }
+
+    setMethod(value.method);
+    setUrl(value.url);
+    setPendingUrlSwitch(null);
+    setHeaderExpanded(false);
+    setCurlState({
+      kind: "filled",
+      command: url,
+      url: value.url,
+      auth: authImported,
+      body: hasBody && bodyAllowedForMethod,
+      bodyLabel,
+      skippedCookies: value.skippedCookies,
+      skippedInsecure: value.skippedInsecure,
+      skippedBody: hasBody && !bodyAllowedForMethod,
+    });
+  };
+  const handleUrlChange = (value: string) => {
+    setUrl(value);
+    setCurlState((prev) => {
+      if (looksLikeCurlCommand(value)) {
+        if (prev?.kind === "detected" && prev.command === value) return prev;
+        return { kind: "detected", command: value };
+      }
+      return null;
+    });
+  };
+  useEffect(() => {
+    setCurlState((prev) => {
+      if (!prev) return prev;
+      if (prev.kind === "filled") return prev.url === url ? prev : null;
+      if (prev.kind === "detected") return prev.command === url ? prev : null;
+      return null;
+    });
+  }, [url]);
   const resultContentRef = useRef<HTMLDivElement>(null);
   const [resultHeight, setResultHeight] = useState<number | "auto">("auto");
   useEffect(() => {
@@ -7614,11 +7881,13 @@ function MainContent({
                     className="relative shrink-0"
                     initial={false}
                     animate={{
-                      height: headerExpanded
-                        ? expandedCardHeight
-                        : compact
-                          ? 191
-                          : 193,
+                      height:
+                        curlCardHeight ??
+                        (headerExpanded
+                          ? expandedCardHeight
+                          : compact
+                            ? 191
+                            : 193),
                     }}
                     transition={headersPanelTransition}
                     style={{
@@ -7672,11 +7941,22 @@ function MainContent({
                             activeTheme={activeTheme}
                             method={method}
                             setMethod={setMethod}
-                            url={url}
-                            setUrl={setUrl}
+                            url={
+                              curlState?.kind === "filled"
+                                ? curlState.command
+                                : url
+                            }
+                            setUrl={handleUrlChange}
                             loading={loading}
                             onSend={onSend}
                             showChevron
+                            sendDisabled={curlState?.kind === "detected"}
+                            sendMuted={curlState?.kind === "detected"}
+                            sendLabel={
+                              curlState?.kind === "detected"
+                                ? "Processing"
+                                : undefined
+                            }
                             pendingMethodSwitch={pendingMethodSwitch}
                             onClearPendingSwitch={() =>
                               setPendingMethodSwitch(null)
@@ -7690,7 +7970,45 @@ function MainContent({
                           />{" "}
                         </div>{" "}
                       </motion.div>{" "}
-                      {!headerExpanded && (
+                      {curlState && (
+                        <motion.div
+                          variants={cardItemVariants}
+                          className="absolute"
+                          style={{
+                            left: compact ? 16 : 54,
+                            top: compact ? 141 : 143,
+                            width: compact ? 393 : 467,
+                          }}
+                        >
+                          {curlState.kind === "detected" && (
+                            <CurlDetectedBanner
+                              isDark={isDark}
+                              onKeep={keepCurlAsText}
+                              onFill={fillCurlRequest}
+                            />
+                          )}
+                          {curlState.kind === "error" && (
+                            <CurlErrorBanner
+                              isDark={isDark}
+                              title={curlState.title}
+                              detail={curlState.detail}
+                            />
+                          )}
+                          {curlState.kind === "filled" && (
+                            <div
+                              className="flex flex-col"
+                              style={{ gap: 12 }}
+                            >
+                              <CurlFilledBanner isDark={isDark} />
+                              <CurlSummaryPanel
+                                isDark={isDark}
+                                state={curlState}
+                              />
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                      {!headerExpanded && !curlState && (
                         <motion.div
                           variants={cardItemVariants}
                           className="absolute flex items-center"
@@ -7759,7 +8077,7 @@ function MainContent({
                     </motion.div>{" "}
                     <AnimatePresence>
                       {" "}
-                      {headerExpanded && (
+                      {headerExpanded && !curlState && (
                         <>
                           {" "}
                           <motion.div
@@ -8439,6 +8757,26 @@ function MainContent({
                                       }}
                                     />
                                   )}
+                                  {bodyMode === "json" && invalidJson && (
+                                    <div
+                                      role="status"
+                                      aria-live="polite"
+                                      style={{
+                                        marginTop: 8,
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        lineHeight: "18px",
+                                        letterSpacing: "-0.48px",
+                                        color: "#9a6700",
+                                      }}
+                                    >
+                                      <span style={{ fontWeight: 500 }}>
+                                        Invalid JSON.
+                                      </span>{" "}
+                                      It will still be sent as-is.
+                                    </div>
+                                  )}
                                   {bodyMode === "text" && (
                                     <>
                                     <div
@@ -8625,6 +8963,27 @@ function MainContent({
                                           </div>
                                         </div>
                                       ))}
+                                    </div>
+                                  )}
+                                  {bodyTooLarge && (
+                                    <div
+                                      role="alert"
+                                      style={{
+                                        marginTop: 8,
+                                        fontFamily:
+                                          "Geist, var(--font-geist-sans)",
+                                        fontSize: 12,
+                                        lineHeight: "18px",
+                                        letterSpacing: "-0.48px",
+                                        color: "#b42318",
+                                      }}
+                                    >
+                                      <span style={{ fontWeight: 500 }}>
+                                        Body too large.
+                                      </span>{" "}
+                                      {formatByteSize(bodyDraftBytes)} /{" "}
+                                      {formatByteSize(MAX_REQUEST_BODY_BYTES)}{" "}
+                                      max. Sending it will fail.
                                     </div>
                                   )}
                                   <div
@@ -9197,7 +9556,7 @@ function MainContent({
                       width: 12,
                       height: 12,
                       borderRadius: "50%",
-                      backgroundColor: isDark ? "#00bf00" : "#008000",
+                      backgroundColor: methodColors[method] ?? methodColors.GET,
                       flexShrink: 0,
                       marginTop: urlWrapped ? 6 : undefined,
                     }}
@@ -9226,7 +9585,7 @@ function MainContent({
                       fontSize: 12,
                       fontWeight: 500,
                       letterSpacing: "-0.6px",
-                      color: isDark ? "#00bf00" : "#008000",
+                      color: methodColors[method] ?? methodColors.GET,
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -11863,6 +12222,24 @@ backgroundColor: isDark
           </motion.div>
         )}{" "}
       </AnimatePresence>{" "}
+      {!response && !loading && !showBrowseApi && (
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            bottom: 24,
+            transform: "translateX(-50%)",
+            width: compact ? "calc(100% - 32px)" : 516,
+            maxWidth: "calc(100% - 32px)",
+            zIndex: 4,
+          }}
+        >
+          <PostmanImportBanner
+            isDark={isDark}
+            onOpen={onOpenPostmanImport}
+          />
+        </div>
+      )}{" "}
     </div>
   );
 }
@@ -15789,6 +16166,9 @@ function UrlInputBar({
   focusSignal,
   highlightSignal,
   showChevron,
+  sendDisabled,
+  sendMuted,
+  sendLabel,
 }: {
   compact?: boolean;
   glass?: boolean;
@@ -15810,6 +16190,9 @@ function UrlInputBar({
   focusSignal?: number;
   highlightSignal?: DiagnosisResult | null;
   showChevron?: boolean;
+  sendDisabled?: boolean;
+  sendMuted?: boolean;
+  sendLabel?: string;
 }) {
   const isDark = activeTheme === "Dark";
   const [showDropdown, setShowDropdown] = useState(false);
@@ -16420,29 +16803,34 @@ function UrlInputBar({
           onClearPendingUrlSwitch?.();
           onSend();
         }}
-        disabled={loading}
-        className="flex items-center gap-1 px-2 py-1.5 text-xs text-white tracking-[-0.04em] transition-colors hover:bg-[#4a4aff] disabled:opacity-60"
-        style={{ borderRadius: 6, backgroundColor: "#5b5bff" }}
+        disabled={loading || sendDisabled}
+        className={`flex items-center gap-1 px-2 py-1.5 text-xs text-white tracking-[-0.04em] transition-colors ${sendMuted ? "" : "hover:bg-[#4a4aff]"} disabled:opacity-60`}
+        style={{
+          borderRadius: 6,
+          backgroundColor: sendMuted ? "#b4b4ff" : "#5b5bff",
+        }}
       >
         {" "}
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          {" "}
-          <path
-            d="M3.333 8h9.334"
-            stroke="white"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />{" "}
-          <path
-            d="M8 3.333l4.667 4.667L8 12.667"
-            stroke="white"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />{" "}
-        </svg>{" "}
-        <span>Send</span>{" "}
+        {!sendLabel && (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            {" "}
+            <path
+              d="M3.333 8h9.334"
+              stroke="white"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />{" "}
+            <path
+              d="M8 3.333l4.667 4.667L8 12.667"
+              stroke="white"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />{" "}
+          </svg>
+        )}{" "}
+        <span>{sendLabel ?? "Send"}</span>{" "}
       </RippleButton>{" "}
       </div>
       {(pendingMethodSwitch || pendingUrlSwitch) && (
@@ -16511,6 +16899,2113 @@ function UrlInputBar({
     </div>
   );
 }
+// Iconly/Light/Download — the import tray used in the modal header.
+function PostmanDownloadIcon({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path
+        d="M12.041 0L0 0"
+        stroke={color}
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        transform="matrix(0,0.75,-0.75,0,9.09375,2.54688)"
+      />
+      <path
+        d="M0 0L2.928 2.916L0 5.832"
+        stroke={color}
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        transform="matrix(0,0.75,-0.75,0,11.2812,9.38281)"
+      />
+      <path
+        d="M0 4.617L0 3.684C0 1.649 1.649 0 3.685 0L8.569 0C10.599 0 12.244 1.645 12.244 3.675L12.244 14.815C12.244 16.85 10.594 18.5 8.559 18.5L3.674 18.5C1.645 18.5 0 16.854 0 14.825L0 13.883"
+        stroke={color}
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        transform="matrix(0,0.75,-0.75,0,16.0312,6.09766)"
+      />
+    </svg>
+  );
+}
+
+// Iconly/Light-Outline/Paper — the collection page in the drop zone and file row.
+function PostmanFileIcon({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 12.7891 14.8984" fill="none">
+      <path
+        d="M8.23058 0C8.26279 0 8.29437 0.0027121 8.32511 0.00792025L8.42775 0.00855C8.58075 0.00855 8.727 0.0708 8.8335 0.18105L12.6322 4.1388C12.7327 4.24305 12.7891 4.3833 12.7891 4.52805L12.7891 11.4025C12.8025 13.2843 11.337 14.8218 9.45225 14.8983L3.438 14.899L3.35625 14.899C1.51879 14.8575 0.0451218 13.3715 0.000226373 11.5519L0 3.3678C0.0435 1.50705 1.58025 0.00855 3.4275 0.00855L8.13604 0.00792025C8.16678 0.0027121 8.19836 0 8.23058 0ZM7.668 1.13325L3.429 1.13355C2.18625 1.13355 1.15425 2.14005 1.125 3.3813L1.125 11.4025C1.09725 12.6873 2.10975 13.7456 3.38175 13.774L9.42975 13.774C10.6815 13.7223 11.673 12.682 11.6641 11.407L11.664 5.23725L10.1566 5.238C8.78407 5.23425 7.66808 4.11525 7.66808 2.74425L7.668 1.13325ZM8.09048 9.45607C8.40098 9.45607 8.65298 9.70807 8.65298 10.0186C8.65298 10.3291 8.40098 10.5811 8.09048 10.5811L4.04047 10.5811C3.72997 10.5811 3.47797 10.3291 3.47797 10.0186C3.47797 9.70807 3.72997 9.45607 4.04047 9.45607L8.09048 9.45607ZM6.5568 6.64207C6.8673 6.64207 7.1193 6.89407 7.1193 7.20457C7.1193 7.51507 6.8673 7.76707 6.5568 7.76707L4.0398 7.76707C3.7293 7.76707 3.4773 7.51507 3.4773 7.20457C3.4773 6.89407 3.7293 6.64207 4.0398 6.64207L6.5568 6.64207ZM8.793 1.764L8.79308 2.74425C8.79308 3.49725 9.40583 4.11075 10.1581 4.113L11.0475 4.11225L8.793 1.764Z"
+        fill={color}
+        fillRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+// Iconly/Light/Delete — the trash next to an uploading file.
+function PostmanTrashIcon({ color }: { color: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path
+        d="M17.4788 7.16406C17.4788 15.1831 18.6331 18.8079 10.8693 18.8079C3.1045 18.8079 4.2826 15.1831 4.2826 7.16406"
+        stroke={color}
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M19.3145 4.85938L3.16406 4.85938"
+        stroke={color}
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13.5068 5.80088C13.5068 5.80088 14.0354 2.03516 10.0811 2.03516C6.12777 2.03516 6.65634 5.80088 6.65634 5.80088"
+        stroke={color}
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// Iconly/Bold/Danger — filled triangle used by the "collection is bigger" banner.
+function PostmanDangerIcon({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 13.3359 12" fill="none">
+      <path
+        d="M5.75193 0.235396C6.65845 -0.26732 7.81159 0.0629796 8.31817 0.961394L13.164 9.37148C13.2707 9.62251 13.3173 9.82663 13.3307 10.0387C13.3573 10.5341 13.184 11.0157 12.8441 11.3863C12.5041 11.7556 12.0442 11.9736 11.5443 12L1.78594 12C1.5793 11.9874 1.37267 11.9405 1.17937 11.8679C0.212868 11.4781 -0.25372 10.3815 0.139547 9.43093L5.01872 0.955449C5.18536 0.657519 5.43865 0.400546 5.75193 0.235396ZM6.66511 8.18174C6.34517 8.18174 6.07855 8.44598 6.07855 8.76373C6.07855 9.08015 6.34517 9.34505 6.66511 9.34505C6.98506 9.34505 7.24502 9.08015 7.24502 8.75646C7.24502 8.44003 6.98506 8.18174 6.66511 8.18174ZM6.66511 4.06026C6.34517 4.06026 6.07855 4.31724 6.07855 4.63498L6.07855 6.50382C6.07855 6.82091 6.34517 7.08581 6.66511 7.08581C6.98506 7.08581 7.24502 6.82091 7.24502 6.50382L7.24502 4.63498C7.24502 4.31724 6.98506 4.06026 6.66511 4.06026Z"
+        fill={color}
+        fillRule="nonzero"
+      />
+    </svg>
+  );
+}
+
+// Filled triangle with an exclamation, used in each "Not imported" row.
+function PostmanDangerSmallIcon({ color }: { color: string }) {
+  return (
+    <svg width="16" height="17" viewBox="0 0 16 16.668" fill="none">
+      <path
+        d="M8.16909 11.7855C7.89309 11.7855 7.66642 11.5615 7.66642 11.2855C7.66642 11.0095 7.88709 10.7855 8.16309 10.7855L8.16909 10.7855C8.44509 10.7855 8.66909 11.0095 8.66909 11.2855C8.66909 11.5615 8.44509 11.7855 8.16909 11.7855ZM7.66576 6.35547C7.66576 6.07947 7.88976 5.85547 8.16576 5.85547C8.44176 5.85547 8.66576 6.07947 8.66576 6.35547L8.66576 8.95216C8.66576 9.22816 8.44176 9.45216 8.16576 9.45216C7.88976 9.45216 7.66576 9.22816 7.66576 8.95216L7.66576 6.35547ZM12.8724 7.46082L12.7311 7.21149C10.7404 3.67147 9.50309 2.35547 8.16576 2.35547C6.82842 2.35547 5.59108 3.67147 3.60041 7.21149L3.45974 7.46082C2.74441 8.71549 1.25774 11.3255 1.53374 12.8828C1.85908 14.7248 3.75574 15.0222 8.16576 15.0222C12.5764 15.0222 14.4731 14.7248 14.7978 12.8828C15.0738 11.3255 13.5871 8.71549 12.8724 7.46082Z"
+        fill={color}
+        fillRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+// Iconly/Bold/Tick-Square — the green check on imported/removed rows.
+function PostmanTickIcon({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path
+        d="M10.8959 1.33203C13.1559 1.33203 14.6693 2.9187 14.6693 5.2787L14.6693 10.726C14.6693 13.0787 13.1559 14.6654 10.8959 14.6654L5.11594 14.6654C2.85594 14.6654 1.33594 13.0787 1.33594 10.726L1.33594 5.2787C1.33594 2.9187 2.85594 1.33203 5.11594 1.33203L10.8959 1.33203ZM10.7893 5.9987C10.5626 5.77203 10.1893 5.77203 9.9626 5.9987L7.20927 8.75203L6.0426 7.58536C5.81594 7.3587 5.4426 7.3587 5.21594 7.58536C4.98927 7.81203 4.98927 8.1787 5.21594 8.41203L6.8026 9.99203C6.91594 10.1054 7.0626 10.1587 7.20927 10.1587C7.3626 10.1587 7.50927 10.1054 7.6226 9.99203L10.7893 6.82536C11.0159 6.5987 11.0159 6.23203 10.7893 5.9987Z"
+        fill={color}
+        fillRule="nonzero"
+      />
+    </svg>
+  );
+}
+
+// Folder picker checkbox: Iconly/Bold/Tick-Square when on, Iconly/Light/Tick-Square
+// when off, matching the design's 16-18px ticks.
+function PostmanTickSquareIcon({
+  checked,
+  color,
+  mutedColor,
+}: {
+  checked: boolean;
+  color: string;
+  mutedColor: string;
+}) {
+  if (checked) {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M10.8959 1.33203C13.1559 1.33203 14.6693 2.9187 14.6693 5.2787L14.6693 10.726C14.6693 13.0787 13.1559 14.6654 10.8959 14.6654L5.11594 14.6654C2.85594 14.6654 1.33594 13.0787 1.33594 10.726L1.33594 5.2787C1.33594 2.9187 2.85594 1.33203 5.11594 1.33203L10.8959 1.33203ZM10.7893 5.9987C10.5626 5.77203 10.1893 5.77203 9.9626 5.9987L7.20927 8.75203L6.0426 7.58536C5.81594 7.3587 5.4426 7.3587 5.21594 7.58536C4.98927 7.81203 4.98927 8.1787 5.21594 8.41203L6.8026 9.99203C6.91594 10.1054 7.0626 10.1587 7.20927 10.1587C7.3626 10.1587 7.50927 10.1054 7.6226 9.99203L10.7893 6.82536C11.0159 6.5987 11.0159 6.23203 10.7893 5.9987Z"
+          fill={color}
+          fillRule="nonzero"
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+      <path
+        d="M5.74875 2.0625C3.483 2.0625 2.0625 3.66675 2.0625 5.937L2.0625 12.063C2.0625 14.3333 3.47625 15.9375 5.74875 15.9375L12.2498 15.9375C14.523 15.9375 15.9375 14.3333 15.9375 12.063L15.9375 5.937C15.9375 3.66675 14.523 2.0625 12.2505 2.0625L5.74875 2.0625Z"
+        fillRule="evenodd"
+        stroke={mutedColor}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6.32812 8.9985L8.10863 10.7783L11.6681 7.21875"
+        fillRule="evenodd"
+        stroke={mutedColor}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PostmanImportBanner({
+  isDark,
+  onOpen,
+}: {
+  isDark: boolean;
+  onOpen: () => void;
+}) {
+  const font = "Geist, var(--font-geist-sans)";
+  return (
+    <div
+      style={{
+        height: 69,
+        boxSizing: "border-box",
+        borderRadius: 8,
+        border: `0.8px solid ${isDark ? "#2d2d2d" : "#f2f2f2"}`,
+        backgroundColor: isDark ? "#161616" : "#ffffff",
+        padding: 12,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: font,
+            fontSize: 16,
+            fontWeight: 500,
+            letterSpacing: "-0.64px",
+            color: isDark ? "#f7f7f7" : "#222222",
+          }}
+        >
+          Import your Postman collection
+        </div>
+        <div
+          style={{
+            marginTop: 2,
+            fontFamily: font,
+            fontSize: 14,
+            letterSpacing: "-0.56px",
+            color: isDark ? "#8c8c8c" : "#939393",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          collection v2.1 (json). It reads in your browser. Nothing is uploaded
+        </div>
+      </div>
+      <RippleButton
+        onClick={onOpen}
+        style={{
+          height: 28,
+          padding: "0 8px",
+          borderRadius: 6,
+          backgroundColor: "#5b5bff",
+          color: "#ffffff",
+          fontFamily: font,
+          fontSize: 12,
+          letterSpacing: "-0.48px",
+          flexShrink: 0,
+        }}
+      >
+        Import
+      </RippleButton>
+    </div>
+  );
+}
+
+type PostmanStep =
+  | "choose"
+  | "uploading"
+  | "folders"
+  | "variables"
+  | "notImported"
+  | "done";
+
+type PostmanResult = {
+  importedRequests: number;
+  folders: number;
+  skipped: number;
+  incomplete: number;
+  credentials: number;
+};
+
+function PostmanImportModal({
+  isDark,
+  folders,
+  onClose,
+  onImport,
+}: {
+  isDark: boolean;
+  folders: SavedFolder[];
+  onClose: () => void;
+  onImport: (folders: SavedFolder[], entries: HistoryEntry[]) => void;
+}) {
+  const font = "Geist, var(--font-geist-sans)";
+  const panelBorder = isDark ? "#2d2d2d" : "#f2f2f2";
+  const cardBg = isDark ? "#161616" : "#ffffff";
+  const textMain = isDark ? "#e7e7e7" : "#595959";
+  const textMuted = isDark ? "#8c8c8c" : "#7a7a7a";
+  const textFaint = isDark ? "#7a7a7a" : "#939393";
+  const softBg = isDark ? "#1f1f1f" : "#fafafa";
+  const [step, setStep] = useState<PostmanStep>("choose");
+  const [collection, setCollection] = useState<PostmanImport | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [result, setResult] = useState<PostmanResult | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const existingEndpoints = folders.reduce(
+    (total, folder) => total + folder.endpoints.length,
+    0,
+  );
+  const freeFolders = Math.max(0, POSTMAN_MAX_FOLDERS - folders.length);
+  const freeEndpoints = Math.max(
+    0,
+    POSTMAN_MAX_ENDPOINTS - existingEndpoints,
+  );
+  const selectedFolders = collection
+    ? collection.folders.filter((folder) => selected.has(folder.id))
+    : [];
+  const selectedEndpoints = selectedFolders.reduce(
+    (total, folder) => total + folder.requests.length,
+    0,
+  );
+  const missingForSelected = useMemo(() => {
+    const keys = new Set<string>();
+    for (const folder of selectedFolders) {
+      for (const request of folder.requests) {
+        for (const key of request.missingKeys) keys.add(key);
+      }
+    }
+    return Array.from(keys)
+      .filter((key) => !isSecretVariable(key))
+      .sort();
+  }, [selectedFolders]);
+  const secretForSelected = useMemo(() => {
+    const keys = new Set<string>();
+    for (const folder of selectedFolders) {
+      for (const request of folder.requests) {
+        for (const key of request.missingKeys) keys.add(key);
+      }
+    }
+    return Array.from(keys).filter(isSecretVariable).sort();
+  }, [selectedFolders]);
+  const variableNames = [...missingForSelected, ...secretForSelected];
+
+  const startFile = async (file: File) => {
+    setError(null);
+    if (file.size > POSTMAN_MAX_FILE_BYTES) {
+      setError("That file is over 5 MB. Export a smaller collection and try again.");
+      return;
+    }
+    setFileName(file.name);
+    setCollection(null);
+    setSelected(new Set());
+    setValues({});
+    setProgress(8);
+    setStep("uploading");
+    try {
+      const text = await file.text();
+      setProgress(55);
+      let json: unknown;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        setError("That file isn't valid JSON. Export the collection again and retry.");
+        setStep("choose");
+        return;
+      }
+      const parsed = parsePostmanCollection(json);
+      setProgress(80);
+      if (!parsed.ok) {
+        setError(
+          parsed.reason === "unsupported_version"
+            ? "Use a Collection v2.1 export. In Postman, choose Export, then collection v2.1."
+            : "That file isn't a Postman collection.",
+        );
+        setStep("choose");
+        return;
+      }
+      if (!parsed.value.folders.length || parsed.value.stats.totalRequests === 0) {
+        setError("That collection doesn't contain any requests.");
+        setStep("choose");
+        return;
+      }
+      setCollection(parsed.value);
+      const picked = new Set<string>();
+      let count = 0;
+      let endpoints = 0;
+      for (const folder of parsed.value.folders) {
+        if (
+          count < freeFolders &&
+          endpoints + folder.requests.length <= freeEndpoints
+        ) {
+          picked.add(folder.id);
+          count += 1;
+          endpoints += folder.requests.length;
+        }
+      }
+      setSelected(picked);
+      setProgress(100);
+      window.setTimeout(() => setStep("folders"), 600);
+    } catch {
+      setError("Couldn't read that file. Try exporting it again.");
+      setStep("choose");
+    }
+  };
+
+  const toggleFolder = (folderId: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(folderId)) {
+        next.delete(folderId);
+        return next;
+      }
+      const folder = collection?.folders.find((item) => item.id === folderId);
+      if (!folder) return current;
+      const currentFolders = collection
+        ? collection.folders.filter((item) => next.has(item.id))
+        : [];
+      const currentEndpoints = currentFolders.reduce(
+        (total, item) => total + item.requests.length,
+        0,
+      );
+      if (
+        !folderFits(
+          folder,
+          currentFolders.length,
+          currentEndpoints,
+          freeFolders,
+          freeEndpoints,
+        )
+      ) {
+        return current;
+      }
+      next.add(folderId);
+      return next;
+    });
+  };
+
+  const backToChoose = () => {
+    setStep("choose");
+    setError(null);
+    setFileName("");
+    setProgress(0);
+    setCollection(null);
+    setSelected(new Set());
+    setValues({});
+  };
+
+  const goToReview = () => {
+    if (!selectedFolders.length) return;
+    if (variableNames.length) setStep("variables");
+    else setStep("notImported");
+  };
+
+  const runImport = () => {
+    if (!collection) return;
+    const now = Date.now();
+    const resolvedValues = { ...collection.variables, ...values };
+    const importedFolders: SavedFolder[] = [];
+    const entries: HistoryEntry[] = [];
+    let incomplete = 0;
+    for (const folder of selectedFolders) {
+      const endpoints = folder.requests.map((request, index) => {
+        const url = resolveVariables(request.url, resolvedValues);
+        const text = [
+          url,
+          ...Object.values(request.headers),
+          request.body ?? "",
+        ].join("\n");
+        if (hasUnresolvedVariables(resolveVariables(text, resolvedValues))) {
+          incomplete += 1;
+        }
+        return { method: request.method, url, savedAt: now + index };
+      });
+      importedFolders.push({
+        id: `postman-${now}-${importedFolders.length}-${Math.random()
+          .toString(36)
+          .slice(2, 7)}`,
+        name: folder.name,
+        createdAt: now,
+        endpoints,
+      });
+      for (const request of folder.requests) {
+        entries.push({
+          method: request.method,
+          url: resolveVariables(request.url, resolvedValues),
+          timestamp: now,
+          status: null,
+          headers: request.headers,
+        });
+      }
+    }
+    const importedRequests = importedFolders.reduce(
+      (total, folder) => total + folder.endpoints.length,
+      0,
+    );
+    onImport(importedFolders, entries);
+    setResult({
+      importedRequests,
+      folders: importedFolders.length,
+      skipped: collection.stats.totalRequests - importedRequests,
+      incomplete,
+      credentials: collection.stats.credentials,
+    });
+    setStep("done");
+  };
+
+  const downloadSkipped = () => {
+    if (!collection) return;
+    const rows: string[][] = [
+      ["Folder", "Method", "URL"],
+    ];
+    for (const folder of collection.folders) {
+      if (selected.has(folder.id)) continue;
+      for (const request of folder.requests) {
+        rows.push([folder.name, request.method, request.url]);
+      }
+    }
+    const csv = rows
+      .map((row) =>
+        row
+          .map((cell) => `"${cell.replace(/"/g, '""')}"`)
+          .join(","),
+      )
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "postman-skipped-requests.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const footerButton = (
+    label: string,
+    onClick: () => void,
+    disabled = false,
+  ) => (
+    <RippleButton
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        height: 28,
+        padding: "0 8px",
+        borderRadius: 6,
+        backgroundColor: disabled ? "#b4b4ff" : "#5b5bff",
+        color: "#ffffff",
+        fontFamily: font,
+        fontSize: 12,
+        letterSpacing: "-0.48px",
+      }}
+    >
+      {label}
+    </RippleButton>
+  );
+  const backButton = (onClick: () => void) => (
+    <button
+      onClick={onClick}
+      style={{
+        border: "none",
+        background: "transparent",
+        padding: "0 8px",
+        height: 28,
+        cursor: "pointer",
+        fontFamily: font,
+        fontSize: 12,
+        letterSpacing: "-0.48px",
+        color: isDark ? "#c7c7c7" : "#676666",
+      }}
+    >
+      Back
+    </button>
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 80,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        onClick={onClose}
+        style={{
+          position: "absolute",
+          inset: 0,
+          backdropFilter: "blur(42px)",
+          WebkitBackdropFilter: "blur(42px)",
+          background: isDark
+            ? "linear-gradient(-23.5deg, rgba(36, 36, 36, 0.55), rgba(129, 129, 129, 0))"
+            : "linear-gradient(-23.5deg, rgba(180, 180, 180, 0.55), rgba(230, 230, 230, 0))",
+        }}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 8 }}
+        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          position: "relative",
+          width: "min(686px, 100%)",
+          maxHeight: "calc(100vh - 32px)",
+          overflowY: "auto",
+          boxSizing: "border-box",
+          borderRadius: 8,
+          border: `0.8px solid ${panelBorder}`,
+          backgroundColor: isDark ? cardBg : "#fcfcfc",
+          padding: 16,
+          boxShadow: isDark
+            ? "0 24px 60px rgba(0,0,0,0.55)"
+            : "0 24px 60px rgba(180,180,180,0.35)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 8,
+              backgroundColor: isDark ? "#212121" : "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <PostmanDownloadIcon color={isDark ? "#c7c7c7" : "#585858"} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontFamily: font,
+                fontSize: 16,
+                fontWeight: 500,
+                lineHeight: "21px",
+                letterSpacing: "-0.8px",
+                color: textMain,
+              }}
+            >
+              {step === "choose"
+                ? "Import your Postman collection"
+                : "Postman collection"}
+            </div>
+            <div
+              style={{
+                marginTop: 4,
+                fontFamily: font,
+                fontSize: 14,
+                lineHeight: "20px",
+                letterSpacing: "-0.56px",
+                color: textMuted,
+              }}
+            >
+              Collection v2.1 (json). it reads in your browser
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close import"
+            style={{
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              padding: 4,
+              color: textFaint,
+              display: "flex",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M4 4l8 8M12 4l-8 8"
+                stroke={textFaint}
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {(step === "choose" || step === "uploading") && (
+          <div style={{ marginTop: 16 }}>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json,application/json"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void startFile(file);
+                event.target.value = "";
+              }}
+            />
+            <div
+              role="button"
+              tabIndex={0}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(false);
+                const file = event.dataTransfer.files?.[0];
+                if (file) void startFile(file);
+              }}
+              onClick={() => fileRef.current?.click()}
+              style={{
+                height: 210,
+                boxSizing: "border-box",
+                borderRadius: 8,
+                border: `${dragging ? "1px" : "0.8px"} solid ${
+                  dragging ? "#5b5bff" : panelBorder
+                }`,
+                backgroundColor: isDark ? "#1b1b1b" : "#ffffff",
+                backgroundImage: `radial-gradient(circle, ${
+                  isDark ? "#2a2a2a" : "#f7f7f7"
+                } 2px, transparent 2px)`,
+                backgroundSize: "12px 12px",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                cursor: "pointer",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 8,
+                    background: isDark
+                      ? "linear-gradient(180deg, rgba(0,128,0,0.55), rgba(0,128,0,0.12))"
+                      : "linear-gradient(180deg, rgba(0,128,0,0.16), rgba(0,128,0,0.03))",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <PostmanFileIcon color={isDark ? "#d1d1d1" : "#4a4a4a"} />
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 8,
+                    maxWidth: 316,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: font,
+                      fontSize: 14,
+                      fontWeight: 500,
+                      letterSpacing: "-0.7px",
+                      color: textMain,
+                      textAlign: "center",
+                    }}
+                  >
+                    Drop a postman collection here or{" "}
+                    <span style={{ textDecoration: "underline" }}>browse</span>
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: font,
+                      fontSize: 14,
+                      lineHeight: "20px",
+                      letterSpacing: "-0.56px",
+                      color: textMuted,
+                      textAlign: "center",
+                    }}
+                  >
+                    Collection v2.1 (.json), up to 5mb. it&rsquo;s read in your
+                    browser. Nothing is uploaded
+                  </div>
+                </div>
+              </div>
+              <div
+                style={{
+                  marginTop: 4,
+                  minWidth: 76,
+                  height: 28,
+                  boxSizing: "border-box",
+                  padding: "0 8px",
+                  borderRadius: 6,
+                  backgroundColor:
+                    step === "uploading" ? "#b4b4ff" : "#5b5bff",
+                  color: "#ffffff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: font,
+                  fontSize: 12,
+                  letterSpacing: "-0.48px",
+                }}
+              >
+                {step === "uploading" ? "Uploading" : "Choose File"}
+              </div>
+            </div>
+            {error && (
+              <div
+                style={{
+                  marginTop: 12,
+                  fontFamily: font,
+                  fontSize: 14,
+                  color: "#b42318",
+                }}
+              >
+                {error}
+              </div>
+            )}
+            {step === "uploading" && fileName && (
+              <div style={{ marginTop: 16 }}>
+                <div
+                  style={{
+                    fontFamily: font,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    letterSpacing: "-0.56px",
+                    color: textMain,
+                  }}
+                >
+                  Postman Collection
+                </div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    borderRadius: 8,
+                    border: `0.8px solid ${panelBorder}`,
+                    padding: 12,
+                  }}
+                >
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <PostmanFileIcon color={textMuted} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontFamily: font,
+                          fontSize: 14,
+                          letterSpacing: "-0.56px",
+                          color: textMain,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {fileName}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: font,
+                          fontSize: 12,
+                          color: textMuted,
+                        }}
+                      >
+                        Uploading. {progress}%
+                      </div>
+                    </div>
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        backToChoose();
+                      }}
+                      aria-label="Remove file"
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        padding: 4,
+                        display: "flex",
+                      }}
+                    >
+                      <PostmanTrashIcon color={textFaint} />
+                    </button>
+                  </div>
+                  <div
+                    style={{
+                      height: 3,
+                      borderRadius: 2,
+                      backgroundColor: isDark ? "#2d2d2d" : "#f2f2f2",
+                      marginTop: 10,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: 3,
+                        width: `${progress}%`,
+                        backgroundColor: "#00b400",
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            <div
+              style={{
+                marginTop: 16,
+                fontFamily: font,
+                fontSize: 14,
+                lineHeight: "20px",
+                letterSpacing: "-0.56px",
+                color: textFaint,
+              }}
+            >
+              Not sure how? in Postman, open the collection menu, Choose export,
+              then collection v2.1
+            </div>
+          </div>
+        )}
+
+        {step === "folders" && collection && (
+          <div
+            style={{
+              marginTop: 16,
+              borderRadius: 8,
+              border: `0.8px solid ${panelBorder}`,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontFamily: font,
+                fontSize: 14,
+                letterSpacing: "-0.56px",
+              }}
+            >
+              <span style={{ fontWeight: 500, color: textMain }}>Folders</span>
+              <span style={{ marginLeft: "auto", fontWeight: 500, color: textMain }}>
+                {Math.min(folders.length, POSTMAN_MAX_FOLDERS)} of{" "}
+                {POSTMAN_MAX_FOLDERS} used
+              </span>
+              <span style={{ fontWeight: 500, color: textMuted }}>
+                {freeFolders} free
+              </span>
+            </div>
+            <div
+              style={{
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: isDark ? "#2d2d2d" : "#f2f2f2",
+                marginTop: 6,
+                marginBottom: 12,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: 6,
+                  width: `${Math.min(100, (folders.length / POSTMAN_MAX_FOLDERS) * 100)}%`,
+                  backgroundColor: "#5b5bff",
+                }}
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontFamily: font,
+                fontSize: 14,
+                letterSpacing: "-0.56px",
+              }}
+            >
+              <span style={{ fontWeight: 500, color: textMain }}>
+                Endpoints
+              </span>
+              <span style={{ marginLeft: "auto", fontWeight: 500, color: textMain }}>
+                {Math.min(existingEndpoints, POSTMAN_MAX_ENDPOINTS)} of{" "}
+                {POSTMAN_MAX_ENDPOINTS} used
+              </span>
+              <span style={{ fontWeight: 500, color: textMuted }}>
+                {freeEndpoints} free
+              </span>
+            </div>
+            <div
+              style={{
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: isDark ? "#2d2d2d" : "#f2f2f2",
+                marginTop: 6,
+                marginBottom: 12,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: 6,
+                  width: `${Math.min(100, (existingEndpoints / POSTMAN_MAX_ENDPOINTS) * 100)}%`,
+                  backgroundColor: "#5b5bff",
+                }}
+              />
+            </div>
+
+            {(collection.stats.totalRequests > freeEndpoints ||
+              collection.folders.length > freeFolders) && (
+              <div
+                style={{
+                  borderRadius: 6,
+                  border: `1px solid ${isDark ? "#5c3b17" : "#ffe8cc"}`,
+                  backgroundColor: isDark ? "#2a1d0e" : "#fff5e9",
+                  padding: 8,
+                  color: isDark ? "#ffb057" : "#dd7800",
+                  fontFamily: font,
+                }}
+              >
+                <div
+                  className="flex items-center"
+                  style={{ gap: 4, fontSize: 14, fontWeight: 500 }}
+                >
+                  <PostmanDangerIcon color={isDark ? "#ffb057" : "#dd7800"} />
+                  Your collection is bigger than the space you have
+                </div>
+                <div
+                  style={{
+                    marginTop: 8,
+                    borderRadius: 6,
+                    backgroundColor: isDark ? "#3a2610" : "#ffe8cd",
+                    padding: 8,
+                    fontSize: 14,
+                    letterSpacing: "-0.56px",
+                  }}
+                >
+                  It has {collection.stats.totalRequests}{" "}
+                  {collection.stats.totalRequests === 1 ? "request" : "requests"}{" "}
+                  in {collection.stats.folderCount}{" "}
+                  {collection.stats.folderCount === 1 ? "folder" : "folders"}.
+                  Pick the folders to import now&gt;
+                </div>
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: 12,
+                borderRadius: 6,
+                border: `0.8px solid ${panelBorder}`,
+                padding: 8,
+                maxHeight: 220,
+                overflowY: "auto",
+              }}
+            >
+              {collection.folders.map((folder) => {
+                const isSelected = selected.has(folder.id);
+                const fits =
+                  isSelected ||
+                  folderFits(
+                    folder,
+                    selectedFolders.length,
+                    selectedEndpoints,
+                    freeFolders,
+                    freeEndpoints,
+                  );
+                return (
+                  <button
+                    key={folder.id}
+                    onClick={() => toggleFolder(folder.id)}
+                    disabled={!fits}
+                    style={{
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      border: "none",
+                      background: "transparent",
+                      padding: "6px 4px",
+                      cursor: fits ? "pointer" : "default",
+                      opacity: fits ? 1 : 0.55,
+                      fontFamily: font,
+                      fontSize: 14,
+                      letterSpacing: "-0.56px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 16,
+                        height: 16,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <PostmanTickSquareIcon
+                        checked={isSelected}
+                        color="#008000"
+                        mutedColor={isDark ? "#5a5a5a" : "#818181"}
+                      />
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        textAlign: "left",
+                        color: isSelected ? textMain : textMuted,
+                      }}
+                    >
+                      {folder.name}
+                    </span>
+                    <span style={{ color: textMuted, fontWeight: 500 }}>
+                      {folder.requests.length} endpoints
+                    </span>
+                    {!fits && (
+                      <span
+                        style={{
+                          borderRadius: 4,
+                          backgroundColor: isDark ? "#2d2d2d" : "#f2f2f2",
+                          padding: "2px 6px",
+                          fontSize: 12,
+                          color: textMuted,
+                        }}
+                      >
+                        Overlimit
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                fontFamily: font,
+                fontSize: 14,
+                lineHeight: "20px",
+                letterSpacing: "-0.56px",
+                color: textFaint,
+              }}
+            >
+              Selected: {selectedFolders.length} folders, {selectedEndpoints}{" "}
+              endpoints.
+              {selectedFolders.length >= freeFolders ||
+              selectedEndpoints >= freeEndpoints
+                ? " Limit reached."
+                : ""}{" "}
+              Subfolders are merged into their parent like parent &gt; child.
+              Folders left out stay in your file, so you can import them after
+              freeing space
+            </div>
+            <div
+              style={{
+                marginTop: 8,
+                fontFamily: font,
+                fontSize: 14,
+                fontWeight: 500,
+                letterSpacing: "-0.56px",
+                color: textMain,
+              }}
+            >
+              Folders aren&rsquo;t created until you import.
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 16,
+              }}
+            >
+              {backButton(backToChoose)}
+              {footerButton(
+                `Next: ${selectedFolders.length} folders, ${selectedEndpoints} endpoints`,
+                goToReview,
+                selectedFolders.length === 0,
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === "variables" && collection && (
+          <div
+            style={{
+              marginTop: 16,
+              borderRadius: 8,
+              border: `0.8px solid ${panelBorder}`,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: font,
+                fontSize: 16,
+                fontWeight: 500,
+                letterSpacing: "-0.64px",
+                color: textMain,
+              }}
+            >
+              The {selectedFolders.length === 1 ? "folder" : "folders"} you
+              picked {selectedFolders.length === 1 ? "uses" : "use"}{" "}
+              {variableNames.length} variables
+            </div>
+            <div
+              style={{
+                marginTop: 8,
+                fontFamily: font,
+                fontSize: 14,
+                lineHeight: "20px",
+                letterSpacing: "-0.56px",
+                color: textMuted,
+              }}
+            >
+              Their requests contain{" "}
+              {variableNames.map((name, index) => (
+                <span key={name}>
+                  <span
+                    style={{
+                      borderRadius: 4,
+                      backgroundColor: isDark ? "#2d2d2d" : "#f2f2f2",
+                      padding: "1px 5px",
+                      fontSize: 12,
+                    }}
+                  >
+                    {name}
+                  </span>
+                  {index < variableNames.length - 1 ? ", " : ""}
+                </span>
+              ))}
+              . Fill them in now, or leave them blank and fill them later
+            </div>
+            <div
+              style={{
+                marginTop: 16,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              {variableNames.map((name) => {
+                const secret = isSecretVariable(name);
+                return (
+                  <div key={name} style={{ display: "flex", gap: 8 }}>
+                    <div
+                      style={{
+                        flex: 1,
+                        height: 40,
+                        boxSizing: "border-box",
+                        borderRadius: 8,
+                        border: `1px solid ${panelBorder}`,
+                        padding: "0 12px",
+                        display: "flex",
+                        alignItems: "center",
+                        fontFamily: font,
+                        fontSize: 12,
+                        letterSpacing: "-0.48px",
+                        color: isDark ? "#c7c7c7" : "#5b5b5b",
+                      }}
+                    >
+                      {name}
+                    </div>
+                    <input
+                      value={secret ? "" : (values[name] ?? "")}
+                      disabled={secret}
+                      placeholder={
+                        secret ? "Not imported: Looks like a secret" : "Value"
+                      }
+                      onChange={(event) =>
+                        setValues((current) => ({
+                          ...current,
+                          [name]: event.target.value,
+                        }))
+                      }
+                      style={{
+                        flex: 1,
+                        height: 40,
+                        boxSizing: "border-box",
+                        borderRadius: 8,
+                        border: `1px solid ${panelBorder}`,
+                        padding: "0 12px",
+                        fontFamily: font,
+                        fontSize: 12,
+                        letterSpacing: "-0.48px",
+                        color: isDark ? "#c7c7c7" : "#6e6d6d",
+                        backgroundColor: secret
+                          ? softBg
+                          : isDark
+                            ? "#212121"
+                            : "#ffffff",
+                        outline: "none",
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <div
+              style={{
+                marginTop: 12,
+                fontFamily: font,
+                fontSize: 14,
+                lineHeight: "20px",
+                letterSpacing: "-0.56px",
+                color: textFaint,
+              }}
+            >
+              Requests missing a value are marked incomplete. Variables used
+              only by folders you left out aren't asked
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 16,
+              }}
+            >
+              {backButton(() => setStep("folders"))}
+              {footerButton("Next", () => setStep("notImported"))}
+            </div>
+          </div>
+        )}
+
+        {step === "notImported" && collection && (
+          <div
+            style={{
+              marginTop: 16,
+              borderRadius: 8,
+              border: `0.8px solid ${panelBorder}`,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: font,
+                fontSize: 16,
+                fontWeight: 500,
+                letterSpacing: "-0.64px",
+                color: textMain,
+              }}
+            >
+              Not imported
+            </div>
+            <div
+              style={{
+                marginTop: 12,
+                borderRadius: 6,
+                border: `0.8px solid ${panelBorder}`,
+                padding: 12,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              {[
+                [
+                  "Scripts",
+                  `${collection.stats.scripts} ${
+                    collection.stats.scripts === 1 ? "request has" : "requests have"
+                  } pre-request or test scripts. Scripts aren't run.`,
+                ],
+                [
+                  "Saved example responses",
+                  `${collection.stats.examples} ${
+                    collection.stats.examples === 1 ? "example isn't" : "examples aren't"
+                  } kept.`,
+                ],
+                [
+                  "Collection and folder auth",
+                  "Inherited auth isn't applied. Add an Authorization header per request",
+                ],
+                [
+                  "File uploads in form-data",
+                  `${collection.stats.fileUploads} ${
+                    collection.stats.fileUploads === 1 ? "request" : "requests"
+                  }. Files can't be attached.`,
+                ],
+                [
+                  "Descriptions and docs",
+                  "Request descriptions aren't kept.",
+                ],
+                [
+                  "Cookies, certificates and proxy settings",
+                  "Not supported",
+                ],
+              ].map(([title, detail]) => (
+                <div key={title}>
+                  <div
+                    className="flex items-center"
+                    style={{ gap: 4 }}
+                  >
+                    <PostmanDangerSmallIcon color={isDark ? "#ffb057" : "#dd7800"} />
+                    <span
+                      style={{
+                        fontFamily: font,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        letterSpacing: "-0.48px",
+                        color: isDark ? "#d1d1d1" : "#585858",
+                      }}
+                    >
+                      {title}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 2,
+                      fontFamily: font,
+                      fontSize: 12,
+                      lineHeight: "20px",
+                      letterSpacing: "-0.48px",
+                      color: textFaint,
+                    }}
+                  >
+                    {detail}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div
+              style={{
+                marginTop: 16,
+                fontFamily: font,
+                fontSize: 14,
+                fontWeight: 500,
+                letterSpacing: "-0.56px",
+                color: textMain,
+              }}
+            >
+              Removed for Safety
+            </div>
+            <div
+              style={{
+                marginTop: 8,
+                borderRadius: 6,
+                border: `0.8px solid ${panelBorder}`,
+                padding: 12,
+              }}
+            >
+              <div className="flex items-center" style={{ gap: 4 }}>
+                <PostmanTickIcon color={isDark ? "#7ee787" : "#008000"} />
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    letterSpacing: "-0.48px",
+                    color: isDark ? "#d1d1d1" : "#585858",
+                  }}
+                >
+                  {collection.stats.credentials} saved credentials
+                </span>
+              </div>
+              <div
+                style={{
+                  marginTop: 2,
+                  fontFamily: font,
+                  fontSize: 12,
+                  lineHeight: "20px",
+                  letterSpacing: "-0.48px",
+                  color: textFaint,
+                }}
+              >
+                Tokens and keys are never imported. Add them when you send
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 16,
+              }}
+            >
+              {backButton(() =>
+                setStep(variableNames.length ? "variables" : "folders"),
+              )}
+              {footerButton(
+                `Import ${selectedFolders.length} folders, ${selectedEndpoints} endpoints`,
+                runImport,
+                selectedFolders.length === 0,
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === "done" && collection && result && (
+          <div
+            style={{
+              marginTop: 16,
+              borderRadius: 8,
+              border: `0.8px solid ${panelBorder}`,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{
+                borderRadius: 8,
+                border: "1px solid #45ff45",
+                backgroundColor: "#ebffeb",
+                padding: 8,
+              }}
+            >
+              <div className="flex items-center" style={{ gap: 4 }}>
+                <PostmanTickIcon color="#008000" />
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: 14,
+                    fontWeight: 500,
+                    letterSpacing: "-0.56px",
+                    color: "#008000",
+                  }}
+                >
+                  Imported {result.importedRequests} of{" "}
+                  {collection.stats.totalRequests} requests
+                </span>
+              </div>
+              <div
+                style={{
+                  marginTop: 8,
+                  borderRadius: 6,
+                  backgroundColor: "#bdffbd",
+                  padding: 8,
+                  fontFamily: font,
+                  fontSize: 14,
+                  letterSpacing: "-0.56px",
+                  color: "#008000",
+                }}
+              >
+                {result.folders} folders created
+              </div>
+            </div>
+            <div
+              style={{
+                marginTop: 12,
+                borderRadius: 6,
+                border: `0.8px solid ${panelBorder}`,
+                padding: 12,
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              <div>
+                <div className="flex items-center" style={{ gap: 4 }}>
+                  <PostmanDangerSmallIcon
+                    color={isDark ? "#ffb057" : "#dd7800"}
+                  />
+                  <span
+                    style={{
+                      fontFamily: font,
+                      fontSize: 12,
+                      color: isDark ? "#d1d1d1" : "#585858",
+                    }}
+                  >
+                    {result.skipped} request
+                    {result.skipped === 1 ? "" : "s"} skipped
+                  </span>
+                </div>
+                <div
+                  style={{
+                    marginTop: 2,
+                    fontFamily: font,
+                    fontSize: 12,
+                    lineHeight: "20px",
+                    color: textFaint,
+                  }}
+                >
+                  over the {POSTMAN_MAX_ENDPOINTS} endpoint limit
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center" style={{ gap: 4 }}>
+                  <PostmanDangerSmallIcon
+                    color={isDark ? "#ffb057" : "#dd7800"}
+                  />
+                  <span
+                    style={{
+                      fontFamily: font,
+                      fontSize: 12,
+                      color: isDark ? "#d1d1d1" : "#585858",
+                    }}
+                  >
+                    {result.incomplete} marked incomplete
+                  </span>
+                </div>
+                <div
+                  style={{
+                    marginTop: 2,
+                    fontFamily: font,
+                    fontSize: 12,
+                    lineHeight: "20px",
+                    color: textFaint,
+                  }}
+                >
+                  Missing a value
+                </div>
+              </div>
+              <div className="flex items-center" style={{ gap: 4 }}>
+                <PostmanTickIcon color={isDark ? "#7ee787" : "#008000"} />
+                <span
+                  style={{
+                    fontFamily: font,
+                    fontSize: 12,
+                    color: isDark ? "#d1d1d1" : "#585858",
+                  }}
+                >
+                  {result.credentials} credentials removed
+                </span>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 16,
+              }}
+            >
+              <button
+                onClick={downloadSkipped}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  padding: "0 8px",
+                  height: 28,
+                  cursor: "pointer",
+                  fontFamily: font,
+                  fontSize: 12,
+                  letterSpacing: "-0.48px",
+                  color: isDark ? "#c7c7c7" : "#676666",
+                }}
+              >
+                Download skipped list
+              </button>
+              {footerButton("Go to folders", onClose)}
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function CurlSparkIcon({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path
+        d="M7.2 1.5 8.5 5.5 12.5 6.8 8.5 8.1 7.2 12.1 5.9 8.1 1.9 6.8 5.9 5.5 7.2 1.5Z"
+        fill={color}
+      />
+      <path
+        d="M12.4 10.2 13 12l1.8.6-1.8.6-.6 1.8-.6-1.8-1.8-.6 1.8-.6.6-1.8Z"
+        fill={color}
+      />
+    </svg>
+  );
+}
+
+function CurlCheckIcon({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6.5" fill={color} />
+      <path
+        d="m4.8 8.2 2.1 2.1 4.3-4.3"
+        stroke="#fff"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CurlWarnIcon({ color }: { color: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M8 1.7 14.4 12.6H1.6L8 1.7Z" fill={color} />
+      <path
+        d="M8 5.4v3.4"
+        stroke="#fff"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <circle cx="8" cy="10.7" r="0.8" fill="#fff" />
+    </svg>
+  );
+}
+
+function CurlDetectedBanner({
+  isDark,
+  onKeep,
+  onFill,
+}: {
+  isDark: boolean;
+  onKeep: () => void;
+  onFill: () => void;
+}) {
+  const accent = isDark ? "#b4b4ff" : "#5b5bff";
+  const font = "Geist, var(--font-geist-sans)";
+  return (
+    <div
+      style={{
+        borderRadius: 8,
+        border: `1px solid ${isDark ? "#3a3a6b" : "#c8c8ff"}`,
+        backgroundColor: isDark ? "#16162e" : "#f4f4ff",
+        padding: 8,
+      }}
+    >
+      <div className="flex items-center" style={{ gap: 4 }}>
+        <CurlSparkIcon color={isDark ? "#8f8fff" : "#5b5bff"} />
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: 14,
+            fontWeight: 500,
+            letterSpacing: "-0.56px",
+            color: accent,
+          }}
+        >
+          This looks like a CURL command
+        </span>
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          height: 72,
+          boxSizing: "border-box",
+          borderRadius: 6,
+          backgroundColor: isDark ? "#1e1e3f" : "#dfdfff",
+          padding: 8,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: 14,
+            lineHeight: "20px",
+            letterSpacing: "-0.56px",
+            color: accent,
+          }}
+        >
+          fill the request from it? Nothing is sent
+        </span>
+        <div
+          className="flex items-center"
+          style={{ justifyContent: "flex-end", gap: 8 }}
+        >
+          <button
+            onClick={onKeep}
+            style={{
+              border: "none",
+              background: "transparent",
+              padding: 0,
+              cursor: "pointer",
+              fontFamily: font,
+              fontSize: 12,
+              letterSpacing: "-0.48px",
+              color: isDark ? "#9e9e9e" : "#676666",
+            }}
+          >
+            Keep as text
+          </button>
+          <RippleButton
+            onClick={onFill}
+            style={{
+              height: 28,
+              padding: "0 8px",
+              borderRadius: 6,
+              backgroundColor: "#5b5bff",
+              color: "#ffffff",
+              fontFamily: font,
+              fontSize: 12,
+              letterSpacing: "-0.48px",
+            }}
+          >
+            Fill request
+          </RippleButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CurlFilledBanner({ isDark }: { isDark: boolean }) {
+  const font = "Geist, var(--font-geist-sans)";
+  const accent = isDark ? "#7ee787" : "#008000";
+  return (
+    <div
+      style={{
+        borderRadius: 8,
+        border: `1px solid ${isDark ? "#2f6b2f" : "#45ff45"}`,
+        backgroundColor: isDark ? "#10240f" : "#ebffeb",
+        padding: 8,
+      }}
+    >
+      <div className="flex items-center" style={{ gap: 4 }}>
+        <CurlCheckIcon color={accent} />
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: 14,
+            fontWeight: 500,
+            letterSpacing: "-0.56px",
+            color: accent,
+          }}
+        >
+          Filled from cURL
+        </span>
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          height: 36,
+          boxSizing: "border-box",
+          borderRadius: 6,
+          backgroundColor: isDark ? "#173d17" : "#bdffbd",
+          padding: "8px 8px",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: 14,
+            lineHeight: "20px",
+            letterSpacing: "-0.56px",
+            color: accent,
+          }}
+        >
+          Check the request, then press send.
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CurlErrorBanner({
+  isDark,
+  title,
+  detail,
+}: {
+  isDark: boolean;
+  title: string;
+  detail: string;
+}) {
+  const font = "Geist, var(--font-geist-sans)";
+  const accent = isDark ? "#ffb057" : "#dd7800";
+  return (
+    <div
+      style={{
+        borderRadius: 8,
+        border: `1px solid ${isDark ? "#5c3b17" : "#ffe8cc"}`,
+        backgroundColor: isDark ? "#2a1d0e" : "#fff5e9",
+        padding: 8,
+      }}
+    >
+      <div className="flex items-center" style={{ gap: 4 }}>
+        <CurlWarnIcon color={accent} />
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: 14,
+            fontWeight: 500,
+            letterSpacing: "-0.56px",
+            color: accent,
+          }}
+        >
+          {title}
+        </span>
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          height: 36,
+          boxSizing: "border-box",
+          borderRadius: 6,
+          backgroundColor: isDark ? "#3a2610" : "#ffe8cd",
+          padding: "8px 8px",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: 14,
+            lineHeight: "20px",
+            letterSpacing: "-0.56px",
+            color: accent,
+          }}
+        >
+          {detail}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CurlSummaryRow({
+  isDark,
+  label,
+  note,
+}: {
+  isDark: boolean;
+  label: string;
+  note?: string;
+}) {
+  const font = "Geist, var(--font-geist-sans)";
+  return (
+    <div>
+      <div className="flex items-center" style={{ gap: 4 }}>
+        <CurlCheckIcon color={isDark ? "#7ee787" : "#008000"} />
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: 12,
+            letterSpacing: "-0.48px",
+            color: isDark ? "#d1d1d1" : "#585858",
+          }}
+        >
+          {label}
+        </span>
+      </div>
+      {note && (
+        <div
+          style={{
+            marginTop: 4,
+            fontFamily: font,
+            fontSize: 12,
+            lineHeight: "20px",
+            letterSpacing: "-0.48px",
+            color: isDark ? "#8c8c8c" : "#939393",
+          }}
+        >
+          {note}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CurlSkipRow({
+  isDark,
+  flag,
+  label,
+  note,
+}: {
+  isDark: boolean;
+  flag: string;
+  label: string;
+  note: string;
+}) {
+  const font = "Geist, var(--font-geist-sans)";
+  return (
+    <div>
+      <div className="flex items-center" style={{ gap: 4 }}>
+        <CurlWarnIcon color={isDark ? "#ffb057" : "#dd7800"} />
+        <span
+          style={{
+            borderRadius: 4,
+            backgroundColor: isDark ? "#2d2d2d" : "#e6e6e6",
+            padding: "2px 6px",
+            fontFamily: font,
+            fontSize: 12,
+            lineHeight: "14px",
+            letterSpacing: "-0.48px",
+            color: isDark ? "#d1d1d1" : "#585858",
+          }}
+        >
+          {flag}
+        </span>
+        <span
+          style={{
+            fontFamily: font,
+            fontSize: 12,
+            letterSpacing: "-0.48px",
+            color: isDark ? "#d1d1d1" : "#585858",
+          }}
+        >
+          {label}
+        </span>
+      </div>
+      <div
+        style={{
+          marginTop: 2,
+          fontFamily: font,
+          fontSize: 12,
+          lineHeight: "20px",
+          letterSpacing: "-0.48px",
+          color: isDark ? "#8c8c8c" : "#939393",
+        }}
+      >
+        {note}
+      </div>
+    </div>
+  );
+}
+
+function CurlSummaryPanel({
+  isDark,
+  state,
+}: {
+  isDark: boolean;
+  state: Extract<CurlState, { kind: "filled" }>;
+}) {
+  const font = "Geist, var(--font-geist-sans)";
+  const border = isDark ? "#2d2d2d" : "#f2f2f2";
+  const titleColor = isDark ? "#bdbdbd" : "#585858";
+  const notImportedCount =
+    Number(state.skippedCookies) +
+    Number(state.skippedInsecure) +
+    Number(state.skippedBody);
+  return (
+    <div
+      style={{
+        borderRadius: 8,
+        border: `1px solid ${border}`,
+        backgroundColor: isDark ? "#161616" : "#ffffff",
+        padding: 12,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: font,
+          fontSize: 14,
+          fontWeight: 500,
+          lineHeight: "18px",
+          letterSpacing: "-0.56px",
+          color: titleColor,
+        }}
+      >
+        Imported
+      </div>
+      <div
+        style={{
+          marginTop: 12,
+          borderRadius: 6,
+          border: `1px solid ${border}`,
+          backgroundColor: isDark ? "#0f0f0f" : "#ffffff",
+          padding: 8,
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        <CurlSummaryRow isDark={isDark} label="Method and URL" />
+        {state.auth && (
+          <CurlSummaryRow
+            isDark={isDark}
+            label="Authorization header"
+            note="Filled in this request only. Never saved to folders or history"
+          />
+        )}
+        {state.body && (
+          <CurlSummaryRow
+            isDark={isDark}
+            label={state.bodyLabel}
+            note="Content-Type is set automatically"
+          />
+        )}
+      </div>
+      {notImportedCount > 0 && (
+        <>
+          <div
+            style={{
+              marginTop: 12,
+              fontFamily: font,
+              fontSize: 14,
+              fontWeight: 500,
+              lineHeight: "18px",
+              letterSpacing: "-0.56px",
+              color: titleColor,
+            }}
+          >
+            Not Imported
+          </div>
+          <div
+            style={{
+              marginTop: 12,
+              borderRadius: 6,
+              border: `1px solid ${border}`,
+              backgroundColor: isDark ? "#1b1b1b" : "#fafafa",
+              padding: 8,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            {state.skippedCookies && (
+              <CurlSkipRow
+                isDark={isDark}
+                flag="-b"
+                label="Cookies"
+                note="Cookies aren't sent"
+              />
+            )}
+            {state.skippedInsecure && (
+              <CurlSkipRow
+                isDark={isDark}
+                flag="-k"
+                label="skip TLS checks"
+                note="Certificate checks stay on"
+              />
+            )}
+            {state.skippedBody && (
+              <CurlSkipRow
+                isDark={isDark}
+                flag="body"
+                label="Request body"
+                note="GET and HEAD requests don't send a body"
+              />
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function IconlyPlus({
   size = 24,
   color = "#5B5BFF",

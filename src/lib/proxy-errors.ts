@@ -16,6 +16,7 @@ export const PROXY_ERROR_MESSAGES: Record<string, string> = {
   upstream_failed: "Upstream request failed",
   too_many_redirects: "Too many redirects",
   host_not_found: "Couldn't find that host. Check the spelling of the domain.",
+  body_too_large: "Request body is too large. The maximum is 8 MB.",
 };
 
 export function proxyErrorResponse(
@@ -30,7 +31,9 @@ export function proxyErrorResponse(
         ? 429
         : code === "store_unavailable"
           ? 503
-          : 500;
+          : code === "body_too_large"
+            ? 413
+            : 500;
   const body: Record<string, unknown> = {
     error: PROXY_ERROR_MESSAGES[code] ?? PROXY_ERROR_MESSAGES.upstream_failed,
     source: "proxy",

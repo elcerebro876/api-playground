@@ -20,6 +20,7 @@ export const PROXY_ERROR_COPY: Record<string, string> = {
   too_many_redirects:
     "The target redirected too many times, so the proxy stopped following.",
   host_not_found: "Couldn't find that host. Check the spelling of the domain.",
+  body_too_large: "Request body is too large. The maximum is 8 MB.",
 };
 
 export function isProxyErrorEnvelope(

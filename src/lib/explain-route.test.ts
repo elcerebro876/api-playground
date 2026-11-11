@@ -4,7 +4,11 @@ import { handleExplain, sectionsLeakValues } from "@/lib/explain-route";
 import type { CachedExplain } from "@/lib/explain-cache";
 import type { ExplainModelInput, ExplainSections } from "@/lib/explain";
 import type { RateLimitResult } from "@/lib/rate-limit";
-import { EXPLAIN_DAILY_MAX_PER_IP, explainGlobalDailyMax } from "@/lib/rate-limit";
+import {
+  EXPLAIN_DAILY_MAX_PER_IP,
+  explainDailyMaxPerIp,
+  explainGlobalDailyMax,
+} from "@/lib/rate-limit";
 import { structureSignature } from "@/lib/explain-key";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
@@ -400,6 +404,26 @@ test("the explain global daily max defaults to 100 and honors its env override",
     }
   }
   assert.equal(EXPLAIN_DAILY_MAX_PER_IP, 3);
+});
+
+test("the per-IP explain daily max defaults to 3 and honors its env override", () => {
+  const previous = process.env.EXPLAIN_DAILY_MAX_PER_IP;
+  try {
+    delete process.env.EXPLAIN_DAILY_MAX_PER_IP;
+    assert.equal(explainDailyMaxPerIp(), 3);
+    process.env.EXPLAIN_DAILY_MAX_PER_IP = "50";
+    assert.equal(explainDailyMaxPerIp(), 50);
+    process.env.EXPLAIN_DAILY_MAX_PER_IP = "0";
+    assert.equal(explainDailyMaxPerIp(), 3);
+    process.env.EXPLAIN_DAILY_MAX_PER_IP = "nope";
+    assert.equal(explainDailyMaxPerIp(), 3);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.EXPLAIN_DAILY_MAX_PER_IP;
+    } else {
+      process.env.EXPLAIN_DAILY_MAX_PER_IP = previous;
+    }
+  }
 });
 
 test("model failures return a fixed error", async () => {

@@ -3,10 +3,14 @@
 //
 // Attempt order (fastest/most reliable first):
 //   1. Cerebras (CEREBRAS_API_KEY) direct, rotating through CEREBRAS_MODELS in
+//      priority order (429/5xx fail fast, at most 1 timeout). Sidelined whenever
+//      the key is absent (e.g. an expired subscription), so the chain skips it.
+//   2. Groq (GROQ_API_KEY), OpenAI-compatible endpoint with free-tier
+//      gpt-oss-120b / qwen models, rotating through GROQ_MODELS. Kept ahead of
+//      Gemini because it answers in about a second.
+//   3. Google Gemini (GEMINI_API_KEY), rotating through GEMINI_MODELS in
 //      priority order (429/5xx fail fast, at most 1 timeout).
-//   2. Google Gemini (GEMINI_API_KEY), rotating through GEMINI_MODELS in
-//      priority order (429/5xx fail fast, at most 1 timeout).
-//   3. OpenRouter (OPENROUTER_API_KEY), rotating through a small list of free
+//   4. OpenRouter (OPENROUTER_API_KEY), rotating through a small list of free
 //      (:free) models. Defaults to OPENROUTER_MODELS; a single OPENROUTER_MODEL
 //      is honored as a one-model alias.
 //
@@ -25,6 +29,7 @@ const GEMINI_ENDPOINT =
   "https://generativelanguage.googleapis.com/v1beta/models";
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const CEREBRAS_ENDPOINT = "https://api.cerebras.ai/v1/chat/completions";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
 const DEFAULT_GEMINI_MODELS =
   "gemini-3.6-flash,gemini-3.8-flash,gemini-3.5-flash,gemini-3.1-flash-lite,gemini-flash-latest";
@@ -44,6 +49,11 @@ const OPENROUTER_MAX_TOKENS = 800;
 
 const DEFAULT_CEREBRAS_MODELS = "gpt-oss-120b,qwen-3.8-27b";
 
+// Groq's free plan serves the same open models as Cerebras at 30 RPM /
+// 1,000 requests a day per model, so it makes a cheap stand-in while the
+// Cerebras subscription is down. IDs are Groq's namespaced model ids.
+const DEFAULT_GROQ_MODELS = "openai/gpt-oss-120b,qwen/qwen3.8-27b";
+
 export function isGeminiConfigured() {
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) return false;
@@ -62,9 +72,18 @@ export function isCerebrasConfigured() {
   return !key.toLowerCase().includes("your_");
 }
 
+export function isGroqConfigured() {
+  const key = process.env.GROQ_API_KEY?.trim();
+  if (!key) return false;
+  return !key.toLowerCase().includes("your_");
+}
+
 export function isAIConfigured() {
   return (
-    isOpenRouterConfigured() || isCerebrasConfigured() || isGeminiConfigured()
+    isOpenRouterConfigured() ||
+    isCerebrasConfigured() ||
+    isGeminiConfigured() ||
+    isGroqConfigured()
   );
 }
 
@@ -91,6 +110,15 @@ function openRouterModels(): string[] {
 function cerebrasModels(): string[] {
   const raw = process.env.CEREBRAS_MODELS?.trim();
   const source = raw || DEFAULT_CEREBRAS_MODELS;
+  return source
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function groqModels(): string[] {
+  const raw = process.env.GROQ_MODELS?.trim();
+  const source = raw || DEFAULT_GROQ_MODELS;
   return source
     .split(",")
     .map((s) => s.trim())
@@ -354,6 +382,87 @@ async function callOpenRouterJson(
   );
 }
 
+// Groq exposes an OpenAI-compatible chat endpoint that also honours JSON mode,
+// so the request/parse shape matches OpenRouter's.
+async function callGroqJson(
+  prompt: string,
+  opts: ResolvedCallOpts,
+): Promise<string> {
+  const key = process.env.GROQ_API_KEY?.trim();
+  if (!key) {
+    return Promise.reject(new Error("GROQ_API_KEY not configured"));
+  }
+
+  const models = groqModels();
+  const attemptErrors: string[] = [];
+  let timeoutsSeen = 0;
+
+  for (const model of models) {
+    const remaining = opts.deadline - Date.now();
+    if (remaining <= 0) {
+      attemptErrors.push("Groq skipped: time budget exhausted");
+      break;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () => controller.abort(),
+      Math.min(opts.timeoutMs, remaining),
+    );
+    try {
+      const res = await fetch(GROQ_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          temperature: opts.temperature,
+          max_tokens: OPENROUTER_MAX_TOKENS,
+          response_format: { type: "json_object" },
+        }),
+      });
+      if (!res.ok) {
+        const bodyText = await res.text();
+        attemptErrors.push(
+          `Groq ${model} error ${res.status}: ${bodyText.slice(0, 160)}`,
+        );
+        if (res.status === 429 || res.status >= 500) continue;
+        return Promise.reject(new Error(attemptErrors.join(" | ")));
+      }
+      const data = await res.json();
+      const text = extractOpenRouterText(data);
+      if (!text) {
+        attemptErrors.push(`Groq ${model} returned empty text`);
+        continue;
+      }
+      return text;
+    } catch (e) {
+      const err = e as Error;
+      if (err?.name === "AbortError") {
+        timeoutsSeen += 1;
+        attemptErrors.push(`Groq ${model} timed out`);
+        if (timeoutsSeen >= MAX_TIMEOUTS_PER_PROVIDER) {
+          return Promise.reject(new Error(attemptErrors.join(" | ")));
+        }
+        continue;
+      }
+      attemptErrors.push(err?.message || "Groq request failed");
+      continue;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return Promise.reject(
+    attemptErrors.length
+      ? new Error(attemptErrors.join(" | "))
+      : new Error("All Groq models failed"),
+  );
+}
+
 async function callCerebrasJson(
   prompt: string,
   opts: ResolvedCallOpts,
@@ -450,6 +559,7 @@ export async function callAIJson(
   const openRouter = isOpenRouterConfigured();
   const cerebras = isCerebrasConfigured();
   const gemini = isGeminiConfigured();
+  const groq = isGroqConfigured();
   const validate = options.validate;
 
   const isValid = (text: string): boolean =>
@@ -471,6 +581,24 @@ export async function callAIJson(
     }
   } else if (cerebras) {
     skipped.push("Cerebras (circuit open)");
+  }
+
+  if (groq && breakerAllows("groq")) {
+    try {
+      const text = await callGroqJson(prompt, callOpts);
+      if (!isValid(text)) {
+        breakerRecordFailure("groq");
+        errors.push("Groq returned output that failed validation");
+      } else {
+        breakerRecordSuccess("groq");
+        return text;
+      }
+    } catch (e) {
+      breakerRecordFailure("groq");
+      errors.push((e as Error).message);
+    }
+  } else if (groq) {
+    skipped.push("Groq (circuit open)");
   }
 
   if (gemini && breakerAllows("gemini")) {
@@ -509,10 +637,10 @@ export async function callAIJson(
     skipped.push("OpenRouter (circuit open)");
   }
 
-  if (!cerebras && !gemini && !openRouter) {
+  if (!cerebras && !gemini && !groq && !openRouter) {
     return Promise.reject(
       new Error(
-        "No AI provider configured. Add CEREBRAS_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY.",
+        "No AI provider configured. Add CEREBRAS_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, or OPENROUTER_API_KEY.",
       ),
     );
   }

@@ -18,9 +18,9 @@ import {
   type CachedExplain,
 } from "@/lib/explain-cache";
 import {
-  EXPLAIN_DAILY_MAX_PER_IP,
   clientIp,
   consumeGlobalDaily,
+  explainDailyMaxPerIp,
   explainGlobalDailyMax,
   hashKey,
   rateLimit,
@@ -75,7 +75,7 @@ function defaultDailyLimit(request: Request): Promise<RateLimitResult> {
     rateLimit(key, {
       burstMax: MODEL_BURST_MAX,
       burstWindowSecs: 10 * 60,
-      dailyMax: EXPLAIN_DAILY_MAX_PER_IP,
+      dailyMax: explainDailyMaxPerIp(),
     }),
   );
 }

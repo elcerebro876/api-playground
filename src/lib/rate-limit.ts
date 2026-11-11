@@ -7,6 +7,14 @@ const DAILY_MAX_PER_IP = 30;
 const DIAGNOSE_DAILY_MAX_DEFAULT = 300;
 
 export const EXPLAIN_DAILY_MAX_PER_IP = 3;
+
+// Per-IP daily explain allowance. 3 is the public default; a local dev server
+// can raise it with EXPLAIN_DAILY_MAX_PER_IP without changing production caps.
+export function explainDailyMaxPerIp(): number {
+  const override = Number(process.env.EXPLAIN_DAILY_MAX_PER_IP);
+  if (Number.isFinite(override) && override > 0) return Math.floor(override);
+  return EXPLAIN_DAILY_MAX_PER_IP;
+}
 const EXPLAIN_GLOBAL_DAILY_MAX_DEFAULT = 100;
 
 export function explainGlobalDailyMax(): number {

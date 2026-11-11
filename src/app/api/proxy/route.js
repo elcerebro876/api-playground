@@ -13,6 +13,7 @@ import {
   isPrivateIpv6,
   redirectHopHeaders,
 } from "../../../lib/proxy-hardening";
+import { isBodyTooLarge } from "../../../lib/request-body";
 
 const ALLOWED_METHODS = new Set(httpMethods.ALLOWED_METHODS);
 const TIMEOUT_MS = 20000;
@@ -76,6 +77,9 @@ export async function POST(request) {
     const m = String(method || "GET").toUpperCase();
     if (!ALLOWED_METHODS.has(m)) throw new ProxyError("bad_request");
     if (typeof url !== "string" || !url.trim()) throw new ProxyError("bad_request");
+    if (typeof body === "string" && isBodyTooLarge(body)) {
+      throw new ProxyError("body_too_large");
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);

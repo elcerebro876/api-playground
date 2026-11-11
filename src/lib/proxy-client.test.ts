@@ -18,6 +18,7 @@ test("every proxy code maps to fixed non-empty deterministic copy", () => {
     "upstream_failed",
     "too_many_redirects",
     "host_not_found",
+    "body_too_large",
   ];
   for (const code of codes) {
     const copy = proxyErrorCopy(code);

@@ -18,6 +18,7 @@ const CODES = [
   "upstream_failed",
   "too_many_redirects",
   "host_not_found",
+  "body_too_large",
 ] as const;
 
 test("every proxy error code carries source, code, and the fixed generic message", async () => {
@@ -25,6 +26,7 @@ test("every proxy error code carries source, code, and the fixed generic message
     blocked_port: 403,
     rate_limited: 429,
     store_unavailable: 503,
+    body_too_large: 413,
   };
   for (const code of CODES) {
     const res = proxyErrorResponse(code, 12);

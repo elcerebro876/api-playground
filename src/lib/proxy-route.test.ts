@@ -153,6 +153,33 @@ test("proxy 500 host_not_found for a typo'd domain, without raw DNS text", async
   }
 });
 
+test("proxy 413 body_too_large stops an over-limit request body before it is sent", async () => {
+  const POST = await getPost();
+  const restore = mockRpc({ ok: true, remaining: 5, retry_after: 0 });
+  try {
+    const res = await POST(
+      proxyReq({
+        method: "POST",
+        url: "https://example.com/",
+        headers: { "Content-Type": "application/json" },
+        body: "a".repeat(8 * 1024 * 1024 + 1),
+      }),
+    );
+    assert.equal(res.status, 413);
+    const data = await res.json();
+    assert.equal(data.source, "proxy");
+    assert.equal(data.code, "body_too_large");
+    assert.equal(
+      data.error,
+      "Request body is too large. The maximum is 8 MB.",
+    );
+    assert.equal(data.status, undefined);
+    assert.equal(data.body, undefined);
+  } finally {
+    restore();
+  }
+});
+
 test("proxy 500 bad_request carries source and code for disallowed methods and missing urls", async () => {
   const POST = await getPost();
   const restore = mockRpc({ ok: true, remaining: 5, retry_after: 0 });
