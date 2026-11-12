@@ -4807,17 +4807,16 @@ function Sidebar({
               type="button"
               onClick={onOpenBrowse}
               style={{
-                width: 53,
-                height: 28,
-                borderRadius: 6,
+                alignSelf: "flex-start",
                 border: "none",
-                backgroundColor: "#5b5bff",
-                color: "#ffffff",
-                fontFamily: "Geist, var(--font-geist-sans)",
-                fontSize: 12,
-                letterSpacing: "-0.48px",
-                cursor: "pointer",
+                background: "transparent",
                 padding: 0,
+                color: "#5b5bff",
+                fontFamily: "Geist, var(--font-geist-sans)",
+                fontSize: 14,
+                fontWeight: 500,
+                letterSpacing: "-0.56px",
+                cursor: "pointer",
               }}
             >
               Search
@@ -7147,6 +7146,69 @@ function ExplorerExplainPopup({
   );
 }
 
+// Iconly-style glyphs used by the welcome capsule buttons.
+function DemoCapsuleIcon({ label, color }: { label: string; color: string }) {
+  const stroke = {
+    stroke: color,
+    strokeWidth: 1.4,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  if (label === "Test a GET") {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M10.664 12L14.664 8L10.664 4" {...stroke} />
+        <path d="M5.336 4L1.336 8L5.336 12" {...stroke} />
+      </svg>
+    );
+  }
+  if (label === "Test a POST") {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <rect x="2" y="2" width="12" height="12" rx="2" {...stroke} />
+        <path d="M4.664 7.333L6 6L4.664 4.666" {...stroke} />
+        <path d="M7.336 8.666L10.003 8.666" {...stroke} />
+      </svg>
+    );
+  }
+  if (label === "Simulate an error") {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <g transform="translate(1.336 2)">
+          <path
+            d="M 13.1547 10 C 13.0377 10.2027 12.8694 10.371 12.6667 10.488 C 12.464 10.6051 12.234 10.6667 12 10.6667 L 3.21867 10.6667 C 3.04358 10.6667 2.87022 10.7012 2.70848 10.7683 C 2.54674 10.8353 2.39978 10.9335 2.276 11.0573 L 0.808 12.5253 C 0.741803 12.5915 0.657469 12.6366 0.565659 12.6548 C 0.473849 12.6731 0.378687 12.6637 0.292204 12.6279 C 0.205722 12.5921 0.131801 12.5314 0.0797901 12.4536 C 0.0277788 12.3758 1.1762e-05 12.2843 0 12.1907 L 0 1.33333 C 0 1.09928 0.0616085 0.869359 0.178633 0.666666 C 0.295657 0.463974 0.463975 0.295657 0.666667 0.178633 C 0.869359 0.0616083 1.09928 0 1.33333 0 L 12 0 C 12.234 0 12.464 0.0616083 12.6667 0.178633 C 12.8694 0.295657 13.0377 0.463974 13.1547 0.666667 C 13.2717 0.869359 13.3333 1.09928 13.3333 1.33333 L 13.3333 9.33333 C 13.3333 9.56738 13.2717 9.79731 13.1547 10 Z"
+            {...stroke}
+          />
+        </g>
+        <path d="M8 4.666L8 7.333" {...stroke} />
+        <path d="M8 10L8.0067 10" {...stroke} />
+      </svg>
+    );
+  }
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <g transform="translate(2 2)">
+        <path
+          d="M 0 6 C 0 7.18669 0.351894 8.34673 1.01118 9.33342 C 1.67047 10.3201 2.60754 11.0892 3.7039 11.5433 C 4.80026 11.9974 6.00666 12.1162 7.17054 11.8847 C 8.33443 11.6532 9.40353 11.0818 10.2426 10.2426 C 11.0818 9.40353 11.6532 8.33443 11.8847 7.17054 C 12.1162 6.00666 11.9974 4.80026 11.5433 3.7039 C 11.0892 2.60754 10.3201 1.67047 9.33342 1.01118 C 8.34673 0.351894 7.18669 0 6 0 C 5.16903 0.00312614 4.34636 0.165561 3.57656 0.478505 C 2.80677 0.791451 2.10411 1.2491 1.50667 1.82667 L 0 3.33333"
+          {...stroke}
+        />
+      </g>
+      <g transform="translate(2 2)">
+        <path
+          d="M 0 0 L 0 3.33333 L 3.33333 3.33333"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
+      <g transform="translate(8 4.666)">
+        <path d="M 0 0 L 0 3.33333 L 2.66667 4.66667" {...stroke} />
+      </g>
+    </svg>
+  );
+}
+
 function MainContent({
   activeTheme,
   method,
@@ -9253,7 +9315,7 @@ function MainContent({
                             setShowHistory((v) => !v);
                           }
                         }}
-                        className={`flex items-center justify-center px-2 py-1.5 text-xs font-medium tracking-[-0.04em] ${isDark ? "" : "bg-white text-[#5a5a5a] hover:bg-gray-50"}`}
+                        className={`flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium tracking-[-0.04em] ${isDark ? "" : "bg-white text-[#5a5a5a] hover:bg-gray-50"}`}
                         style={{
                           borderRadius: 6,
                           boxShadow: isDark
@@ -9267,6 +9329,10 @@ function MainContent({
                         }}
                       >
                         {" "}
+                        <DemoCapsuleIcon
+                          label={label}
+                          color={isDark ? "#8c8c8c" : "#5a5a5a"}
+                        />{" "}
                         {label}{" "}
                       </button>
                     ))}{" "}
@@ -17364,12 +17430,11 @@ function PostmanImportBanner({
       style={{
         height: 69,
         boxSizing: "border-box",
-        borderRadius: 8,
-        border: `0.8px solid ${isDark ? "#2d2d2d" : "#f2f2f2"}`,
-        backgroundColor: isDark ? "#161616" : "#ffffff",
+        borderRadius: 10,
+        backgroundColor: isDark ? "#161616" : "#fcfcfc",
         padding: 12,
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         gap: 12,
       }}
     >
@@ -17379,7 +17444,7 @@ function PostmanImportBanner({
             fontFamily: font,
             fontSize: 16,
             fontWeight: 500,
-            letterSpacing: "-0.64px",
+            letterSpacing: "-0.8px",
             color: isDark ? "#f7f7f7" : "#222222",
           }}
         >
@@ -17390,6 +17455,7 @@ function PostmanImportBanner({
             marginTop: 2,
             fontFamily: font,
             fontSize: 14,
+            lineHeight: "20px",
             letterSpacing: "-0.56px",
             color: isDark ? "#8c8c8c" : "#939393",
             overflow: "hidden",
@@ -17400,22 +17466,25 @@ function PostmanImportBanner({
           collection v2.1 (json). It reads in your browser. Nothing is uploaded
         </div>
       </div>
-      <RippleButton
+      <button
+        type="button"
         onClick={onOpen}
         style={{
-          height: 28,
-          padding: "0 8px",
-          borderRadius: 6,
-          backgroundColor: "#5b5bff",
-          color: "#ffffff",
+          border: "none",
+          background: "transparent",
+          padding: 0,
+          color: "#5b5bff",
           fontFamily: font,
-          fontSize: 12,
-          letterSpacing: "-0.48px",
+          fontSize: 14,
+          fontWeight: 500,
+          letterSpacing: "-0.56px",
+          lineHeight: "18px",
           flexShrink: 0,
+          cursor: "pointer",
         }}
       >
         Import
-      </RippleButton>
+      </button>
     </div>
   );
 }
