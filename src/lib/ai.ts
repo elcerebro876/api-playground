@@ -6,13 +6,14 @@
 //      priority order (429/5xx fail fast, at most 1 timeout). Sidelined whenever
 //      the key is absent (e.g. an expired subscription), so the chain skips it.
 //   2. Groq (GROQ_API_KEY), OpenAI-compatible endpoint with free-tier
-//      gpt-oss-120b / qwen models, rotating through GROQ_MODELS. Kept ahead of
-//      Gemini because it answers in about a second.
-//   3. Google Gemini (GEMINI_API_KEY), rotating through GEMINI_MODELS in
-//      priority order (429/5xx fail fast, at most 1 timeout).
-//   4. OpenRouter (OPENROUTER_API_KEY), rotating through a small list of free
+//      gpt-oss-120b / qwen models, rotating through GROQ_MODELS. Kept first
+//      because it answers in about a second.
+//   3. OpenRouter (OPENROUTER_API_KEY), rotating through a small list of free
 //      (:free) models. Defaults to OPENROUTER_MODELS; a single OPENROUTER_MODEL
 //      is honored as a one-model alias.
+//   4. Google Gemini (GEMINI_API_KEY), rotating through GEMINI_MODELS in
+//      priority order (429/5xx fail fast, at most 1 timeout). Last because it
+//      can take tens of seconds when its pool is degraded.
 //
 // The whole chain runs under a shared wall-clock budget
 // (AIJsonOptions.deadlineMs, default 20s): each attempt is clamped to the
@@ -47,12 +48,25 @@ const DEFAULT_OPENROUTER_MODELS =
 // beyond the ~150 tokens a diagnosis/explanation actually needs.
 const OPENROUTER_MAX_TOKENS = 800;
 
+// Groq's free plan meters 8,000 tokens per minute per model. Explanations only
+// need ~150 visible tokens, but gpt-oss is a reasoning model: it spends part of
+// the budget before writing JSON, and at 300 tokens Groq rejects the reply with
+// json_validate_failed. 600 leaves room for the reasoning pass while still
+// stretching the per-minute budget.
+const GROQ_MAX_TOKENS = 600;
+
+// A degraded Gemini pool can sit on a request for a minute. Cap each attempt so
+// one slow model cannot eat the whole cross-provider budget.
+const GEMINI_MAX_ATTEMPT_MS = 6_000;
+
 const DEFAULT_CEREBRAS_MODELS = "gpt-oss-120b,qwen-3.8-27b";
 
 // Groq's free plan serves the same open models as Cerebras at 30 RPM /
 // 1,000 requests a day per model, so it makes a cheap stand-in while the
-// Cerebras subscription is down. IDs are Groq's namespaced model ids.
-const DEFAULT_GROQ_MODELS = "openai/gpt-oss-120b,qwen/qwen3.8-27b";
+// Cerebras subscription is down. IDs are Groq's namespaced model ids. qwen is
+// first because it answers in a few hundred milliseconds without a reasoning
+// pass; gpt-oss is the slower fallback.
+const DEFAULT_GROQ_MODELS = "qwen/qwen3.8-27b,openai/gpt-oss-120b";
 
 export function isGeminiConfigured() {
   const key = process.env.GEMINI_API_KEY?.trim();
@@ -217,7 +231,7 @@ async function callGeminiJson(
     const controller = new AbortController();
     const timer = setTimeout(
       () => controller.abort(),
-      Math.min(opts.timeoutMs, remaining),
+      Math.min(opts.timeoutMs, remaining, GEMINI_MAX_ATTEMPT_MS),
     );
     try {
       const res = await fetch(
@@ -420,7 +434,7 @@ async function callGroqJson(
           model,
           messages: [{ role: "user", content: prompt }],
           temperature: opts.temperature,
-          max_tokens: OPENROUTER_MAX_TOKENS,
+          max_tokens: GROQ_MAX_TOKENS,
           response_format: { type: "json_object" },
         }),
       });
@@ -601,24 +615,6 @@ export async function callAIJson(
     skipped.push("Groq (circuit open)");
   }
 
-  if (gemini && breakerAllows("gemini")) {
-    try {
-      const text = await callGeminiJson(prompt, callOpts);
-      if (!isValid(text)) {
-        breakerRecordFailure("gemini");
-        errors.push("Gemini returned output that failed validation");
-      } else {
-        breakerRecordSuccess("gemini");
-        return text;
-      }
-    } catch (e) {
-      breakerRecordFailure("gemini");
-      errors.push((e as Error).message);
-    }
-  } else if (gemini) {
-    skipped.push("Gemini (circuit open)");
-  }
-
   if (openRouter && breakerAllows("openrouter")) {
     try {
       const text = await callOpenRouterJson(prompt, callOpts);
@@ -635,6 +631,24 @@ export async function callAIJson(
     }
   } else if (openRouter) {
     skipped.push("OpenRouter (circuit open)");
+  }
+
+  if (gemini && breakerAllows("gemini")) {
+    try {
+      const text = await callGeminiJson(prompt, callOpts);
+      if (!isValid(text)) {
+        breakerRecordFailure("gemini");
+        errors.push("Gemini returned output that failed validation");
+      } else {
+        breakerRecordSuccess("gemini");
+        return text;
+      }
+    } catch (e) {
+      breakerRecordFailure("gemini");
+      errors.push((e as Error).message);
+    }
+  } else if (gemini) {
+    skipped.push("Gemini (circuit open)");
   }
 
   if (!cerebras && !gemini && !groq && !openRouter) {

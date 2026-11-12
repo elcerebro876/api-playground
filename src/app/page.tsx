@@ -18,10 +18,10 @@ import {
 } from "framer-motion";
 import LoadingState from "@/components/LoadingState";
 import { Sparkle } from "@/components/icons";
-import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadExplorerExplainDismissed, saveExplorerExplainDismissed, loadExplorerExplainShown, saveExplorerExplainShown, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, loadExplainUses, saveExplainUses, loadSavedExplains, saveSavedExplain, removeSavedExplain, setSavedExplainAutoShow, savedExplainKey, loadSavedFolders, saveSavedFolders, type HistoryEntry, type SavedExplain, type SavedFolder, type SavedFolderEndpoint } from "@/lib/storage";
+import { loadStoredData, saveStoredData, applyStreakOnLoad, loadExplainDismissed, saveExplainDismissed, loadExplorerExplainDismissed, saveExplorerExplainDismissed, loadExplorerExplainShown, saveExplorerExplainShown, loadCardTests, saveCardTests, loadDiagnosisUses, saveDiagnosisUses, loadDiagnosisCache, saveDiagnosisCache, loadExplainUses, saveExplainUses, loadSavedExplains, saveSavedExplain, removeSavedExplain, setSavedExplainAutoShow, savedExplainKey, loadSavedFolders, saveSavedFolders, getCachedExplain, hasCachedExplain, saveCachedExplain, type HistoryEntry, type SavedExplain, type SavedFolder, type SavedFolderEndpoint } from "@/lib/storage";
 import type { ExplainResult } from "@/lib/explain";
 import { isExplainEligible, EXPLAIN_INPUT_LIMIT } from "@/lib/explain-eligibility";
-import { structureSignature } from "@/lib/explain-key";
+import { structureSignature, explainCacheKey } from "@/lib/explain-key";
 import { buildCandidates, type Candidate } from "@/lib/explain-candidates";
 import { DIAGNOSIS_MAX_USES, SECRET_HEADER_RE, SECRET_QUERY_RE, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
 import { trackToolUsed, track } from "@/lib/posthog";
@@ -278,12 +278,17 @@ export default function Home() {
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainError, setExplainError] = useState(false);
   const [explainData, setExplainData] = useState<ExplainResult | null>(null);
+  // Bumped whenever a fresh explanation lands in the local cache, so surfaces
+  // that already show the endpoint (the Discovery card) can flip their button
+  // to "Analyze again" without another request.
+  const [explainCacheTick, setExplainCacheTick] = useState(0);
   const [savedExplains, setSavedExplains] = useState<
     Record<string, SavedExplain>
   >({});
   const diagUsesRef = useRef(0);
   const diagTokenRef = useRef(0);
   const diagAvailableRef = useRef<boolean | null>(null);
+  const diagProbingRef = useRef(false);
   const diagReqRef = useRef<{
     m: string;
     u: string;
@@ -318,26 +323,26 @@ export default function Home() {
     until: number;
     seconds: number;
   } | null>(null);
+  const probeDiagnosisAvailability = useCallback(async (): Promise<boolean> => {
+    if (diagProbingRef.current) return diagAvailableRef.current === true;
+    diagProbingRef.current = true;
+    try {
+      const res = await fetch("/api/diagnose", { method: "GET" });
+      const j = res.ok
+        ? await res.json().catch(() => null)
+        : null;
+      diagAvailableRef.current = Boolean(j?.configured);
+    } catch {
+      diagAvailableRef.current = false;
+    } finally {
+      diagProbingRef.current = false;
+    }
+    return diagAvailableRef.current === true;
+  }, []);
   useEffect(() => {
     diagUsesRef.current = loadDiagnosisUses();
-    let alive = true;
-    fetch("/api/diagnose", { method: "GET" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (alive) diagAvailableRef.current = Boolean(j?.configured);
-      })
-      .catch(() => {
-        if (alive) diagAvailableRef.current = false;
-      })
-      .finally(() => {
-        if (alive && diagAvailableRef.current === null) {
-          diagAvailableRef.current = false;
-        }
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
+    void probeDiagnosisAvailability();
+  }, [probeDiagnosisAvailability]);
   const firstNoAuthPopupShown = useRef(false);
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const explorerExplainTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -460,12 +465,15 @@ export default function Home() {
     setMethod(item.method);
     setUrl(item.url);
     if (item.responseBody) {
+      // Bump the key like the log rows do so the result card resets instead of
+      // animating from the previous endpoint's layout.
+      setResponseKey((k) => k + 1);
       setResponse({
         status: item.status ?? undefined,
         time: item.time ?? undefined,
         body: item.responseBody,
         headers: item.responseHeaders,
-        request: { method: item.method, url: item.url, key: responseKey },
+        request: { method: item.method, url: item.url, key: responseKey + 1 },
       });
       setHeadersFilter("common");
     }
@@ -479,7 +487,13 @@ export default function Home() {
     } else {
       setExplainCtx(null);
     }
+    // Drop any explanation still showing for the endpoint that was open, so
+    // the panel cannot flash stale content before the new analysis starts.
     setExplainPopupOpen(false);
+    setExplainPanelOpen(false);
+    setExplainLoading(false);
+    setExplainError(false);
+    setExplainData(null);
   };
   const handleCardTested = (
     apiName: string,
@@ -646,8 +660,18 @@ export default function Home() {
   }, []);
   const retryDiagnosis = useCallback(() => {
     const r = diagReqRef.current;
-    if (r) runDiagnosis(r.m, r.u, r.h, r.data);
-  }, [runDiagnosis]);
+    if (!r) return;
+    // The one-shot availability probe can fail transiently (for example while
+    // the dev server restarts). Re-check it on an explicit retry instead of
+    // leaving the endpoint stuck on "Coaching unavailable".
+    if (diagAvailableRef.current === true) {
+      runDiagnosis(r.m, r.u, r.h, r.data);
+      return;
+    }
+    void probeDiagnosisAvailability().then((available) => {
+      if (available) runDiagnosis(r.m, r.u, r.h, r.data);
+    });
+  }, [probeDiagnosisAvailability, runDiagnosis]);
 
   const sendRequest = useCallback(
     async (opts?: {
@@ -673,6 +697,14 @@ export default function Home() {
       }
       const m = opts?.method || method;
       const u = opts?.url || url;
+      // Discovery sends bypass the composer, but the result card renders the
+      // composer URL/method. Mirror them (masking any key in the query) so the
+      // card shows the endpoint that was actually called instead of the
+      // placeholder, which collapses the pill to a sliver.
+      if (opts?.apiName) {
+        setMethod(m);
+        setUrl(maskUrlSecrets(u));
+      }
       const h: Record<string, string> = {};
       if (opts?.headers) {
         Object.assign(h, opts.headers);
@@ -956,13 +988,39 @@ export default function Home() {
     }) => {
       if (!explainCtx) return;
       setExplainPopupOpen(false);
-      setExplainPanelOpen(true);
-      setExplainLoading(true);
-      setExplainError(false);
-      setExplainData(null);
       const snapshot = response?.request;
       const snapshotMatches = snapshot?.url === explainCtx.url;
       const responseHeaders = override?.headers ?? response?.headers;
+      const status = override?.status ?? response?.status ?? 0;
+      const body = (override?.body ?? response?.body ?? "").slice(
+        0,
+        EXPLAIN_INPUT_LIMIT,
+      );
+      const contentType = responseHeaders?.["content-type"] ?? "";
+      const credentialed = hasCredentialInput(
+        explainCtx.url,
+        explainCtx.headers,
+      );
+      const cacheKey = explainKeyFor({
+        method: snapshotMatches ? snapshot?.method : explainCtx.method,
+        url: explainCtx.url,
+        status,
+        body,
+        contentType,
+        credentialed,
+      });
+      // Reopening an endpoint the user already analyzed must look instant: show
+      // the stored result before any network work or skeleton state.
+      const cached = cacheKey ? getCachedExplain(cacheKey) : null;
+      setExplainPanelOpen(true);
+      setExplainError(false);
+      if (cached) {
+        setExplainData(cached);
+        setExplainLoading(false);
+        return;
+      }
+      setExplainLoading(true);
+      setExplainData(null);
       try {
         const res = await fetch("/api/explain", {
           method: "POST",
@@ -971,17 +1029,11 @@ export default function Home() {
             method: snapshotMatches ? snapshot?.method : explainCtx.method,
             url: explainCtx.url,
             apiName: explainCtx.apiName,
-            status: override?.status ?? response?.status ?? 0,
-            body: (override?.body ?? response?.body ?? "").slice(
-              0,
-              EXPLAIN_INPUT_LIMIT,
-            ),
-            contentType: responseHeaders?.["content-type"] ?? "",
+            status,
+            body,
+            contentType,
             truncated: response?.truncated === true,
-            credentialed: hasCredentialInput(
-              explainCtx.url,
-              explainCtx.headers,
-            ),
+            credentialed,
           }),
         });
         const data = await res.json();
@@ -989,7 +1041,12 @@ export default function Home() {
           setExplainError(true);
           return;
         }
-        setExplainData(data as ExplainResult);
+        const result = data as ExplainResult;
+        setExplainData(result);
+        if (cacheKey) {
+          saveCachedExplain(cacheKey, result);
+          setExplainCacheTick((n) => n + 1);
+        }
       } catch {
         setExplainError(true);
       } finally {
@@ -1236,6 +1293,7 @@ export default function Home() {
               explainLoading={explainLoading}
               explainError={explainError}
               explainData={explainData}
+              explainCacheTick={explainCacheTick}
               onOpenExplain={openExplain}
               onCloseExplain={closeExplain}
               onAnalyze={handleCardAnalyze}
@@ -5293,6 +5351,30 @@ function pathnameOf(value: string): string {
   }
 }
 
+// Mirrors the server's normalization in /api/explain so a locally cached
+// explanation is found under the exact key the shared cache would use.
+function explainKeyFor(input: {
+  method?: string;
+  url?: string;
+  status?: number | null;
+  body?: unknown;
+  contentType?: string;
+  credentialed: boolean;
+}): string | null {
+  const body =
+    typeof input.body === "string"
+      ? input.body
+      : JSON.stringify(input.body ?? "");
+  return explainCacheKey({
+    method: (input.method || "GET").toUpperCase(),
+    url: (input.url ?? "").trim().slice(0, 500),
+    status: typeof input.status === "number" ? input.status : 0,
+    contentType: input.contentType || "application/json",
+    body: body.slice(0, EXPLAIN_INPUT_LIMIT),
+    credentialed: input.credentialed,
+  });
+}
+
 function hasCredentialInput(
   url?: string,
   headers?: Record<string, string>,
@@ -6433,7 +6515,7 @@ function ExplainStrip({
                       color: "#939393",
                     }}
                   >
-                    {explainUses} of 3 free explains left
+                    {Math.max(0, 3 - explainUses)} of 3 free explains left
                   </span>
                 </>
               )}
@@ -7252,6 +7334,7 @@ function MainContent({
   explainLoading,
   explainError,
   explainData,
+  explainCacheTick,
   onOpenExplain,
   onCloseExplain,
   onAnalyze,
@@ -7339,6 +7422,7 @@ function MainContent({
   explainLoading: boolean;
   explainError: boolean;
   explainData: ExplainResult | null;
+  explainCacheTick: number;
   onOpenExplain: () => void;
   onCloseExplain: () => void;
   onAnalyze?: (result: {
@@ -7394,7 +7478,7 @@ function MainContent({
     const el = urlMeasureRef.current;
     if (!el) return;
     setUrlTextWidth(el.getBoundingClientRect().width);
-  }, [url, editing, isDark]);
+  }, [url, editing, isDark, response, loading]);
   useEffect(() => {
     if (!editing) return;
     const timer = setTimeout(() => {
@@ -7577,6 +7661,23 @@ function MainContent({
     setStagedFix((s) => (s ? { ...s, fixValue: value } : s));
   };
   const isDiscovery = explainCtx !== null;
+  // True once this Discovery endpoint has an explanation in the local cache, so
+  // the prompt can offer "Analyze again" and reopen it instantly.
+  const discoveryExplainCached = useMemo(() => {
+    if (!explainCtx || !response) return false;
+    const snapshot = response.request;
+    const snapshotMatches = snapshot?.url === explainCtx.url;
+    const key = explainKeyFor({
+      method: snapshotMatches ? snapshot?.method : explainCtx.method,
+      url: explainCtx.url,
+      status: response.status,
+      body: response.body,
+      contentType: response.headers?.["content-type"],
+      credentialed: hasCredentialInput(explainCtx.url, explainCtx.headers),
+    });
+    return key ? hasCachedExplain(key) : false;
+    // explainCacheTick refreshes this after a fresh analysis is stored.
+  }, [explainCtx, response, explainCacheTick]);
   const explainSaveKey = response?.request
     ? savedExplainKey(response.request.method, response.request.url)
     : null;
@@ -8000,6 +8101,7 @@ function MainContent({
                   sessionCardTests={sessionCardTests}
                   onCardTested={onCardTested}
                   onViewLastResponse={onViewLastResponse}
+                  explainCacheTick={explainCacheTick}
                 />
               )}{" "}
               {!response && !loading && !showBrowseApi && (
@@ -9696,6 +9798,7 @@ function MainContent({
                     visibility: "hidden",
                     pointerEvents: "none",
                     whiteSpace: "nowrap",
+                    width: "max-content",
                     fontFamily: "Geist, var(--font-geist-sans)",
                     fontSize: 14,
                   }}
@@ -11830,7 +11933,7 @@ backgroundColor: isDark
                       alignSelf: "flex-start",
                     }}
                   >
-                    Analyze now
+                    {discoveryExplainCached ? "Analyze again" : "Analyze now"}
                   </RippleButton>
                 </motion.div>
               ) : explainCtx ? null : (
@@ -12847,6 +12950,7 @@ function BrowseApiSection({
   sessionCardTests,
   onCardTested,
   onViewLastResponse,
+  explainCacheTick,
 }: {
   compact?: boolean;
   w1440?: boolean;
@@ -12876,6 +12980,7 @@ function BrowseApiSection({
   sessionCardTests: Record<string, { key: string; entry: HistoryEntry }>;
   onCardTested: (apiName: string, snapshot: HistoryEntry, key: string) => void;
   onViewLastResponse: (apiName: string) => void;
+  explainCacheTick?: number;
 }) {
   const apis: {
     name: string;
@@ -13157,6 +13262,10 @@ function BrowseApiSection({
     headers?: Record<string, string>;
   } | null>(null);
   const [cardExpanded, setCardExpanded] = useState(false);
+  // Tracks which "No auth" grid card is currently sending. These cards skip the
+  // detail modal, so without this the grid has no visible feedback until the
+  // proxied request resolves.
+  const [gridSending, setGridSending] = useState<string | null>(null);
   const [cardRetryFaded, setCardRetryFaded] = useState(false);
   const [cardCopied, setCardCopied] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -13168,6 +13277,25 @@ function BrowseApiSection({
   const expandedJsonHRef = useRef(0);
   const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const measuredResultRef = useRef<typeof cardResult>(null);
+  // The inline prompt flips to "Analyze again" once this endpoint has a cached
+  // explanation, so a repeat visit is instant instead of another model call.
+  const cardAnalyzed = useMemo(() => {
+    if (!selectedApi?.url || !cardResult) return false;
+    const { url, headers } = buildCardRequest(
+      selectedApi,
+      cardAuthValue?.trim() ? cardAuthValue : "",
+    );
+    const key = explainKeyFor({
+      method: "GET",
+      url,
+      status: cardResult.status,
+      body: cardResult.body,
+      contentType: cardResult.headers?.["content-type"],
+      credentialed: hasCredentialInput(url, headers),
+    });
+    return key ? hasCachedExplain(key) : false;
+    // explainCacheTick refreshes this after a fresh analysis is stored.
+  }, [selectedApi, cardResult, cardAuthValue, explainCacheTick]);
   const selectApiForCard = (api: (typeof apis)[number]) => {
     setSelectedApi(api);
     const rec = sessionCardTests[api.name];
@@ -13176,6 +13304,19 @@ function BrowseApiSection({
     setCardStatus("idle");
     setCardResult(null);
     setCardExpanded(false);
+  };
+  const sendNoAuthCard = async (api: (typeof apis)[number]) => {
+    if (gridSending || !api.url) return;
+    setGridSending(api.name);
+    try {
+      await onSend({
+        method: "GET",
+        url: api.url,
+        apiName: api.name,
+      });
+    } finally {
+      setGridSending(null);
+    }
   };
   const runCardRequest = async () => {
     if (!selectedApi) return;
@@ -13796,7 +13937,11 @@ function BrowseApiSection({
                     cursor: "pointer",
                   }}
                   onClick={() => {
-                    if (api.tag !== "No auth") selectApiForCard(api);
+                    if (api.tag === "No auth") {
+                      void sendNoAuthCard(api);
+                    } else {
+                      selectApiForCard(api);
+                    }
                   }}
                 >
                   {" "}
@@ -13967,10 +14112,11 @@ function BrowseApiSection({
                             letterSpacing: -0.6,
                           }}
                         >
-                          {api.keyLabel}
+                          {gridSending === api.name ? "Sending..." : api.keyLabel}
                         </span>{" "}
                       </div>{" "}
                       <div
+                        aria-busy={gridSending === api.name}
                         style={{
                           alignSelf: "flex-end",
                           borderRadius: 6,
@@ -13980,14 +14126,13 @@ function BrowseApiSection({
                           alignItems: "center",
                           gap: 4,
                           marginTop: compact || w1440 ? 8 : 12,
-                          cursor: "pointer",
+                          cursor:
+                            gridSending === api.name ? "default" : "pointer",
+                          opacity: gridSending === api.name ? 0.72 : 1,
                         }}
-                        onClick={() => {
-                          onSend({
-                            method: "GET",
-                            url: api.url,
-                            apiName: api.tag === "No auth" ? api.name : undefined,
-                          });
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void sendNoAuthCard(api);
                         }}
                       >
                         {" "}
@@ -13999,30 +14144,55 @@ function BrowseApiSection({
                             color: "#ffffff",
                           }}
                         >
-                          Send
+                          {gridSending === api.name ? "Sending" : "Send"}
                         </span>{" "}
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 16 16"
-                          fill="none"
-                        >
-                          {" "}
-                          <path
-                            d="M3.333 8h9.334"
-                            stroke="white"
-                            strokeWidth="1.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />{" "}
-                          <path
-                            d="M8 3.333l4.667 4.667L8 12.667"
-                            stroke="white"
-                            strokeWidth="1.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />{" "}
-                        </svg>{" "}
+                        {gridSending === api.name ? (
+                          <svg
+                            className="animate-spin"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            aria-hidden="true"
+                          >
+                            <circle
+                              cx="8"
+                              cy="8"
+                              r="6"
+                              stroke="rgba(255,255,255,0.35)"
+                              strokeWidth="1.6"
+                            />
+                            <path
+                              d="M14 8a6 6 0 0 0-6-6"
+                              stroke="white"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                          >
+                            {" "}
+                            <path
+                              d="M3.333 8h9.334"
+                              stroke="white"
+                              strokeWidth="1.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />{" "}
+                            <path
+                              d="M8 3.333l4.667 4.667L8 12.667"
+                              stroke="white"
+                              strokeWidth="1.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />{" "}
+                          </svg>
+                        )}{" "}
                       </div>{" "}
                     </>
                   ) : (
@@ -15825,7 +15995,8 @@ function BrowseApiSection({
                         alignItems: "center",
                         justifyContent: "center",
                         height: 28,
-                        width: 81,
+                        minWidth: 81,
+                        padding: "0 8px",
                         borderRadius: 6,
                         backgroundColor: "#5A5AFF",
                         color: "#ffffff",
@@ -15845,7 +16016,7 @@ function BrowseApiSection({
                         }
                       }}
                     >
-                      Analyze now
+                      {cardAnalyzed ? "Analyze again" : "Analyze now"}
                     </RippleButton>
                   </div>
                   <div

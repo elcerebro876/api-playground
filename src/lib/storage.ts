@@ -335,21 +335,112 @@ export function saveExplainUses(count: number, now: Date = new Date()): void {
   } catch { /* storage unavailable - silent fallback */ }
 }
 
+// Client-side mirror of completed explanations, so reopening an endpoint the
+// user already analyzed is instant and never spends another model call. Keyed
+// by the same structural key the server cache uses; entries expire with the
+// result's own TTL.
+const EXPLAIN_CACHE_KEY = "api-playground-explain-cache";
+const EXPLAIN_CACHE_MAX = 80;
+
+type CachedExplainRecord = { result: ExplainResult; savedAt: number };
+
+function loadExplainCacheMap(): Record<string, CachedExplainRecord> {
+  try {
+    const raw = window.localStorage.getItem(EXPLAIN_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    const map: Record<string, CachedExplainRecord> = {};
+    for (const [key, rec] of Object.entries(
+      parsed as Record<string, Partial<CachedExplainRecord>>,
+    )) {
+      if (!rec || !rec.result || typeof rec.savedAt !== "number") continue;
+      map[key] = { result: rec.result, savedAt: rec.savedAt };
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+export function getCachedExplain(key: string): ExplainResult | null {
+  const rec = loadExplainCacheMap()[key];
+  if (!rec) return null;
+  const created = Date.parse(rec.result.createdAt);
+  const ttlSecs = Number(rec.result.ttlSecs);
+  if (
+    !Number.isFinite(created) ||
+    !Number.isFinite(ttlSecs) ||
+    ttlSecs <= 0 ||
+    created + ttlSecs * 1000 <= Date.now()
+  ) {
+    return null;
+  }
+  return rec.result;
+}
+
+export function hasCachedExplain(key: string): boolean {
+  return getCachedExplain(key) !== null;
+}
+
+export function saveCachedExplain(key: string, result: ExplainResult): void {
+  try {
+    const current = loadExplainCacheMap();
+    const next = { ...current, [key]: { result, savedAt: Date.now() } };
+    const entries = Object.entries(next);
+    const trimmed =
+      entries.length > EXPLAIN_CACHE_MAX
+        ? Object.fromEntries(
+            entries
+              .sort((a, b) => b[1].savedAt - a[1].savedAt)
+              .slice(0, EXPLAIN_CACHE_MAX),
+          )
+        : next;
+    window.localStorage.setItem(EXPLAIN_CACHE_KEY, JSON.stringify(trimmed));
+  } catch { /* storage unavailable - silent fallback */ }
+}
+
 const DIAGNOSIS_USES_KEY = "api-playground-diagnosis-uses";
 
-export function loadDiagnosisUses(): number {
+function diagnosisDayKey(now: Date): string {
+  return now.toISOString().slice(0, 10);
+}
+
+// The 5 free coached errors are a daily allowance, so the counter must roll
+// over like the explain counter. Older builds stored a bare lifetime number;
+// treat that legacy value as expired so it does not lock the user out forever.
+export function loadDiagnosisUses(now: Date = new Date()): number {
   try {
     const raw = window.localStorage.getItem(DIAGNOSIS_USES_KEY);
     if (!raw) return 0;
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) && n > 0 ? n : 0;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return 0;
+    }
+    if (typeof parsed === "number") return 0;
+    if (!parsed || typeof parsed !== "object") return 0;
+    const rec = parsed as { day?: unknown; count?: unknown };
+    if (rec.day !== diagnosisDayKey(now)) return 0;
+    return typeof rec.count === "number" && rec.count > 0
+      ? Math.floor(rec.count)
+      : 0;
   } catch { /* storage unavailable — silent fallback */ }
   return 0;
 }
 
-export function saveDiagnosisUses(count: number): void {
+export function saveDiagnosisUses(count: number, now: Date = new Date()): void {
   try {
-    window.localStorage.setItem(DIAGNOSIS_USES_KEY, String(count));
+    window.localStorage.setItem(
+      DIAGNOSIS_USES_KEY,
+      JSON.stringify({
+        day: diagnosisDayKey(now),
+        count: Math.max(0, count),
+      }),
+    );
   } catch { /* storage unavailable — silent fallback */ }
 }
 
