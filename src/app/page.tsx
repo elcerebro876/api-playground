@@ -3988,6 +3988,14 @@ function Sidebar({
     onSelect(history[index], index);
   };
 
+  const sidebarInsetDividerStyle: React.CSSProperties = {
+    flexShrink: 0,
+    height: 1,
+    marginLeft: 16,
+    marginRight: 16,
+    backgroundColor: activeTheme === "Dark" ? "#2d2d2d" : "#E6E6E6",
+  };
+
   return (
     <div
       className={`flex h-full ${compact ? "w-[196px]" : "w-[212px]"} shrink-0 flex-col`}
@@ -4042,21 +4050,12 @@ function Sidebar({
           </div>{" "}
         </div>{" "}
       </div>{" "}
-      <div
-        aria-hidden="true"
-        style={{
-          flexShrink: 0,
-          height: 1,
-          marginLeft: 16,
-          marginRight: 16,
-          backgroundColor: activeTheme === "Dark" ? "#2d2d2d" : "#F2F2F2",
-        }}
-      />{" "}
+      <div aria-hidden="true" style={sidebarInsetDividerStyle} />{" "}
       <div
         style={{
           flexShrink: 0,
           height: 18,
-          margin: "12px 16px 4px",
+          margin: "12px 16px 0",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -4109,25 +4108,25 @@ function Sidebar({
       >
         {" "}
         {folders.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              padding: "8px 8px 0",
-            }}
-          >
+          <>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                padding: "8px 8px 0",
+              }}
+            >
             {folders.map((folder) => {
               const expanded = Boolean(expandedFolders[folder.id]);
               return (
                 <div
                   key={folder.id}
-                  style={{ display: "flex", flexDirection: "column", gap: 4 }}
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
                 >
                   <div
                     style={{
-                      height: 18,
-                      padding: "0 8px",
+                      padding: expanded ? "8px 8px" : "8px 8px 4px",
                       display: "flex",
                       alignItems: "center",
                       gap: 6,
@@ -4238,19 +4237,22 @@ function Sidebar({
                       </svg>
                     </span>
                   </div>
-                  {expanded && folder.endpoints.length > 0 && (
-                    <div
-                      style={{
-                        marginLeft: 12,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 4,
-                      }}
-                    >
+                  <motion.div
+                    initial={false}
+                    animate={{
+                      height:
+                        expanded && folder.endpoints.length > 0 ? "auto" : 0,
+                      opacity: expanded && folder.endpoints.length > 0 ? 1 : 0,
+                    }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    style={{
+                      overflow: "hidden",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
                       {folder.endpoints.map((endpoint, index) => {
-                        const badge =
-                          methodBadgeColors[endpoint.method] ??
-                          methodBadgeColors.GET;
                         const endpointIndex = historyIndexOf(endpoint);
                         const active =
                           endpointIndex >= 0 &&
@@ -4279,22 +4281,18 @@ function Sidebar({
                           >
                             <span
                               style={{
-                                width: 34,
-                                height: 21,
-                                borderRadius: 6,
-                                backgroundColor:
-                                  activeTheme === "Dark"
-                                    ? badge.darkBg
-                                    : badge.lightBg,
-                                color:
-                                  activeTheme === "Dark"
-                                    ? badge.darkText
-                                    : badge.lightText,
-                                fontFamily: "Geist, var(--font-geist-sans)",
-                                fontSize: 10,
-                                display: "flex",
+                                display: "inline-flex",
                                 alignItems: "center",
-                                justifyContent: "center",
+                                borderRadius: 6,
+                                padding: "2px 6px",
+                                fontFamily: "Geist, var(--font-geist-sans)",
+                                fontSize: 12,
+                                fontWeight: 500,
+                                ...methodBadgeStyle(
+                                  endpoint.method,
+                                  active,
+                                  activeTheme === "Dark",
+                                ),
                                 flexShrink: 0,
                               }}
                             >
@@ -4318,12 +4316,16 @@ function Sidebar({
                           </div>
                         );
                       })}
-                    </div>
-                  )}
+                  </motion.div>
                 </div>
               );
             })}
-          </div>
+            </div>
+            <div
+              aria-hidden="true"
+              style={{ ...sidebarInsetDividerStyle, marginTop: 8 }}
+            />
+          </>
         )}{" "}
         {history.length === 0 ? (
           discoveryHistory.length > 0 ? null : (
@@ -4704,7 +4706,7 @@ function Sidebar({
             {" "}
             <div
               className="flex shrink-0 items-center px-4"
-              style={{ paddingTop: history.length === 0 ? 24 : 16 }}
+              style={{ paddingTop: 24 }}
             >
               {" "}
               <span
