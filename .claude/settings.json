@@ -1,0 +1,70 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook claude",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook claude",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook claude",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook claude",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook claude",
+            "timeout": 180
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook claude",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

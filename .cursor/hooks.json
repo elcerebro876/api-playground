@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook cursor",
+        "failClosed": false
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook cursor",
+        "failClosed": false
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook cursor",
+        "failClosed": false
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook cursor",
+        "failClosed": false
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook cursor",
+        "failClosed": false
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook cursor",
+        "failClosed": false
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook cursor",
+        "failClosed": false
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook cursor",
+        "failClosed": false
+      }
+    ],
+    "stop": [
+      {
+        "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook cursor",
+        "failClosed": false,
+        "timeout": 180,
+        "loop_limit": 20
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "node \"C:\\Users\\ADMIN\\AppData\\Roaming\\npm\\node_modules\\replume-cli\\dist\\cli.js\" hook cursor",
+        "failClosed": false
+      }
+    ]
+  }
+}

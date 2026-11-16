@@ -1,0 +1,10 @@
+events.jsonl
+reports/
+contracts/
+hook-errors.log
+baseline.json
+usage.jsonl
+acceptance.jsonl
+evidence/
+memory/
+contract.yaml

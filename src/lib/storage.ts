@@ -536,3 +536,25 @@ export function saveDiagnosisCache(
     window.localStorage.setItem(DIAGNOSIS_CACHE_KEY, JSON.stringify(next));
   } catch { /* storage unavailable — silent fallback */ }
 }
+
+const PLAYGROUND_ENTERED_KEY = "api-playground-entered";
+
+export function loadPlaygroundEntered(): boolean {
+  try {
+    return window.localStorage.getItem(PLAYGROUND_ENTERED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function savePlaygroundEntered(entered: boolean): void {
+  try {
+    if (entered) {
+      window.localStorage.setItem(PLAYGROUND_ENTERED_KEY, "1");
+    } else {
+      window.localStorage.removeItem(PLAYGROUND_ENTERED_KEY);
+    }
+  } catch {
+    /* storage unavailable — silent fallback */
+  }
+}
