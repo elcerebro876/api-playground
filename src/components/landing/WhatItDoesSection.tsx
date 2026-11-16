@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 const geist = { fontFamily: "var(--font-geist-sans)" } as const;
 
@@ -48,6 +48,16 @@ function getStickyTop(sticky: HTMLElement) {
   return Math.max(headerHeight, (window.innerHeight - sticky.offsetHeight) / 2);
 }
 
+/** Old content clears quickly, then the new content fades and slides in. */
+function featureSwitch(active: boolean): CSSProperties {
+  return {
+    transitionProperty: "opacity, transform",
+    transitionDuration: active ? "300ms" : "140ms",
+    transitionTimingFunction: "ease-out",
+    transitionDelay: active ? "80ms" : "0ms",
+  };
+}
+
 export default function WhatItDoesSection() {
   const [activeStep, setActiveStep] = useState(0);
   const sectionRef = useRef<HTMLElement>(null);
@@ -90,8 +100,6 @@ export default function WhatItDoesSection() {
     };
   }, []);
 
-  const section = WHAT_IT_DOES_SECTIONS[activeStep] ?? WHAT_IT_DOES_SECTIONS[0];
-
   const goToFeature = (index: number) => {
     const sectionEl = sectionRef.current;
     if (!sectionEl) return;
@@ -114,7 +122,9 @@ export default function WhatItDoesSection() {
         ? sectionTop - stickyTop + progress * scrollTrack
         : sectionTop - stickyTop;
 
-    window.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+    // Jump in a single frame so the card crossfades straight to the tapped
+    // feature instead of flicking through the ones in between.
+    window.scrollTo({ top: Math.max(0, target), behavior: "auto" });
   };
 
   return (
@@ -156,11 +166,7 @@ export default function WhatItDoesSection() {
               />
             ))}
           </div>
-          <WhatItDoesDemoCard
-            title={section.cardTitle}
-            description={section.cardBody}
-            stepIndex={activeStep}
-          />
+          <WhatItDoesDemoCard stepIndex={activeStep} />
         </div>
       </div>
     </section>
@@ -340,38 +346,75 @@ function FeatureIcon({ kind, active }: { kind: FeatureId; active: boolean }) {
   );
 }
 
-function WhatItDoesDemoCard({
-  title,
-  description,
-  stepIndex,
-}: {
-  title: string;
-  description: string;
-  stepIndex: number;
-}) {
+function WhatItDoesDemoCard({ stepIndex }: { stepIndex: number }) {
   return (
     <div className="relative h-[332px] w-[789px] overflow-hidden rounded-xl border border-[#ebebeb] bg-white">
       <DotPattern />
       <div className="relative flex h-full gap-6 p-6">
-        <div className="flex w-[320px] min-h-[284px] flex-col justify-end pb-2">
-          <h3
-            className="text-base font-semibold tracking-[-0.05em] text-[#585858]"
-            style={geist}
-          >
-            {title}
-          </h3>
-          <p
-            className="mt-2 text-xs leading-normal tracking-[-0.035em] text-[#707070]"
-            style={geist}
-          >
-            {description}
-          </p>
+        <div className="relative w-[320px] min-h-[284px]">
+          {WHAT_IT_DOES_SECTIONS.map((item, index) => (
+            <div
+              key={item.id}
+              aria-hidden={index !== stepIndex}
+              className={`absolute bottom-2 left-0 w-[320px] ${
+                index === stepIndex
+                  ? "translate-y-0 opacity-100"
+                  : "pointer-events-none translate-y-2 opacity-0"
+              }`}
+              style={featureSwitch(stepIndex === index)}
+            >
+              <h3
+                className="text-base font-semibold tracking-[-0.05em] text-[#585858]"
+                style={geist}
+              >
+                {item.cardTitle}
+              </h3>
+              <p
+                className="mt-2 text-xs leading-normal tracking-[-0.035em] text-[#707070]"
+                style={geist}
+              >
+                {item.cardBody}
+              </p>
+            </div>
+          ))}
         </div>
-        {stepIndex === 0 && <ErrorCoachingDemoPanel />}
-        {stepIndex === 1 && <ResponsesExplainDemoPanel />}
-        {stepIndex === 2 && <CuratedDiscoverDemoPanel />}
-        {stepIndex === 3 && <ImportCollectionDemoPanel />}
+        <div className="relative h-[296px] w-[409px] shrink-0">
+          <DemoPanel active={stepIndex === 0}>
+            <ErrorCoachingDemoPanel />
+          </DemoPanel>
+          <DemoPanel active={stepIndex === 1}>
+            <ResponsesExplainDemoPanel />
+          </DemoPanel>
+          <DemoPanel active={stepIndex === 2}>
+            <CuratedDiscoverDemoPanel />
+          </DemoPanel>
+          <DemoPanel active={stepIndex === 3}>
+            <ImportCollectionDemoPanel />
+          </DemoPanel>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function DemoPanel({
+  active,
+  children,
+}: {
+  active: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      aria-hidden={!active}
+      className={`absolute left-0 top-0 ${
+        active
+          ? "translate-y-0 opacity-100"
+          : "pointer-events-none translate-y-2 opacity-0"
+      }`}
+      style={featureSwitch(active)}
+    >
+      {children}
     </div>
   );
 }

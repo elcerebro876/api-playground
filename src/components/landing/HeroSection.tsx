@@ -1,6 +1,8 @@
 "use client";
 
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
+import LandingFooter from "@/components/landing/LandingFooter";
+import PrivacySection from "@/components/landing/PrivacySection";
 import WhatItDoesSection from "@/components/landing/WhatItDoesSection";
 
 type HeroSectionProps = {
@@ -23,6 +25,8 @@ export default function HeroSection({
         <LandingProductShot />
         <WhatItDoesSection />
         <HowItWorksSection />
+        <PrivacySection />
+        <LandingFooter onTryFree={onTryFree} />
       </main>
     </div>
   );
