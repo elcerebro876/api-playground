@@ -26,6 +26,7 @@ const HOW_IT_WORKS_STEPS = [
 export default function HowItWorksSection() {
   return (
     <section
+      id="how-it-works"
       aria-labelledby="how-it-works-heading"
       className="hidden lg:block lg:mt-[140px]"
     >

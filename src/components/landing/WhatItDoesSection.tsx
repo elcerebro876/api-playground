@@ -130,6 +130,7 @@ export default function WhatItDoesSection() {
   return (
     <section
       ref={sectionRef}
+      id="what-it-does"
       aria-labelledby="what-it-does-heading"
       className="hidden lg:block lg:mt-[140px] lg:h-[max(120vh,900px)]"
     >
@@ -152,6 +153,7 @@ export default function WhatItDoesSection() {
           that comes after.
         </p>
         <div
+          id="discover"
           data-what-it-does-demo
           className="mx-auto mt-[46px] flex items-start justify-center gap-6"
         >

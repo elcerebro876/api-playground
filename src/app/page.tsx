@@ -20,7 +20,7 @@ export default function LandingPage() {
     <div className="min-h-screen">
       <HeroSection
         onTryFree={() => enterPlayground("/play")}
-        onStartSample={() => enterPlayground("/play")}
+        onStartSample={() => enterPlayground("/play?discover=1")}
       />
     </div>
   );

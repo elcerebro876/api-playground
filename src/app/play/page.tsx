@@ -218,7 +218,10 @@ export default function Home() {
     { key: string; value: string }[]
   >([{ key: "", value: "" }]);
   const [deleteBody, setDeleteBody] = useState(false);
-  const [showBrowseApi, setShowBrowseApi] = useState(false);
+  const [showBrowseApi, setShowBrowseApi] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("discover") === "1";
+  });
   const [showPostmanImport, setShowPostmanImport] = useState(false);
   const [response, setResponse] = useState<{
     status?: number;
@@ -388,6 +391,16 @@ export default function Home() {
     mq.addEventListener("change", check);
     return () => mq.removeEventListener("change", check);
   }, []);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("discover") === "1") {
+      setShowBrowseApi(true);
+      params.delete("discover");
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
+      window.history.replaceState(null, "", next);
+    }
+  }, []);
+
   useEffect(() => {
     const data = loadStoredData();
     const updated = applyStreakOnLoad(data);
