@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1792457305.3681357,
-    "ast_hash": "32d3b4d21705b4829b8728d761dd4962",
+    "mtime": 1794827033.9541802,
+    "ast_hash": "091ada0c72ff54630f6767ba19878e83",
     "semantic_hash": ""
   },
   "postcss.config.mjs": {
@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "src/app/page.tsx": {
-    "mtime": 1794585625.4553852,
-    "ast_hash": "6fe869233855806d26cee62450bd1983",
+    "mtime": 1794826205.2897131,
+    "ast_hash": "8e30c4f0f44c960e440245e99528089a",
     "semantic_hash": ""
   },
   "src/components/LoadingState.tsx": {
@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "src/lib/storage.ts": {
-    "mtime": 1794507563.7507944,
-    "ast_hash": "1f5f7274cd7e9947b997d7f124fd1e31",
+    "mtime": 1794826196.5870752,
+    "ast_hash": "1b5c86670cf48f9eb30f8928261cdf86",
     "semantic_hash": ""
   },
   "tsconfig.json": {
@@ -517,6 +517,41 @@
   "SECURITY.md": {
     "mtime": 1792456834.3281832,
     "ast_hash": "d086bfb64bd74e6ba3048b8cc7aed4e0",
+    "semantic_hash": ""
+  },
+  "src/app/play/layout.tsx": {
+    "mtime": 1794826205.7672207,
+    "ast_hash": "39ece20ad1f8c8ca256c96d9b5ecb5e2",
+    "semantic_hash": ""
+  },
+  "src/app/play/page.tsx": {
+    "mtime": 1794586059.768283,
+    "ast_hash": "b4c851b4ce236be119829cf82bda0c50",
+    "semantic_hash": ""
+  },
+  "src/components/landing/HeroSection.tsx": {
+    "mtime": 1794827803.8927474,
+    "ast_hash": "aefddd24175465cd6299779973927f27",
+    "semantic_hash": ""
+  },
+  "public/landing/hero-preview.png": {
+    "mtime": 1794770881.2513278,
+    "ast_hash": "337a5ed1b9540fa81e8049cff81ea63f",
+    "semantic_hash": ""
+  },
+  "scripts/record-landing-demo.mjs": {
+    "mtime": 1794827549.8744469,
+    "ast_hash": "90e01d11bf9d44ce923a71c8e7c7ec7b",
+    "semantic_hash": ""
+  },
+  "public/landing/hero-demo.webm": {
+    "mtime": 1794827586.7911248,
+    "ast_hash": "225610f82358c855219a680e000d024f",
+    "semantic_hash": ""
+  },
+  "public/landing/hero-demo-poster.jpg": {
+    "mtime": 1794827587.0298274,
+    "ast_hash": "2c4d2d9ffccf2b85c7813a4fa7d57071",
     "semantic_hash": ""
   }
 }

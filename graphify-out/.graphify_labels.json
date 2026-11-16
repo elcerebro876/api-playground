@@ -1,12 +1,12 @@
 {
-  "0": "page.tsx",
+  "0": "HeroSection.tsx",
   "1": "devDependencies",
   "2": "compilerOptions",
   "3": "dependencies",
   "4": "ai.ts",
   "5": "diagnose.ts",
   "6": "LoadingState.tsx",
-  "7": "layout.tsx",
+  "7": "play/page.tsx",
   "8": "README.md",
   "9": "This is NOT the Next.js you know",
   "10": "eslint.config.mjs",
@@ -18,13 +18,14 @@
   "16": "storage.ts",
   "17": "explain-candidates.ts",
   "18": "postman.ts",
-  "19": "MainContent",
+  "19": "BrowseApiSection",
   "20": "ExplainStrip",
   "21": "curl.ts",
   "22": "Security roadmap — Task D",
-  "23": "explain-eligibility.ts",
+  "23": "explain-key.ts",
   "24": "storage-saved-explains.test.ts",
   "25": "proxy-client.ts",
-  "26": "icons.tsx",
-  "27": "methodBadgeStyle"
+  "26": "MainContent",
+  "27": "play/layout.tsx",
+  "28": "record-landing-demo.mjs"
 }
