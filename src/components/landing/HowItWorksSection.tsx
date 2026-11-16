@@ -27,7 +27,7 @@ export default function HowItWorksSection() {
   return (
     <section
       aria-labelledby="how-it-works-heading"
-      className="hidden lg:block lg:mt-[calc(132px-150vh)]"
+      className="hidden lg:block lg:mt-[140px]"
     >
       <h2
         id="how-it-works-heading"
@@ -36,7 +36,7 @@ export default function HowItWorksSection() {
       >
         From unknown endpoint to a decision in three steps
       </h2>
-      <div className="mt-[86px] flex items-start gap-4">
+      <div className="mt-6 flex items-start gap-4">
         {HOW_IT_WORKS_STEPS.map((step) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img

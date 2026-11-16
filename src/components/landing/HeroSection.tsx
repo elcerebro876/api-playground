@@ -30,7 +30,10 @@ export default function HeroSection({
 
 function LandingHeader() {
   return (
-    <header className="mx-auto flex w-full max-w-[1200px] items-center justify-between px-16 pb-2 pt-9">
+    <header
+      data-landing-header
+      className="sticky top-0 z-50 mx-auto flex w-full max-w-[1200px] items-center justify-between bg-white px-16 pb-2 pt-9"
+    >
       <span
         className="text-sm font-semibold tracking-[-0.07em] text-[#3d3d3d]"
         style={{ fontFamily: "var(--font-geist-sans)" }}

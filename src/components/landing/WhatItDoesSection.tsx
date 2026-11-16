@@ -40,22 +40,17 @@ const WHAT_IT_DOES_SECTIONS: {
 ];
 
 const STEP_COUNT = WHAT_IT_DOES_SECTIONS.length;
-/** Scroll distance to step through all features once the section is in view. */
-const SCROLL_TRACK_VH = 1.5;
 
-function isWhatItDoesInView(stickyEl: HTMLElement, vh: number) {
-  const demoRow = stickyEl.querySelector<HTMLElement>(
-    "[data-what-it-does-demo]",
-  );
-  const rect = demoRow?.getBoundingClientRect() ?? stickyEl.getBoundingClientRect();
-  return rect.top < vh * 0.72 && rect.bottom > vh * 0.28;
+/** Keep the section centered in the viewport, but never under the navbar. */
+function getStickyTop(sticky: HTMLElement) {
+  const header = document.querySelector<HTMLElement>("[data-landing-header]");
+  const headerHeight = header?.offsetHeight ?? 0;
+  return Math.max(headerHeight, (window.innerHeight - sticky.offsetHeight) / 2);
 }
 
 export default function WhatItDoesSection() {
   const [activeStep, setActiveStep] = useState(0);
-  const [stickyTopPx, setStickyTopPx] = useState<number | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
-  const engageScrollYRef = useRef<number | null>(null);
 
   useEffect(() => {
     const updateActiveStep = () => {
@@ -67,44 +62,23 @@ export default function WhatItDoesSection() {
       );
       if (!sticky) return;
 
-      const vh = window.innerHeight;
-      const inView = isWhatItDoesInView(sticky, vh);
+      const stickyTop = getStickyTop(sticky);
+      sticky.style.top = `${stickyTop}px`;
 
-      const scrollTrack = vh * SCROLL_TRACK_VH;
+      // The section pauses until this scroll track runs out.
+      const scrollTrack = section.offsetHeight - sticky.offsetHeight;
+      if (scrollTrack <= 0) return;
 
-      if (engageScrollYRef.current === null) {
-        if (!inView) {
-          setActiveStep(0);
-          setStickyTopPx(null);
-          return;
-        }
-        engageScrollYRef.current = window.scrollY;
-      }
-
-      const scrolledIntoTrack = window.scrollY - engageScrollYRef.current;
-
-      if (scrolledIntoTrack < -120) {
-        engageScrollYRef.current = null;
-        setActiveStep(0);
-        setStickyTopPx(null);
-        return;
-      }
-
-      if (scrolledIntoTrack >= scrollTrack) {
-        setActiveStep(STEP_COUNT - 1);
-        setStickyTopPx(null);
-        return;
-      }
-
-      const progress = scrolledIntoTrack / scrollTrack;
+      const pinnedDistance = stickyTop - section.getBoundingClientRect().top;
+      const progress = Math.min(
+        1,
+        Math.max(0, pinnedDistance / scrollTrack),
+      );
       const step = Math.min(
         STEP_COUNT - 1,
         Math.floor(progress * STEP_COUNT),
       );
       setActiveStep(step);
-      if (step >= 1) {
-        setStickyTopPx((prev) => prev ?? sticky.getBoundingClientRect().top);
-      }
     };
 
     updateActiveStep();
@@ -118,16 +92,40 @@ export default function WhatItDoesSection() {
 
   const section = WHAT_IT_DOES_SECTIONS[activeStep] ?? WHAT_IT_DOES_SECTIONS[0];
 
+  const goToFeature = (index: number) => {
+    const sectionEl = sectionRef.current;
+    if (!sectionEl) return;
+
+    const sticky = sectionEl.querySelector<HTMLElement>(
+      "[data-what-it-does-sticky]",
+    );
+    if (!sticky) return;
+
+    const stickyTop = getStickyTop(sticky);
+    sticky.style.top = `${stickyTop}px`;
+    setActiveStep(index);
+
+    const sectionTop = sectionEl.getBoundingClientRect().top + window.scrollY;
+    const scrollTrack = sectionEl.offsetHeight - sticky.offsetHeight;
+    // Land in the middle of the clicked feature's slice of the scroll track.
+    const progress = (index + 0.5) / STEP_COUNT;
+    const target =
+      scrollTrack > 0
+        ? sectionTop - stickyTop + progress * scrollTrack
+        : sectionTop - stickyTop;
+
+    window.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+  };
+
   return (
     <section
       ref={sectionRef}
       aria-labelledby="what-it-does-heading"
-      className="hidden lg:block lg:mt-[132px] lg:pb-[150vh]"
+      className="hidden lg:block lg:mt-[140px] lg:h-[max(120vh,900px)]"
     >
       <div
         data-what-it-does-sticky
         className="sticky z-10 flex flex-col justify-start bg-white pb-10"
-        style={{ top: stickyTopPx ?? 0 }}
       >
         <h2
           id="what-it-does-heading"
@@ -153,6 +151,8 @@ export default function WhatItDoesSection() {
                 key={item.id}
                 active={index === activeStep}
                 kind={item.id}
+                label={item.cardTitle}
+                onClick={() => goToFeature(index)}
               />
             ))}
           </div>
@@ -170,19 +170,26 @@ export default function WhatItDoesSection() {
 function FeatureIconButton({
   active,
   kind,
+  label,
+  onClick,
 }: {
   active: boolean;
   kind: FeatureId;
+  label: string;
+  onClick: () => void;
 }) {
   return (
-    <div
-      className={`flex size-12 items-center justify-center rounded-xl ${
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={active}
+      className={`flex size-12 cursor-pointer items-center justify-center rounded-xl ${
         active ? "bg-[#5b5bff]" : "border border-[#f2f2f2] bg-white"
       }`}
-      aria-hidden
     >
       <FeatureIcon kind={kind} active={active} />
-    </div>
+    </button>
   );
 }
 
