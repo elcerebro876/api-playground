@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
 import LandingFooter from "@/components/landing/LandingFooter";
 import PrivacySection from "@/components/landing/PrivacySection";
+import TryItHereSection from "@/components/landing/TryItHereSection";
 import WhatItDoesSection from "@/components/landing/WhatItDoesSection";
 
 const geist = { fontFamily: "var(--font-geist-sans)" } as const;
@@ -26,11 +27,13 @@ const GITHUB_REPO =
 type HeroSectionProps = {
   onTryFree: () => void;
   onStartSample: () => void;
+  onSendSample: () => void;
 };
 
 export default function HeroSection({
   onTryFree,
   onStartSample,
+  onSendSample,
 }: HeroSectionProps) {
   return (
     <div className="min-h-full bg-white text-[#3d3d3d]">
@@ -43,6 +46,7 @@ export default function HeroSection({
         <LandingProductShot />
         <WhatItDoesSection />
         <HowItWorksSection />
+        <TryItHereSection onSend={onSendSample} />
         <PrivacySection />
         <LandingFooter onTryFree={onTryFree} />
       </main>

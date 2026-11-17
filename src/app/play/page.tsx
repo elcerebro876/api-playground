@@ -245,6 +245,7 @@ export default function Home() {
   const [apisTested, setApisTested] = useState(0);
   const [streak, setStreak] = useState(1);
   const [responseKey, setResponseKey] = useState(0);
+  const landingAutosendUrlRef = useRef<string | null>(null);
   const historyRef = useRef<HistoryEntry[]>([]);
   const discoveryHistoryRef = useRef<HistoryEntry[]>([]);
   const apisTestedRef = useRef(0);
@@ -393,9 +394,24 @@ export default function Home() {
   }, []);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    let changed = false;
     if (params.get("discover") === "1") {
       setShowBrowseApi(true);
       params.delete("discover");
+      changed = true;
+    }
+    const sampleUrl = params.get("url");
+    if (sampleUrl) {
+      setMethod("GET");
+      setUrl(sampleUrl);
+      if (params.get("autosend") === "1") {
+        landingAutosendUrlRef.current = sampleUrl;
+      }
+      params.delete("url");
+      params.delete("autosend");
+      changed = true;
+    }
+    if (changed) {
       const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
       window.history.replaceState(null, "", next);
     }
@@ -993,6 +1009,12 @@ export default function Home() {
       handleProxyError,
     ],
   );
+  useEffect(() => {
+    const pending = landingAutosendUrlRef.current;
+    if (!pending) return;
+    landingAutosendUrlRef.current = null;
+    void sendRequest({ method: "GET", url: pending });
+  }, [sendRequest]);
   const openExplain = useCallback(
     async (override?: {
       status?: number;

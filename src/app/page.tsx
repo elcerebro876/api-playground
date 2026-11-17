@@ -21,6 +21,7 @@ export default function LandingPage() {
       <HeroSection
         onTryFree={() => enterPlayground("/play")}
         onStartSample={() => enterPlayground("/play?discover=1")}
+        onSendSample={() => enterPlayground("/play")}
       />
     </div>
   );
