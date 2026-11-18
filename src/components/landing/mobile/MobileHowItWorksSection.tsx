@@ -2,22 +2,22 @@
 
 const geist = { fontFamily: "var(--font-geist-sans)" } as const;
 
-const STEPS = [
-  {
-    src: "/landing/OebTN.png",
-    alt: "Step 2: Send the request and view the response",
-    label: "Step 2",
-    title: "Send it",
-    body: "See the real response, status and headers, like any API client",
-  },
-  {
-    src: "/landing/vxcEL.png",
-    alt: "Step 3: Read what the response means",
-    label: "Step 3",
-    title: "Understand it",
-    body: "Get plain-language explainers and a build idea from the body",
-  },
-] as const;
+const STEP_THREE = {
+  src: "/landing/vxcEL.png",
+  alt: "Step 3: Read what the response means",
+  label: "Step 3",
+  title: "Understand it",
+  body: "Get plain-language explainers and a build idea from the body",
+} as const;
+
+const STEP_TWO_JSON_ROWS: readonly (readonly [string, string])[] = [
+  ["“status”:", "“ok”,"],
+  ["“node_id”:", "“node_8f3a1c”,"],
+  ["“network”:", "“ethereum-mainnet”,"],
+  ["“block_height”:", "20481923,"],
+  ["“latency_ms”:", "142,"],
+  ["“uptime”:", "“99.98%”,"],
+];
 
 export default function MobileHowItWorksSection() {
   return (
@@ -36,39 +36,35 @@ export default function MobileHowItWorksSection() {
 
       <div className="mt-4 flex flex-col gap-4">
         <MobileHowItWorksStepOne />
-        {STEPS.map((step) => (
-          <article
-            key={step.src}
-            className="overflow-hidden rounded-xl border border-[#f2f2f2] bg-white"
-          >
-            <div className="overflow-hidden bg-white px-3 pt-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={step.src}
-                alt={step.alt}
-                className="h-auto w-full rounded-lg"
-                draggable={false}
-              />
-            </div>
-            <div className="px-3 pb-4 pt-3">
-              <span className="inline-flex rounded-md bg-[#f0f0ff] px-1.5 py-0.5 text-xs font-medium tracking-[-0.04em] text-[#5b5bff]">
-                {step.label}
-              </span>
-              <h3
-                className="mt-2 text-base font-semibold tracking-[-0.05em] text-[#585858]"
-                style={geist}
-              >
-                {step.title}
-              </h3>
-              <p
-                className="mt-1 text-xs font-normal tracking-[-0.035em] text-[#707070]"
-                style={geist}
-              >
-                {step.body}
-              </p>
-            </div>
-          </article>
-        ))}
+        <MobileHowItWorksStepTwo />
+        <article className="overflow-hidden rounded-xl border border-[#f2f2f2] bg-white">
+          <div className="overflow-hidden bg-white px-3 pt-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={STEP_THREE.src}
+              alt={STEP_THREE.alt}
+              className="h-auto w-full rounded-lg"
+              draggable={false}
+            />
+          </div>
+          <div className="px-3 pb-4 pt-3">
+            <span className="inline-flex rounded-md bg-[#f0f0ff] px-1.5 py-0.5 text-xs font-medium tracking-[-0.04em] text-[#5b5bff]">
+              {STEP_THREE.label}
+            </span>
+            <h3
+              className="mt-2 text-base font-semibold tracking-[-0.05em] text-[#585858]"
+              style={geist}
+            >
+              {STEP_THREE.title}
+            </h3>
+            <p
+              className="mt-1 text-xs font-normal tracking-[-0.035em] text-[#707070]"
+              style={geist}
+            >
+              {STEP_THREE.body}
+            </p>
+          </div>
+        </article>
       </div>
     </section>
   );
@@ -156,6 +152,77 @@ function MobileHowItWorksStepOne() {
         style={geist}
       >
         Drop in any endpoint, or chose one from Discover
+      </p>
+    </article>
+  );
+}
+
+function MobileHowItWorksStepTwo() {
+  return (
+    <article className="relative h-[423px] w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white">
+      <div className="absolute left-3 right-3 top-3 h-[294px] overflow-hidden rounded-lg bg-[#fafafa]">
+        <span
+          className="absolute left-3 top-3 text-sm font-medium tracking-[-0.04em] text-[#9e9e9e]"
+          style={geist}
+        >
+          Body
+        </span>
+
+        <div className="absolute right-3 top-3 flex items-center gap-2 rounded-xl bg-[#f2f2f2] p-1">
+          <span
+            className="rounded-lg bg-white px-1.5 py-1 text-sm font-medium tracking-[-0.05em] text-[#222222]"
+            style={geist}
+          >
+            Pretty
+          </span>
+          <span
+            className="rounded-lg px-1.5 py-1 text-sm font-medium tracking-[-0.05em] text-[#818181]"
+            style={geist}
+          >
+            Raw
+          </span>
+        </div>
+
+        <span
+          className="absolute left-3 top-[46px] text-sm font-medium text-[#9e9e9e]"
+          style={geist}
+        >
+          {"{"}
+        </span>
+        <div className="absolute left-[26px] right-3 top-20 space-y-[10px]">
+          {STEP_TWO_JSON_ROWS.map(([key, value]) => (
+            <h4
+              key={key}
+              className="flex items-center gap-3 text-sm font-medium tracking-[-0.04em]"
+              style={geist}
+            >
+              <span className="text-[#9e9e9e]">{key}</span>
+              <span className="text-[#737373]">{value}</span>
+            </h4>
+          ))}
+        </div>
+        <span
+          className="absolute bottom-7 left-3 text-sm font-medium text-[#9e9e9e]"
+          style={geist}
+        >
+          {"}"}
+        </span>
+      </div>
+
+      <span className="absolute left-3 top-[336px] inline-flex rounded-md bg-[#f0f0ff] px-1.5 py-0.5 text-xs font-medium tracking-[-0.04em] text-[#5b5bff]">
+        Step 2
+      </span>
+      <h3
+        className="absolute left-3 top-[366px] text-base font-semibold tracking-[-0.05em] text-[#585858]"
+        style={geist}
+      >
+        Send it
+      </h3>
+      <p
+        className="absolute left-3 right-3 top-[395px] text-xs font-normal tracking-[-0.035em] text-[#707070]"
+        style={geist}
+      >
+        See the real response, status and headers, like any API client
       </p>
     </article>
   );
