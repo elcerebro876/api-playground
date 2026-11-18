@@ -18,7 +18,7 @@ export default function MobileLandingFooter({
 }: MobileLandingFooterProps) {
   return (
     <footer className="relative z-10 mt-20 px-4 pb-10 lg:hidden">
-      <div className="relative mx-auto min-h-[384px] max-w-[343px] overflow-hidden rounded-xl bg-[#9ec9eb]">
+      <div className="relative mx-auto max-w-[343px] overflow-hidden rounded-xl bg-[#9ec9eb]">
         <div className="relative z-10 mx-4 my-9 overflow-hidden rounded-lg bg-white px-3 pb-3 pt-3 shadow-sm">
           <p
             className="text-sm font-semibold tracking-[-0.05em] text-[#3d3d3d]"
