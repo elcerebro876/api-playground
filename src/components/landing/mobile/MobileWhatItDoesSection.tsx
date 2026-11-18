@@ -91,31 +91,107 @@ export default function MobileWhatItDoesSection() {
 
 function MobileErrorDemo() {
   return (
-    <div className="flex h-full flex-col p-3">
-      <div className="flex items-start justify-between gap-2">
+    <div className="relative size-full bg-[#fafafa]">
+      <p
+        className="absolute left-3 top-4 max-w-[220px] text-xs font-medium tracking-[-0.05em] text-[#585858]"
+        style={geist}
+      >
+        PUT request. api.example/v1/charges
+      </p>
+      <span
+        className="absolute right-3 top-3 rounded-md bg-[#ffdada] px-2 py-1 text-xs font-normal tracking-[-0.04em] text-[#c70000]"
+        style={geist}
+      >
+        200
+      </span>
+
+      <div className="absolute left-3 right-3 top-[46px] flex h-14 items-start overflow-hidden rounded-md bg-white px-3 py-3">
         <p
-          className="text-xs font-medium tracking-[-0.05em] text-[#585858]"
+          className="text-xs font-normal leading-normal tracking-[-0.05em] text-[#585858]"
           style={geist}
         >
-          PUT request. api.example/v1/charges
+          {`{“error”: “invalid_api_key, “message”: “no  valid API key provided”}`}
         </p>
-        <span className="shrink-0 rounded-md bg-[#ffdada] px-2 py-1 text-xs text-[#c70000]">
-          401
-        </span>
       </div>
-      <div className="mt-3 rounded-md bg-white p-3 text-xs tracking-[-0.05em] text-[#585858]">
-        {`{“error”: “invalid_api_key”, “message”: “no valid API key provided”}`}
-      </div>
-      <div className="mt-3 flex-1 rounded-md border border-[#f2f2f2] bg-white p-3">
-        <p className="text-xs font-medium text-[#585858]">Wrong auth scheme</p>
-        <p className="mt-2 text-xs leading-5 text-[#939393]">
-          This API expects an x-api key header, not a bearer token.
-        </p>
-        <span className="mt-3 inline-flex rounded-md bg-white px-2 py-1.5 text-xs text-[#5b5bff]">
-          Fix header
-        </span>
+
+      <div className="absolute left-3 right-3 top-[114px] h-[190px] overflow-hidden rounded-md border border-[#f2f2f2] bg-white">
+        <div className="flex items-center gap-2 px-3 pt-3">
+          <span
+            className="text-xs font-normal tracking-[-0.05em] text-[#585858]"
+            style={geist}
+          >
+            Authorization
+          </span>
+          <span
+            className="rounded bg-[#ffd6d6] px-2 py-0.5 text-xs font-normal leading-[1.67] tracking-[-0.04em] text-[#ff1616]"
+            style={geist}
+          >
+            Bearer sk_live_4f8a2c9d1e7b6f30
+          </span>
+        </div>
+
+        <div className="mx-1 mt-3 h-[142px] overflow-hidden rounded bg-[#f7f7f7]">
+          <div className="flex items-center gap-2 px-3 pt-3">
+            <CoachLightbulbIcon />
+            <p
+              className="text-xs font-medium tracking-[-0.05em] text-[#585858]"
+              style={geist}
+            >
+              Wrong auth scheme
+            </p>
+          </div>
+          <p
+            className="px-3 pt-1 text-xs font-normal leading-[1.67] tracking-[-0.04em] text-[#939393]"
+            style={geist}
+          >
+            This API expects an x-api key header, not a bearer token. The key
+            itself looks valid- its just in the wrong place
+          </p>
+          <span
+            className="mx-3 mt-4 inline-flex rounded-md bg-white px-2 py-1.5 text-xs font-normal tracking-[-0.04em] text-[#5b5bff]"
+            style={geist}
+          >
+            Fix header
+          </span>
+        </div>
       </div>
     </div>
+  );
+}
+
+function CoachLightbulbIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      className="shrink-0"
+      aria-hidden
+    >
+      <path
+        d="M9 12c0.2-1 0.7-1.7 1.5-2.5 1-0.9 1.5-2.2 1.5-3.5 0-1.5913-0.63214-3.11742-1.75736-4.24264-1.12522-1.12522-2.65134-1.75736-4.24264-1.75736-1.5913 0-3.11742 0.63214-4.24264 1.75736-1.12522 1.12522-1.75736 2.65134-1.75736 4.24264 0 1 0.2 2.2 1.5 3.5 0.7 0.7 1.3 1.5 1.5 2.5"
+        stroke="#5b5bff"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        transform="translate(4.5 1.5)"
+      />
+      <path
+        d="M0 0h4.5"
+        stroke="#5b5bff"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        transform="translate(6.75 13.5)"
+      />
+      <path
+        d="M0 0h3"
+        stroke="#5b5bff"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        transform="translate(7.5 16.5)"
+      />
+    </svg>
   );
 }
 

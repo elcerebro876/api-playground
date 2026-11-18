@@ -10,6 +10,7 @@ import MobileHowItWorksSection from "@/components/landing/mobile/MobileHowItWork
 import MobileLandingFooter from "@/components/landing/mobile/MobileLandingFooter";
 import MobileLandingMenu from "@/components/landing/mobile/MobileLandingMenu";
 import MobilePrivacySection from "@/components/landing/mobile/MobilePrivacySection";
+import MobileUnderWorksBanner from "@/components/landing/mobile/MobileUnderWorksBanner";
 import MobileWhatItDoesSection from "@/components/landing/mobile/MobileWhatItDoesSection";
 import WhatItDoesSection from "@/components/landing/WhatItDoesSection";
 
@@ -49,6 +50,7 @@ export default function HeroSection({
           onStartSample={onStartSample}
         />
         <LandingProductShot />
+        <MobileUnderWorksBanner />
         <MobileWhatItDoesSection />
         <MobileHowItWorksSection />
         <MobilePrivacySection />
