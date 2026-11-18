@@ -213,7 +213,7 @@ function MobileHowItWorksStepThree() {
           and an idea for something you could build with it
         </p>
         <span
-          className="mt-4 inline-flex rounded-md bg-white px-1.5 py-1.5 text-xs font-medium tracking-[-0.04em] text-[#5c5c5c]"
+          className="absolute bottom-3 left-3 inline-flex rounded-md bg-white px-1.5 py-1.5 text-xs font-medium tracking-[-0.04em] text-[#5c5c5c]"
           style={geist}
         >
           Skip for now

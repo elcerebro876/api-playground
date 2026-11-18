@@ -54,12 +54,14 @@ export default function HeroSection({
         <MobileWhatItDoesSection />
         <MobileHowItWorksSection />
         <MobilePrivacySection />
+        <div className="hidden lg:block">
+          <WhatItDoesSection />
+          <HowItWorksSection />
+          <TryItHereSection onSend={onSendSample} />
+          <PrivacySection />
+          <LandingFooter onTryFree={onTryFree} />
+        </div>
         <MobileLandingFooter onTryFree={onTryFree} />
-        <WhatItDoesSection />
-        <HowItWorksSection />
-        <TryItHereSection onSend={onSendSample} />
-        <PrivacySection />
-        <LandingFooter onTryFree={onTryFree} />
       </main>
     </div>
   );
