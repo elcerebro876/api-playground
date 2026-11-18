@@ -2,22 +2,14 @@
 
 const geist = { fontFamily: "var(--font-geist-sans)" } as const;
 
-const STEP_THREE = {
-  src: "/landing/vxcEL.png",
-  alt: "Step 3: Read what the response means",
-  label: "Step 3",
-  title: "Understand it",
-  body: "Get plain-language explainers and a build idea from the body",
+const STEP_TWO_SAMPLE_RESPONSE = {
+  status: "ok",
+  node_id: "node_8f3a1c",
+  network: "ethereum-mainnet",
+  block_height: 20481923,
+  latency_ms: 142,
+  uptime: "99.98%",
 } as const;
-
-const STEP_TWO_JSON_ROWS: readonly (readonly [string, string])[] = [
-  ["“status”:", "“ok”,"],
-  ["“node_id”:", "“node_8f3a1c”,"],
-  ["“network”:", "“ethereum-mainnet”,"],
-  ["“block_height”:", "20481923,"],
-  ["“latency_ms”:", "142,"],
-  ["“uptime”:", "“99.98%”,"],
-];
 
 export default function MobileHowItWorksSection() {
   return (
@@ -37,34 +29,7 @@ export default function MobileHowItWorksSection() {
       <div className="mt-4 flex flex-col gap-4">
         <MobileHowItWorksStepOne />
         <MobileHowItWorksStepTwo />
-        <article className="overflow-hidden rounded-xl border border-[#f2f2f2] bg-white">
-          <div className="overflow-hidden bg-white px-3 pt-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={STEP_THREE.src}
-              alt={STEP_THREE.alt}
-              className="h-auto w-full rounded-lg"
-              draggable={false}
-            />
-          </div>
-          <div className="px-3 pb-4 pt-3">
-            <span className="inline-flex rounded-md bg-[#f0f0ff] px-1.5 py-0.5 text-xs font-medium tracking-[-0.04em] text-[#5b5bff]">
-              {STEP_THREE.label}
-            </span>
-            <h3
-              className="mt-2 text-base font-semibold tracking-[-0.05em] text-[#585858]"
-              style={geist}
-            >
-              {STEP_THREE.title}
-            </h3>
-            <p
-              className="mt-1 text-xs font-normal tracking-[-0.035em] text-[#707070]"
-              style={geist}
-            >
-              {STEP_THREE.body}
-            </p>
-          </div>
-        </article>
+        <MobileHowItWorksStepThree />
       </div>
     </section>
   );
@@ -159,8 +124,8 @@ function MobileHowItWorksStepOne() {
 
 function MobileHowItWorksStepTwo() {
   return (
-    <article className="relative h-[423px] w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white">
-      <div className="absolute left-3 right-3 top-3 h-[294px] overflow-hidden rounded-lg bg-[#fafafa]">
+    <article className="w-full min-h-[423px] overflow-hidden rounded-xl border border-[#f2f2f2] bg-white">
+      <div className="relative mx-3 mt-3 h-[294px] overflow-hidden rounded-lg bg-[#fafafa]">
         <span
           className="absolute left-3 top-3 text-sm font-medium tracking-[-0.04em] text-[#9e9e9e]"
           style={geist}
@@ -183,49 +148,182 @@ function MobileHowItWorksStepTwo() {
           </span>
         </div>
 
-        <span
-          className="absolute left-3 top-[46px] text-sm font-medium text-[#9e9e9e]"
+        <div
+          className="absolute bottom-7 left-3 right-3 top-[46px] overflow-hidden text-sm font-medium leading-7 tracking-[-0.04em]"
           style={geist}
         >
-          {"{"}
-        </span>
-        <div className="absolute left-[26px] right-3 top-20 space-y-[10px]">
-          {STEP_TWO_JSON_ROWS.map(([key, value]) => (
-            <h4
-              key={key}
-              className="flex items-center gap-3 text-sm font-medium tracking-[-0.04em]"
-              style={geist}
-            >
-              <span className="text-[#9e9e9e]">{key}</span>
-              <span className="text-[#737373]">{value}</span>
-            </h4>
-          ))}
+          <LandingJsonView data={STEP_TWO_SAMPLE_RESPONSE} rowGapClass="mb-[14px]" />
         </div>
-        <span
-          className="absolute bottom-7 left-3 text-sm font-medium text-[#9e9e9e]"
+      </div>
+
+      <div className="px-3 pb-4 pt-6">
+        <span className="inline-flex rounded-md bg-[#f0f0ff] px-1.5 py-0.5 text-xs font-medium tracking-[-0.04em] text-[#5b5bff]">
+          Step 2
+        </span>
+        <h3
+          className="mt-2 text-base font-semibold tracking-[-0.05em] text-[#585858]"
           style={geist}
         >
-          {"}"}
+          Send it
+        </h3>
+        <p
+          className="mt-1 text-xs font-normal leading-snug tracking-[-0.035em] text-[#707070]"
+          style={geist}
+        >
+          See the real response, status and headers, like any API client
+        </p>
+      </div>
+    </article>
+  );
+}
+
+function MobileHowItWorksStepThree() {
+  return (
+    <article className="w-full min-h-[423px] overflow-hidden rounded-xl border border-[#f2f2f2] bg-white">
+      <div className="relative mx-3 mt-[76px] h-[178px] overflow-hidden rounded-lg bg-[#fafafa] p-3">
+        <div className="flex items-start justify-between gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/explain-avatar.png"
+            alt=""
+            width={40}
+            height={40}
+            className="size-10 shrink-0 rounded-lg object-cover"
+            draggable={false}
+          />
+          <span
+            className="shrink-0 rounded-md bg-[#5b5bff] px-1.5 py-1.5 text-xs font-normal tracking-[-0.04em] text-white"
+            style={geist}
+          >
+            Analyze now
+          </span>
+        </div>
+
+        <p
+          className="mt-3 text-sm font-medium tracking-[-0.035em] text-[#585858]"
+          style={geist}
+        >
+          There&apos;s more to this response
+        </p>
+        <p
+          className="mt-1.5 max-w-[295px] text-xs font-normal leading-[1.67] tracking-[-0.04em] text-[#939393]"
+          style={geist}
+        >
+          This response came back in 142ms. See who it&apos;s for, what it does,
+          and an idea for something you could build with it
+        </p>
+        <span
+          className="mt-4 inline-flex rounded-md bg-white px-1.5 py-1.5 text-xs font-medium tracking-[-0.04em] text-[#5c5c5c]"
+          style={geist}
+        >
+          Skip for now
         </span>
       </div>
 
-      <span className="absolute left-3 top-[336px] inline-flex rounded-md bg-[#f0f0ff] px-1.5 py-0.5 text-xs font-medium tracking-[-0.04em] text-[#5b5bff]">
-        Step 2
-      </span>
-      <h3
-        className="absolute left-3 top-[366px] text-base font-semibold tracking-[-0.05em] text-[#585858]"
-        style={geist}
-      >
-        Send it
-      </h3>
-      <p
-        className="absolute left-3 right-3 top-[395px] text-xs font-normal tracking-[-0.035em] text-[#707070]"
-        style={geist}
-      >
-        See the real response, status and headers, like any API client
-      </p>
+      <div className="px-3 pb-4 pt-6">
+        <span className="inline-flex rounded-md bg-[#f0f0ff] px-1.5 py-0.5 text-xs font-medium tracking-[-0.04em] text-[#5b5bff]">
+          Step 3
+        </span>
+        <h3
+          className="mt-2 text-base font-semibold tracking-[-0.05em] text-[#585858]"
+          style={geist}
+        >
+          Read what it means
+        </h3>
+        <p
+          className="mt-1 text-xs font-normal leading-snug tracking-[-0.035em] text-[#707070]"
+          style={geist}
+        >
+          Fix the errors in one click, or open the explanation and see what you
+          could build
+        </p>
+      </div>
     </article>
   );
+}
+
+/** Same token colors as Try it right here `JsonView` (desktop). */
+function LandingJsonView({
+  data,
+  depth = 0,
+  rowGapClass,
+}: {
+  data: unknown;
+  depth?: number;
+  rowGapClass?: string;
+}) {
+  const indent = depth * 16;
+  if (data === null) return <span className="text-[#FE7C0B]">null</span>;
+  if (typeof data === "boolean")
+    return <span className="text-[#FE7C0B]">{String(data)}</span>;
+  if (typeof data === "number")
+    return <span className="text-[#FE7C0B]">{data}</span>;
+  if (typeof data === "string") {
+    return (
+      <span>
+        <span className="text-[#9e9e9e]">&quot;</span>
+        <span className="text-[#1BC95A]">{data}</span>
+        <span className="text-[#9e9e9e]">&quot;</span>
+      </span>
+    );
+  }
+  if (Array.isArray(data)) {
+    if (data.length === 0) return <span className="text-[#9e9e9e]">[]</span>;
+    return (
+      <>
+        <span className="text-[#9e9e9e]">[</span>
+        {data.map((item, i) => (
+          <div
+            key={i}
+            className={rowGapClass}
+            style={{ paddingLeft: indent + 16 }}
+          >
+            <LandingJsonView data={item} depth={depth + 1} rowGapClass={rowGapClass} />
+            {i < data.length - 1 && (
+              <span className="text-[#9e9e9e]">,</span>
+            )}
+          </div>
+        ))}
+        <div style={{ paddingLeft: indent }}>
+          <span className="text-[#9e9e9e]">]</span>
+        </div>
+      </>
+    );
+  }
+  if (typeof data === "object" && data !== null) {
+    const obj = data as Record<string, unknown>;
+    const keys = Object.keys(obj);
+    if (keys.length === 0) return <span className="text-[#9e9e9e]">{"{}"}</span>;
+    return (
+      <>
+        <span className="text-[#9e9e9e]">{"{"}</span>
+        {keys.map((key, i) => (
+          <div
+            key={key}
+            className={rowGapClass}
+            style={{ paddingLeft: indent + 16 }}
+          >
+            <span className="text-[#9e9e9e]">&quot;</span>
+            <span className="text-[#0396DC]">{key}</span>
+            <span className="text-[#9e9e9e]">&quot;</span>
+            <span className="text-[#9e9e9e]">: </span>
+            <LandingJsonView
+              data={obj[key]}
+              depth={depth + 1}
+              rowGapClass={rowGapClass}
+            />
+            {i < keys.length - 1 && (
+              <span className="text-[#9e9e9e]">,</span>
+            )}
+          </div>
+        ))}
+        <div style={{ paddingLeft: indent }}>
+          <span className="text-[#9e9e9e]">{"}"}</span>
+        </div>
+      </>
+    );
+  }
+  return <span className="text-[#9e9e9e]">{String(data)}</span>;
 }
 
 function MethodChevronIcon() {
