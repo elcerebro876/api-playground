@@ -18,15 +18,7 @@ export default function MobileLandingFooter({
 }: MobileLandingFooterProps) {
   return (
     <footer className="relative z-10 mt-20 px-4 pb-10 lg:hidden">
-      <div className="relative mx-auto min-h-[384px] max-w-[343px] overflow-hidden rounded-xl bg-[#8ec4f0]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/landing/n0KpHa.png"
-          alt=""
-          className="absolute inset-x-0 top-0 h-[220px] w-full object-cover object-top"
-          draggable={false}
-          aria-hidden
-        />
+      <div className="relative mx-auto min-h-[384px] max-w-[343px] overflow-hidden rounded-xl bg-[#9ec9eb]">
         <div className="relative z-10 mx-4 my-9 overflow-hidden rounded-lg bg-white px-3 pb-3 pt-3 shadow-sm">
           <p
             className="text-sm font-semibold tracking-[-0.05em] text-[#3d3d3d]"
@@ -97,14 +89,6 @@ export default function MobileLandingFooter({
               </div>
             </div>
           </div>
-
-          <p
-            className="pointer-events-none mt-6 -ml-14 overflow-hidden text-[5.125rem] font-medium leading-none tracking-[-0.05em] text-[#4f46e5]"
-            style={geist}
-            aria-hidden
-          >
-            Playground
-          </p>
         </div>
       </div>
     </footer>
