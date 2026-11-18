@@ -10,7 +10,7 @@ const MOBILE_FEATURES = [
   },
   {
     title: "Responses that explain themselves",
-    body: "Who the API is for, what it does, and a build idea, so a JSON blob turns into a decision",
+    body: "Who the API is for, What it does, and a build idea, So a JSON blob turns into a decision",
     demo: "explain" as const,
   },
   {
@@ -197,25 +197,95 @@ function CoachLightbulbIcon() {
 
 function MobileExplainDemo() {
   return (
-    <div className="flex h-full flex-col gap-2 p-3">
-      <p className="text-xs font-medium text-[#282828]">AI Explaination</p>
-      {[
-        "Target users",
-        "Problems it solves",
-        "Build Idea",
-      ].map((label) => (
-        <div
-          key={label}
-          className={`rounded-lg border p-2 text-xs ${
-            label === "Build Idea"
-              ? "border-[#b6b6fe] bg-[#f0f0ff] text-[#5b5bff]"
-              : "border-[#f2f2f2] bg-[#fafafa] text-[#6a6767]"
-          }`}
+    <div className="relative size-full bg-[#fafafa]">
+      <div className="absolute left-3 top-3 flex items-center gap-2">
+        <AiSparkleIcon />
+        <p
+          className="text-sm font-medium tracking-[-0.05em] text-[#282828]"
+          style={geist}
         >
-          <span className="font-medium text-[#585858]">{label}</span>
+          AI Explaination
+        </p>
+      </div>
+
+      <div className="absolute left-3 right-3 top-[38px] h-[94px] overflow-hidden rounded-lg border border-[#f2f2f2] bg-[#fafafa]">
+        <p
+          className="px-2 pt-2 text-sm font-medium tracking-[-0.05em] text-[#585858]"
+          style={geist}
+        >
+          Target users
+        </p>
+        <div className="mx-1 mt-1.5 h-14 overflow-hidden rounded-md bg-[#f0f0f0] px-2 py-2">
+          <p
+            className="text-xs font-normal leading-[1.67] tracking-[-0.04em] text-[#6a6767]"
+            style={geist}
+          >
+            Infra teams monitoring node uptime and network health
+          </p>
         </div>
-      ))}
+      </div>
+
+      <div className="absolute left-3 right-3 top-[144px] h-[94px] overflow-hidden rounded-lg border border-[#f2f2f2] bg-[#fafafa]">
+        <p
+          className="px-2 pt-2 text-sm font-medium tracking-[-0.05em] text-[#585858]"
+          style={geist}
+        >
+          Problems it solves
+        </p>
+        <div className="mx-1 mt-1.5 h-14 overflow-hidden rounded-md bg-[#f0f0f0] px-2 py-2">
+          <p
+            className="text-xs font-normal leading-[1.67] tracking-[-0.04em] text-[#6a6767]"
+            style={geist}
+          >
+            Skip building your own health-check polling from scratch
+          </p>
+        </div>
+      </div>
+
+      <div className="absolute left-3 right-3 top-[250px] h-[82px] overflow-hidden rounded-lg border border-[#b6b6fe] bg-[#f0f0ff]">
+        <div className="flex items-center gap-1 px-2 pt-2">
+          <AiSparkleIcon />
+          <p
+            className="text-sm font-medium tracking-[-0.05em] text-[#5b5bff]"
+            style={geist}
+          >
+            Build Idea
+          </p>
+        </div>
+        <p
+          className="px-2 pt-1 text-sm font-normal leading-[1.43] tracking-[-0.04em] text-[#5b5bff]"
+          style={geist}
+        >
+          A status dashboard that alerts you when uptime drops below a threshold
+        </p>
+      </div>
     </div>
+  );
+}
+
+function AiSparkleIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      className="shrink-0"
+      aria-hidden
+    >
+      <path
+        transform="translate(0.6654 0.4983)"
+        d="M13.751 7.179c-2.906-.75-5.178-3.021-5.927-5.928l-.323-1.251-.322 1.251c-.75 2.907-3.021 5.178-5.928 5.928l-1.251 .322 1.251 .324c2.907 .749 5.178 3.02 5.928 5.926l.322 1.252 .323-1.252c.749-2.906 3.021-5.177 5.927-5.926l1.252-.324z"
+        fill="#5b5bff"
+        fillRule="evenodd"
+      />
+      <path
+        transform="translate(11.0021 1.8333)"
+        d="M1.665 3.331c0-.774 .85-1.666 1.666-1.666-.786 0-1.666-.9-1.666-1.665 0 .765-.872 1.665-1.665 1.665 .763 0 1.665 .887 1.665 1.666z"
+        fill="#5b5bff"
+        fillRule="evenodd"
+      />
+    </svg>
   );
 }
 
