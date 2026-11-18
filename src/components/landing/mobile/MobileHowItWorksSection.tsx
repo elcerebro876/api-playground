@@ -179,7 +179,7 @@ function MobileHowItWorksStepTwo() {
 
 function MobileHowItWorksStepThree() {
   return (
-    <article className="w-full min-h-[423px] overflow-hidden rounded-xl border border-[#f2f2f2] bg-white">
+    <article className="w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white">
       <div className="relative mx-3 mt-[76px] h-[178px] overflow-hidden rounded-lg bg-[#fafafa] p-3">
         <div className="flex items-start justify-between gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -206,7 +206,7 @@ function MobileHowItWorksStepThree() {
           There&apos;s more to this response
         </p>
         <p
-          className="mt-1.5 max-w-[295px] text-xs font-normal leading-[1.67] tracking-[-0.04em] text-[#939393]"
+          className="mt-1.5 text-xs font-normal leading-[1.67] tracking-[-0.04em] text-[#939393]"
           style={geist}
         >
           This response came back in 142ms. See who it&apos;s for, what it does,
@@ -220,7 +220,7 @@ function MobileHowItWorksStepThree() {
         </span>
       </div>
 
-      <div className="px-3 pb-4 pt-6">
+      <div className="px-3 pb-3 pt-6">
         <span className="inline-flex rounded-md bg-[#f0f0ff] px-1.5 py-0.5 text-xs font-medium tracking-[-0.04em] text-[#5b5bff]">
           Step 3
         </span>
@@ -231,7 +231,7 @@ function MobileHowItWorksStepThree() {
           Read what it means
         </h3>
         <p
-          className="mt-1 text-xs font-normal leading-snug tracking-[-0.035em] text-[#707070]"
+          className="mt-2 text-xs font-normal leading-snug tracking-[-0.035em] text-[#707070]"
           style={geist}
         >
           Fix the errors in one click, or open the explanation and see what you

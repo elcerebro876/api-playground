@@ -301,11 +301,141 @@ function MobileDiscoverDemo() {
 
 function MobileImportDemo() {
   return (
-    <div className="flex h-full flex-col justify-center gap-2 p-4 text-center">
-      <p className="text-xs font-medium text-[#585858]">Postman collection</p>
-      <p className="text-xs text-[#707070]">
-        Import a .json collection and run requests with explainers.
-      </p>
+    <div className="relative size-full overflow-hidden bg-[#fafafa] p-3">
+      <div className="flex items-center gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white">
+          <FolderGlyphIcon className="h-[18px] w-[18px]" color="#595959" />
+        </div>
+        <div className="min-w-0">
+          <p
+            className="text-sm font-medium tracking-[-0.035em] text-[#595959]"
+            style={geist}
+          >
+            Postman collection
+          </p>
+          <p
+            className="mt-1 text-xs leading-[1.67] tracking-[-0.04em] text-[#7a7a7a]"
+            style={geist}
+          >
+            Collection v2.1 (json). it reads in your browser
+          </p>
+        </div>
+      </div>
+
+      <div className="relative mt-[18px] h-[213px] overflow-hidden rounded-md bg-white">
+        <div className="px-3 pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <p
+              className="text-xs font-medium tracking-[-0.05em] text-[#585858]"
+              style={geist}
+            >
+              Folders
+            </p>
+            <div
+              className="flex shrink-0 items-center gap-2 text-xs font-medium tracking-[-0.05em]"
+              style={geist}
+            >
+              <span className="text-[#585858]">7 of 10 used</span>
+              <span className="text-[#7a7a7a]">3 free</span>
+            </div>
+          </div>
+          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-sm bg-[#cbcbff]">
+            <div className="h-full w-[86.7%] rounded-sm bg-[#9b9bff]" />
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <p
+              className="text-xs font-medium tracking-[-0.05em] text-[#585858]"
+              style={geist}
+            >
+              Endpoints
+            </p>
+            <div
+              className="flex shrink-0 items-center gap-2 text-xs font-medium tracking-[-0.05em]"
+              style={geist}
+            >
+              <span className="text-[#585858]">61 of 100 used</span>
+              <span className="text-[#7a7a7a]">39 free</span>
+            </div>
+          </div>
+          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-sm bg-[#cbcbff]">
+            <div className="h-full w-[76%] rounded-sm bg-[#9b9bff]" />
+          </div>
+        </div>
+
+        <div className="absolute left-3 right-3 top-[92px] overflow-hidden rounded-lg border-[0.6px] border-[#ffdaae] bg-[#fffdfa]">
+          <div className="flex items-start gap-1 px-2 pt-2">
+            <WarningSparkleIcon />
+            <p
+              className="text-xs font-medium leading-tight tracking-[-0.05em] text-[#dd7800]"
+              style={geist}
+            >
+              You collection is bigger than the space you have
+            </p>
+          </div>
+          <div className="mx-1 mb-1 mt-2 rounded-md bg-[#fff3e0] px-2 py-2">
+            <p
+              className="text-xs font-normal leading-[1.67] tracking-[-0.04em] text-[#a95c00]"
+              style={geist}
+            >
+              It has 240 request in 14 folders. Pick the folders to import now
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function FolderGlyphIcon({
+  color,
+  className,
+}: {
+  color: string;
+  className?: string;
+}) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <path
+        transform="translate(2.2499 2.2501)"
+        d="M19.869 13.482q0 1.456-.427 2.636-.434 1.198-1.28 2.044-.846 .846-2.044 1.28-1.18 .427-2.636 .427h-7.782q-1.459 0-2.642-.427-1.2-.433-2.048-1.279-.847-.846-1.282-2.044-.428-1.181-.428-2.637v-7.8q0-1.462 .283-2.569 .311-1.216 .974-2.048 1.406-1.765 4.336-1.765h2q.705 .001 1.333 .315 .63 .315 1.052 .879l.911 1.212q.225 .299 .56 .466 .334 .167 .708 .168h2.829q1.461 0 2.52 .384 1.105 .402 1.813 1.231 .678 .794 .992 1.988 .286 1.086 .286 2.574l-.028 4.969zM18.469 13.478l.028-4.961q0-1.306-.24-2.218-.233-.885-.703-1.435-.468-.548-1.226-.824-.827-.3-2.042-.3h-2.831q-.703-.001-1.332-.316-.629-.314-1.052-.876l-.915-1.216q-.223-.298-.556-.465-.334-.166-.707-.167h-2q-1.186 0-2.012 .334-.752 .305-1.229 .903-.952 1.195-.952 3.745v7.8q0 1.21 .344 2.159 .328 .905 .955 1.531 .628 .626 1.535 .953 .952 .344 2.166 .344h7.782q1.21 0 2.16-.344 .905-.327 1.53-.953 .626-.625 .953-1.53 .344-.95 .344-2.16z"
+        fill={color}
+      />
+      <path
+        transform="translate(7.481 14.463)"
+        d="M0-.7h8.735q.139 0 .268 .053 .129 .054 .227 .152 .098 .098 .152 .227 .053 .129 .053 .268 0 .139-.053 .268-.054 .129-.152 .227-.098 .098-.227 .152-.129 .053-.268 .053h-8.735q-.139 0-.268-.053-.129-.054-.227-.152-.098-.098-.152-.227-.053-.129-.053-.268 0-.139 .053-.268 .054-.129 .152-.227 .098-.098 .227-.152 .129-.053 .268-.053z"
+        fill={color}
+      />
+    </svg>
+  );
+}
+
+function WarningSparkleIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      className="mt-0.5 shrink-0"
+      aria-hidden
+    >
+      <path
+        transform="translate(0.6654 0.4983)"
+        d="M13.751 7.179c-2.906-.75-5.178-3.021-5.927-5.928l-.323-1.251-.322 1.251c-.75 2.907-3.021 5.178-5.928 5.928l-1.251 .322 1.251 .324c2.907 .749 5.178 3.02 5.928 5.926l.322 1.252 .323-1.252c.749-2.906 3.021-5.177 5.927-5.926l1.252-.324z"
+        fill="#dd7800"
+        fillRule="evenodd"
+      />
+      <path
+        transform="translate(11.0021 1.8333)"
+        d="M1.665 3.331c0-.774 .85-1.666 1.666-1.666-.786 0-1.666-.9-1.666-1.665 0 .765-.872 1.665-1.665 1.665 .763 0 1.665 .887 1.665 1.666z"
+        fill="#dd7800"
+        fillRule="evenodd"
+      />
+    </svg>
   );
 }
