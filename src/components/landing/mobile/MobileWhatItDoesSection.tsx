@@ -15,7 +15,7 @@ const MOBILE_FEATURES = [
   },
   {
     title: "Curated API to start from",
-    body: "Pick an API from Discover, prefill an example, and run it. Auth needs are labelled up front.",
+    body: "Pick an API from Discover prefill an example, and run it. Auth needs are labelled up front.",
     demo: "discover" as const,
   },
   {
@@ -59,13 +59,7 @@ export default function MobileWhatItDoesSection() {
               ) : feature.demo === "explain" ? (
                 <MobileExplainDemo />
               ) : feature.demo === "discover" ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src="/landing/discover-curated.png"
-                  alt=""
-                  className="size-full object-cover object-top"
-                  draggable={false}
-                />
+                <MobileDiscoverDemo />
               ) : (
                 <MobileImportDemo />
               )}
@@ -286,6 +280,22 @@ function AiSparkleIcon() {
         fillRule="evenodd"
       />
     </svg>
+  );
+}
+
+function MobileDiscoverDemo() {
+  return (
+    <div className="relative size-full overflow-hidden rounded-lg bg-[#f0f0ff]">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/landing/discover-curated.png"
+        alt=""
+        width={175}
+        height={174}
+        className="absolute left-[72px] top-[69px] h-[174px] w-[175px] object-cover"
+        draggable={false}
+      />
+    </div>
   );
 }
 
