@@ -6,6 +6,11 @@ import HowItWorksSection from "@/components/landing/HowItWorksSection";
 import LandingFooter from "@/components/landing/LandingFooter";
 import PrivacySection from "@/components/landing/PrivacySection";
 import TryItHereSection from "@/components/landing/TryItHereSection";
+import MobileHowItWorksSection from "@/components/landing/mobile/MobileHowItWorksSection";
+import MobileLandingFooter from "@/components/landing/mobile/MobileLandingFooter";
+import MobileLandingMenu from "@/components/landing/mobile/MobileLandingMenu";
+import MobilePrivacySection from "@/components/landing/mobile/MobilePrivacySection";
+import MobileWhatItDoesSection from "@/components/landing/mobile/MobileWhatItDoesSection";
 import WhatItDoesSection from "@/components/landing/WhatItDoesSection";
 
 const geist = { fontFamily: "var(--font-geist-sans)" } as const;
@@ -38,12 +43,16 @@ export default function HeroSection({
   return (
     <div className="min-h-full bg-white text-[#3d3d3d]">
       <LandingHeader />
-      <main className="mx-auto w-full max-w-[1200px] px-16 pb-16 pt-8">
+      <main className="mx-auto w-full max-w-[1200px] px-4 pb-12 pt-4 lg:px-16 lg:pb-16 lg:pt-8">
         <LandingTaglineBlock
           onTryFree={onTryFree}
           onStartSample={onStartSample}
         />
         <LandingProductShot />
+        <MobileWhatItDoesSection />
+        <MobileHowItWorksSection />
+        <MobilePrivacySection />
+        <MobileLandingFooter onTryFree={onTryFree} />
         <WhatItDoesSection />
         <HowItWorksSection />
         <TryItHereSection onSend={onSendSample} />
@@ -105,7 +114,7 @@ function LandingHeader() {
   return (
     <header
       data-landing-header
-      className="sticky top-0 z-50 mx-auto flex w-full max-w-[1200px] items-center justify-between bg-white px-16 pb-2 pt-9"
+      className="sticky top-0 z-50 mx-auto flex w-full max-w-[1200px] items-center justify-between bg-white px-4 pb-2 pt-6 lg:px-16 lg:pt-9"
     >
       <a
         href="#"
@@ -119,7 +128,7 @@ function LandingHeader() {
         Playground
       </a>
       <nav
-        className="hidden items-center gap-6 md:flex"
+        className="hidden items-center gap-6 lg:flex"
         aria-label="Landing sections"
       >
         {LANDING_NAV.map((item) => (
@@ -139,20 +148,23 @@ function LandingHeader() {
           </a>
         ))}
       </nav>
-      <a
-        href={GITHUB_REPO}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 rounded-md bg-[#222222] px-3 py-1.5"
-      >
-        <GithubStarIcon />
-        <span
-          className="text-xs font-medium tracking-[-0.035em] text-white"
-          style={geist}
+      <div className="flex items-center gap-3">
+        <a
+          href={GITHUB_REPO}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden items-center gap-2 rounded-md bg-[#222222] px-3 py-1.5 lg:inline-flex"
         >
-          Star on Github
-        </span>
-      </a>
+          <GithubStarIcon />
+          <span
+            className="text-xs font-medium tracking-[-0.035em] text-white"
+            style={geist}
+          >
+            Star on Github
+          </span>
+        </a>
+        <MobileLandingMenu />
+      </div>
     </header>
   );
 }
@@ -166,9 +178,9 @@ function LandingTaglineBlock({
 }) {
   return (
     <>
-      <div className="mt-12 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
+      <div className="mt-6 flex flex-col gap-2 lg:mt-12 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
         <motion.h1
-          className="max-w-[464px] text-[30px] font-semibold leading-[1.2] tracking-[-0.05em] text-[#3d3d3d]"
+          className="max-w-[343px] text-lg font-semibold leading-[1.2] tracking-[-0.05em] text-[#3d3d3d] lg:max-w-[464px] lg:text-[30px]"
           style={geist}
           variants={HERO_TEXT_REVEAL}
           initial="hidden"
@@ -179,7 +191,7 @@ function LandingTaglineBlock({
           could build.
         </motion.h1>
         <motion.p
-          className="max-w-[386px] text-base font-normal leading-normal tracking-[-0.035em] text-[#707070] lg:pt-1"
+          className="max-w-[343px] text-xs font-normal leading-normal tracking-[-0.035em] text-[#707070] lg:max-w-[386px] lg:pt-1 lg:text-base"
           style={geist}
           variants={HERO_TEXT_REVEAL}
           initial="hidden"
@@ -235,16 +247,16 @@ function LandingProductShot() {
 
   return (
     <motion.div
-      className="relative mt-4 overflow-hidden rounded-xl border border-[#f2f2f2] bg-[#fafafa] px-4 pb-4 pt-10 lg:mt-6 lg:pb-0"
+      className="relative mt-4 h-[276px] overflow-hidden rounded-xl border border-[#f2f2f2] bg-[#fafafa] px-2 pb-2 pt-10 lg:h-auto lg:px-4 lg:pb-0 lg:pt-10"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.22 }}
     >
-      <div className="absolute left-5 top-[15px] flex items-center gap-2">
+      <div className="absolute left-3 top-3 flex items-center gap-3.5 lg:left-5 lg:top-[15px] lg:gap-2">
         {["#fb7269", "#fdbb2e", "#31c553"].map((color, index) => (
           <span
             key={color}
-            className="size-2 rounded-full"
+            className="size-1.5 rounded-full lg:size-2"
             style={{
               backgroundColor: color,
               animation: "pixel-on 1s ease-in-out infinite",
@@ -254,10 +266,10 @@ function LandingProductShot() {
           />
         ))}
       </div>
-      <div className="relative mx-auto w-full max-w-[1054px] overflow-hidden rounded-lg bg-white">
-        <div className="relative h-0 w-full pb-[calc(100%*749/1054-16px)]">
+      <div className="relative mx-auto h-[232px] w-full max-w-[1054px] overflow-hidden rounded-lg bg-white lg:h-auto">
+        <div className="relative size-full lg:h-0 lg:pb-[calc(100%*749/1054-16px)]">
           <video
-            className="absolute inset-0 object-contain object-top"
+            className="absolute inset-0 size-full object-cover object-top lg:object-contain"
             autoPlay
             loop
             muted
