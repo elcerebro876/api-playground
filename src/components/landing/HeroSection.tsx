@@ -67,8 +67,18 @@ export default function HeroSection({
   );
 }
 
+function getVisibleLandingSection(sectionId: string): HTMLElement | null {
+  const matches = document.querySelectorAll<HTMLElement>(
+    `section#${CSS.escape(sectionId)}`,
+  );
+  for (const el of matches) {
+    if (el.getClientRects().length > 0) return el;
+  }
+  return document.getElementById(sectionId);
+}
+
 function scrollToSection(sectionId: string) {
-  const target = document.getElementById(sectionId);
+  const target = getVisibleLandingSection(sectionId);
   const header = document.querySelector<HTMLElement>("[data-landing-header]");
   if (!target) return;
   const top =
@@ -108,7 +118,7 @@ function LandingHeader() {
     );
 
     for (const item of LANDING_NAV) {
-      const el = document.getElementById(item.id);
+      const el = getVisibleLandingSection(item.id);
       if (el) observer.observe(el);
     }
 

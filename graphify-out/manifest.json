@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1794827033.9541802,
-    "ast_hash": "091ada0c72ff54630f6767ba19878e83",
+    "mtime": 1794844537.7588625,
+    "ast_hash": "c13c08b7da34bd7f15ecb50ca328dfce",
     "semantic_hash": ""
   },
   "postcss.config.mjs": {
@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "src/app/page.tsx": {
-    "mtime": 1794826205.2897131,
-    "ast_hash": "8e30c4f0f44c960e440245e99528089a",
+    "mtime": 1794931878.1672556,
+    "ast_hash": "13676f740e3d039a93a980dccef72004",
     "semantic_hash": ""
   },
   "src/components/LoadingState.tsx": {
@@ -45,7 +45,7 @@
     "semantic_hash": ""
   },
   "src/lib/storage.ts": {
-    "mtime": 1794826196.5870752,
+    "mtime": 1794844537.841326,
     "ast_hash": "1b5c86670cf48f9eb30f8928261cdf86",
     "semantic_hash": ""
   },
@@ -520,38 +520,153 @@
     "semantic_hash": ""
   },
   "src/app/play/layout.tsx": {
-    "mtime": 1794826205.7672207,
-    "ast_hash": "39ece20ad1f8c8ca256c96d9b5ecb5e2",
+    "mtime": 1794844537.814788,
+    "ast_hash": "b1c1af3ef7c70aa4f34a41ab43aaf52e",
     "semantic_hash": ""
   },
   "src/app/play/page.tsx": {
-    "mtime": 1794586059.768283,
-    "ast_hash": "b4c851b4ce236be119829cf82bda0c50",
+    "mtime": 1794927948.10771,
+    "ast_hash": "3de755dabc71c15a42e1aa7a46e5bfb8",
     "semantic_hash": ""
   },
   "src/components/landing/HeroSection.tsx": {
-    "mtime": 1794827803.8927474,
-    "ast_hash": "aefddd24175465cd6299779973927f27",
+    "mtime": 1795021607.5487106,
+    "ast_hash": "4c061271acfe9cf3ed21bc359854b50b",
     "semantic_hash": ""
   },
   "public/landing/hero-preview.png": {
-    "mtime": 1794770881.2513278,
+    "mtime": 1794844537.7862508,
     "ast_hash": "337a5ed1b9540fa81e8049cff81ea63f",
     "semantic_hash": ""
   },
   "scripts/record-landing-demo.mjs": {
-    "mtime": 1794827549.8744469,
-    "ast_hash": "90e01d11bf9d44ce923a71c8e7c7ec7b",
+    "mtime": 1794844537.8097868,
+    "ast_hash": "6f0f95fac6c6f23938159aa8663a1148",
     "semantic_hash": ""
   },
   "public/landing/hero-demo.webm": {
-    "mtime": 1794827586.7911248,
+    "mtime": 1794844537.777243,
     "ast_hash": "225610f82358c855219a680e000d024f",
     "semantic_hash": ""
   },
   "public/landing/hero-demo-poster.jpg": {
-    "mtime": 1794827587.0298274,
+    "mtime": 1794844537.77124,
     "ast_hash": "2c4d2d9ffccf2b85c7813a4fa7d57071",
+    "semantic_hash": ""
+  },
+  "src/components/landing/HowItWorksSection.tsx": {
+    "mtime": 1794858376.1091945,
+    "ast_hash": "8b05a1dea7423d2b8f4ba84458ee573c",
+    "semantic_hash": ""
+  },
+  "src/components/landing/LandingFooter.tsx": {
+    "mtime": 1794857537.3824973,
+    "ast_hash": "ab3c6ebe9fb5b7e2009b548419391008",
+    "semantic_hash": ""
+  },
+  "src/components/landing/PrivacySection.tsx": {
+    "mtime": 1794856594.1801503,
+    "ast_hash": "e11b45d40f2a273458c50f9b9c6108dd",
+    "semantic_hash": ""
+  },
+  "src/components/landing/TryItHereSection.tsx": {
+    "mtime": 1794931729.7030804,
+    "ast_hash": "657374d1b1f8f34cc17f9e0faca55e28",
+    "semantic_hash": ""
+  },
+  "src/components/landing/WhatItDoesSection.tsx": {
+    "mtime": 1794858851.7119598,
+    "ast_hash": "b31d3d1aed51b893e245353ced5a8acc",
+    "semantic_hash": ""
+  },
+  "src/components/landing/mobile/MobileHowItWorksSection.tsx": {
+    "mtime": 1795009954.9213877,
+    "ast_hash": "f196476516e8f4ec17aaa00d430ccb12",
+    "semantic_hash": ""
+  },
+  "src/components/landing/mobile/MobileLandingFooter.tsx": {
+    "mtime": 1795009014.9262805,
+    "ast_hash": "4bee86ddc90e4e4b2b65a257425591ac",
+    "semantic_hash": ""
+  },
+  "src/components/landing/mobile/MobileLandingMenu.tsx": {
+    "mtime": 1795001723.8662596,
+    "ast_hash": "aaffb5d24c2730eda25b587873e00a92",
+    "semantic_hash": ""
+  },
+  "src/components/landing/mobile/MobilePrivacySection.tsx": {
+    "mtime": 1795001790.3319569,
+    "ast_hash": "571a9495f1996a82f44013cb88efa48e",
+    "semantic_hash": ""
+  },
+  "src/components/landing/mobile/MobileUnderWorksBanner.tsx": {
+    "mtime": 1795002361.425648,
+    "ast_hash": "7cbb12a347de7b54e13e787fcd1fa672",
+    "semantic_hash": ""
+  },
+  "src/components/landing/mobile/MobileWhatItDoesSection.tsx": {
+    "mtime": 1795006223.5214515,
+    "ast_hash": "6a3702161659ae99a644498b51ab4511",
+    "semantic_hash": ""
+  },
+  ".agents/skills/replume/SKILL.md": {
+    "mtime": 1794844537.6996405,
+    "ast_hash": "ab412d9a6049b67514efbd4b620650e8",
+    "semantic_hash": ""
+  },
+  ".claude/skills/replume/SKILL.md": {
+    "mtime": 1794844537.7066221,
+    "ast_hash": "ab412d9a6049b67514efbd4b620650e8",
+    "semantic_hash": ""
+  },
+  "public/landing/MnrrP.png": {
+    "mtime": 1794844537.7628634,
+    "ast_hash": "a56ad244e3de594d4788824a242d1a0e",
+    "semantic_hash": ""
+  },
+  "public/landing/OebTN.png": {
+    "mtime": 1794844537.7658687,
+    "ast_hash": "8597bf42f91b4ed80d441d92580927d9",
+    "semantic_hash": ""
+  },
+  "public/landing/discover-curated.png": {
+    "mtime": 1794844537.769859,
+    "ast_hash": "a3d0a37b36eab16d35b740d73d993c0f",
+    "semantic_hash": ""
+  },
+  "public/landing/n0KpHa.png": {
+    "mtime": 1794856742.3479111,
+    "ast_hash": "fc9cae2364d0db4cc605aff5e21426a4",
+    "semantic_hash": ""
+  },
+  "public/landing/pencil-exports/DbNs0.svg": {
+    "mtime": 1794844537.7912543,
+    "ast_hash": "425e5630aec998dd29dc1b96791e3b96",
+    "semantic_hash": ""
+  },
+  "public/landing/pencil-exports/K05LUo.svg": {
+    "mtime": 1794844537.7932534,
+    "ast_hash": "62855708f03291fabf3cd4d481ea0cd7",
+    "semantic_hash": ""
+  },
+  "public/landing/pencil-exports/evEkE.svg": {
+    "mtime": 1794844537.7957618,
+    "ast_hash": "38dcc24df894d71592d5282704406ef1",
+    "semantic_hash": ""
+  },
+  "public/landing/pencil-tmp/MONgT.svg": {
+    "mtime": 1794844537.798776,
+    "ast_hash": "1ed0565557a1484f0e647a8009c55188",
+    "semantic_hash": ""
+  },
+  "public/landing/pencil-tmp/lgHUx.svg": {
+    "mtime": 1794844537.8007748,
+    "ast_hash": "4cebcbbebc1f7c1cdfddd559f9b42518",
+    "semantic_hash": ""
+  },
+  "public/landing/vxcEL.png": {
+    "mtime": 1794844537.8037717,
+    "ast_hash": "29ed20ed55d90bf6166bc2096a1e31f7",
     "semantic_hash": ""
   }
 }
