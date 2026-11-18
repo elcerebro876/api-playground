@@ -38,8 +38,8 @@ export default function MobileHowItWorksSection() {
 function MobileHowItWorksStepOne() {
   return (
     <article className="relative h-[423px] w-full overflow-hidden rounded-xl border border-[#f2f2f2] bg-white">
-      <div className="absolute left-3 right-3 top-[82px] h-[52px] overflow-hidden rounded-lg border border-[#f2f2f2] bg-white">
-        <div className="absolute left-4 top-3 flex items-center gap-1 rounded-md border border-[#f2f2f2] bg-[#fcfcfc] px-2 py-1.5">
+      <div className="absolute left-3 right-3 top-[82px] flex h-[52px] items-center gap-4 overflow-hidden rounded-lg border border-[#f2f2f2] bg-white px-4">
+        <div className="flex shrink-0 items-center gap-1 rounded-md border border-[#f2f2f2] bg-[#fcfcfc] px-2 py-1.5">
           <span
             className="size-3 shrink-0 rounded-full bg-[#008000]"
             aria-hidden
@@ -53,7 +53,7 @@ function MobileHowItWorksStepOne() {
           <MethodChevronIcon />
         </div>
         <p
-          className="absolute left-1/2 top-[17px] -translate-x-1/2 text-sm font-normal tracking-[-0.04em] text-[#9e9e9e]"
+          className="min-w-0 flex-1 text-center text-sm font-normal tracking-[-0.04em] text-[#9e9e9e]"
           style={geist}
         >
           Paste an API endpoint...
