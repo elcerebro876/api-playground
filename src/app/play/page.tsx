@@ -13019,6 +13019,26 @@ function BrowseApiSection({
   onViewLastResponse: (apiName: string) => void;
   explainCacheTick?: number;
 }) {
+  // Discovery switches to the compact card layout below 1400px, and to two
+  // columns below 1300px. Wider viewports keep the existing three-column
+  // desktop presentation untouched.
+  const [narrow, setNarrow] = useState(false);
+  const [twoCol, setTwoCol] = useState(false);
+  useEffect(() => {
+    const compactMq = window.matchMedia("(max-width: 1399px)");
+    const twoColMq = window.matchMedia("(max-width: 1299px)");
+    const check = () => {
+      setNarrow(compactMq.matches);
+      setTwoCol(twoColMq.matches);
+    };
+    check();
+    compactMq.addEventListener("change", check);
+    twoColMq.addEventListener("change", check);
+    return () => {
+      compactMq.removeEventListener("change", check);
+      twoColMq.removeEventListener("change", check);
+    };
+  }, []);
   const apis: {
     name: string;
     desc: string;
@@ -13941,7 +13961,7 @@ function BrowseApiSection({
               transition={{ duration: 0.25, ease: "easeOut" }}
               style={{
                 display: "grid",
-                gridTemplateColumns: compact
+                gridTemplateColumns: twoCol
                   ? "repeat(2, 1fr)"
                   : "repeat(3, 1fr)",
                 gap: 16,
@@ -13969,7 +13989,8 @@ function BrowseApiSection({
                     padding: 12,
                     display: "flex",
                     flexDirection: "column",
-                    height: 205,
+                    height: narrow ? "auto" : 205,
+                    minHeight: narrow ? 183 : undefined,
                     transition: "background-color 0.15s ease",
                     cursor: "pointer",
                   }}
@@ -14070,9 +14091,9 @@ function BrowseApiSection({
                   <span
                     style={{
                       fontFamily: "Geist, var(--font-geist-sans)",
-                      fontSize: 16,
+                      fontSize: narrow ? 14 : 16,
                       fontWeight: 600,
-                      letterSpacing: "-0.8px",
+                      letterSpacing: narrow ? "-0.7px" : "-0.8px",
                       color: isDark ? "#FFFFFF" : "#585858",
                       marginTop: 12,
                     }}
@@ -14082,8 +14103,8 @@ function BrowseApiSection({
                   <span
                     style={{
                       fontFamily: "Geist, var(--font-geist-sans)",
-                      fontSize: 14,
-                      letterSpacing: "-0.56px",
+                      fontSize: narrow ? 12 : 14,
+                      letterSpacing: narrow ? "-0.48px" : "-0.56px",
                       color: isDark ? "#F7F7F7" : "#939393",
                       lineHeight: "20px",
                       marginTop: 2,
@@ -14104,7 +14125,7 @@ function BrowseApiSection({
                             ? "1px solid #004700"
                             : (api.panelBorder ?? "0.8px solid #FFE8CC"),
                           width: "fit-content",
-                          padding: 8,
+                          padding: narrow ? "4px 6px" : 8,
                           display: "flex",
                           alignItems: "center",
                           gap: 8,
@@ -14162,7 +14183,11 @@ function BrowseApiSection({
                           display: "flex",
                           alignItems: "center",
                           gap: 4,
-                          marginTop: compact || w1440 ? 8 : 12,
+                          marginTop: narrow
+                            ? 2
+                            : compact || w1440
+                              ? 8
+                              : 12,
                           cursor:
                             gridSending === api.name ? "default" : "pointer",
                           opacity: gridSending === api.name ? 0.72 : 1,
@@ -14250,40 +14275,44 @@ function BrowseApiSection({
                       }}
                     >
                       {" "}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        {" "}
-                        <img
-                          src="/star-icon.png"
-                          alt=""
-                          width={18}
-                          height={18}
-                          style={{ display: "block", flexShrink: 0 }}
-                        />{" "}
-                        <span
+                      {!narrow && (
+                        <div
                           style={{
-                            fontFamily: "Geist, var(--font-geist-sans)",
-                            fontSize: 16,
-                            fontWeight: 500,
-                            letterSpacing: "-0.8px",
-                            color: isDark
-                              ? "#DC7800"
-                              : (api.labelColor ?? "#DC7800"),
-                            whiteSpace: "nowrap",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
                           }}
                         >
-                          {api.keyLabel ?? "Need a key"}
-                        </span>{" "}
-                        <div style={{ flex: 1, minWidth: 0 }} />{" "}
-                      </div>{" "}
+                          {" "}
+                          <img
+                            src="/star-icon.png"
+                            alt=""
+                            width={18}
+                            height={18}
+                            style={{ display: "block", flexShrink: 0 }}
+                          />{" "}
+                          <span
+                            style={{
+                              fontFamily: "Geist, var(--font-geist-sans)",
+                              fontSize: 16,
+                              fontWeight: 500,
+                              letterSpacing: "-0.8px",
+                              color: isDark
+                                ? "#DC7800"
+                                : (api.labelColor ?? "#DC7800"),
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {api.keyLabel ?? "Need a key"}
+                          </span>{" "}
+                          <div style={{ flex: 1, minWidth: 0 }} />{" "}
+                        </div>
+                      )}{" "}
                       {api.keyDesc
                         ? (() => {
-                            const text = api.cardKeyDesc ?? api.keyDesc;
+                            const text = narrow
+                              ? (api.keyDesc ?? api.cardKeyDesc)
+                              : (api.cardKeyDesc ?? api.keyDesc);
                             const m = text.match(
                               /(platform\.openai\.com|openweathermap\.org|console\.anthropic\.com)/,
                             );
@@ -14292,8 +14321,8 @@ function BrowseApiSection({
                                 <span
                                   style={{
                                     fontFamily: "Geist, var(--font-geist-sans)",
-                                    fontSize: 14,
-                                    letterSpacing: "-0.56px",
+                                    fontSize: narrow ? 12 : 14,
+                                    letterSpacing: narrow ? "-0.4px" : "-0.56px",
                                     color: "#DC7800",
                                     lineHeight: "20px",
                                   }}
@@ -14308,8 +14337,8 @@ function BrowseApiSection({
                               <span
                                 style={{
                                   fontFamily: "Geist, var(--font-geist-sans)",
-                                  fontSize: 14,
-                                  letterSpacing: "-0.56px",
+                                  fontSize: narrow ? 12 : 14,
+                                  letterSpacing: narrow ? "-0.4px" : "-0.56px",
                                   color: "#DC7800",
                                   lineHeight: "20px",
                                 }}
