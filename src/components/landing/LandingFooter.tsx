@@ -1,5 +1,7 @@
 "use client";
 
+import { track } from "@/lib/posthog";
+
 const geist = { fontFamily: "var(--font-geist-sans)" } as const;
 
 const SITEMAP_LINKS = [
@@ -41,7 +43,13 @@ export default function LandingFooter({ onTryFree }: LandingFooterProps) {
             </p>
             <button
               type="button"
-              onClick={onTryFree}
+              onClick={() => {
+                track({
+                  name: "landing_cta_clicked",
+                  properties: { which: "final" },
+                });
+                onTryFree();
+              }}
               className="absolute left-[613px] top-4 flex h-7 items-center justify-center rounded-md bg-[#5b5bff] px-3 py-1.5 text-xs font-medium tracking-[-0.035em] text-white"
               style={geist}
             >

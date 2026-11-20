@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { track } from "@/lib/posthog";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
 import LandingFooter from "@/components/landing/LandingFooter";
 import PrivacySection from "@/components/landing/PrivacySection";
@@ -233,7 +234,10 @@ function LandingTaglineBlock({
       >
         <motion.button
           type="button"
-          onClick={onTryFree}
+          onClick={() => {
+            track({ name: "landing_cta_clicked", properties: { which: "hero" } });
+            onTryFree();
+          }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="cursor-pointer rounded-md bg-[#5b5bff] px-3 py-1.5 text-xs font-medium tracking-[-0.035em] text-white shadow-sm hover:bg-[#4f4fef] hover:shadow-md active:bg-[#4545e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5b5bff]/45 focus-visible:ring-offset-2"
@@ -243,7 +247,13 @@ function LandingTaglineBlock({
         </motion.button>
         <motion.button
           type="button"
-          onClick={onStartSample}
+          onClick={() => {
+            track({
+              name: "landing_cta_clicked",
+              properties: { which: "sample_api" },
+            });
+            onStartSample();
+          }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="cursor-pointer rounded-md border border-[#f2f2f2] bg-white px-3 py-1.5 text-xs font-medium tracking-[-0.035em] text-[#3d3d3d] shadow-sm hover:border-[#e0e0e0] hover:bg-[#fafafa] hover:shadow-md active:bg-[#f5f5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5b5bff]/30 focus-visible:ring-offset-2"

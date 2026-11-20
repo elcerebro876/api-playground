@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
+import { track } from "@/lib/posthog";
 
 const geist = { fontFamily: "var(--font-geist-sans)" } as const;
 
@@ -270,7 +271,13 @@ export default function TryItHereSection({ onSend }: TryItHereSectionProps) {
 
               <motion.button
                 type="button"
-                onClick={onSend}
+                onClick={() => {
+                  track({
+                    name: "landing_cta_clicked",
+                    properties: { which: "sample_api" },
+                  });
+                  onSend();
+                }}
                 className="mt-6 cursor-pointer self-center rounded-md bg-[#5b5bff] px-3 py-1.5 text-xs font-medium tracking-[-0.04em] text-white hover:bg-[#4f4fef] active:bg-[#4545e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5b5bff]/45 focus-visible:ring-offset-2"
                 style={geist}
                 variants={responseReveal}

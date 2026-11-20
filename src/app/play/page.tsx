@@ -24,7 +24,15 @@ import { isExplainEligible, EXPLAIN_INPUT_LIMIT } from "@/lib/explain-eligibilit
 import { structureSignature, explainCacheKey } from "@/lib/explain-key";
 import { buildCandidates, type Candidate } from "@/lib/explain-candidates";
 import { DIAGNOSIS_MAX_USES, SECRET_HEADER_RE, SECRET_QUERY_RE, buildDiagnosisInput, diagnosisCacheKey, jsonBodyRequired, maskHeaderValue, maskUrlSecrets, statusLabel, stripFixes, type DiagnosisResult } from "@/lib/diagnose";
-import { trackToolUsed, track } from "@/lib/posthog";
+import {
+  trackToolUsed,
+  track,
+  curatedApiId,
+  statusClassOf,
+  contentTypeOf,
+  hostnameOf,
+  type RequestSource,
+} from "@/lib/posthog";
 import { formatFreshness, formatSavedAge } from "@/lib/explain-freshness";
 import {
   isProxyErrorEnvelope,
@@ -246,6 +254,8 @@ export default function Home() {
   const [streak, setStreak] = useState(1);
   const [responseKey, setResponseKey] = useState(0);
   const landingAutosendUrlRef = useRef<string | null>(null);
+  const pendingRequestSourceRef = useRef<RequestSource>("manual");
+  const urlFixPendingRef = useRef(false);
   const historyRef = useRef<HistoryEntry[]>([]);
   const discoveryHistoryRef = useRef<HistoryEntry[]>([]);
   const apisTestedRef = useRef(0);
@@ -467,7 +477,12 @@ export default function Home() {
       lastVisitDate: new Date().toDateString(),
     });
   };
-  const handleHistorySelect = (item: HistoryEntry, index: number) => {
+  const handleHistorySelect = (
+    item: HistoryEntry,
+    index: number,
+    origin: "history" | "import" = "history",
+  ) => {
+    pendingRequestSourceRef.current = origin;
     setActiveHistoryIndex(index);
     setActiveDiscoveryIndex(null);
     setMethod(item.method);
@@ -489,6 +504,7 @@ export default function Home() {
     setExplainPopupOpen(false);
   };
   const handleDiscoverySelect = (item: HistoryEntry, index: number) => {
+    pendingRequestSourceRef.current = "history";
     setActiveDiscoveryIndex(index);
     setActiveHistoryIndex(null);
     setMethod(item.method);
@@ -611,6 +627,10 @@ export default function Home() {
           ),
         );
         setDiagState("result");
+        track({
+          name: "error_coach_shown",
+          properties: { error_type: String(input.status ?? "unknown") },
+        });
       } else {
         setDiag(null);
         setDiagState("fallback");
@@ -650,6 +670,10 @@ export default function Home() {
           saveDiagnosisUses(diagUsesRef.current);
           setDiag({ ...j, label: j.label || statusLabel(input.status) || undefined });
           setDiagState("result");
+          track({
+            name: "error_coach_shown",
+            properties: { error_type: String(input.status ?? "unknown") },
+          });
           saveDiagnosisCache(cacheKey, j);
         } else {
           // A genuine "nothing found" is cached briefly so repeats are instant,
@@ -708,6 +732,7 @@ export default function Home() {
       url?: string;
       headers?: Record<string, string>;
       apiName?: string;
+      source?: RequestSource;
       suppressExplain?: boolean;
     }) => {
       if (!opts?.apiName) {
@@ -789,8 +814,19 @@ export default function Home() {
       if (!opts?.apiName) {
         setLastExplorerReq({ method: m, url: u, headers: { ...h } });
       }
+      const source = opts?.source ?? pendingRequestSourceRef.current;
+      pendingRequestSourceRef.current = "manual";
+      const startedAt = Date.now();
       try {
-        trackToolUsed({ method: m, url: maskUrlSecrets(u) });
+        trackToolUsed({ method: m, host: hostnameOf(u) || "unknown" });
+        track({
+          name: "request_sent",
+          properties: {
+            method: upperMethod,
+            source,
+            has_body: Boolean(requestBody),
+          },
+        });
         const res = await fetch("/api/proxy", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -802,6 +838,21 @@ export default function Home() {
           }),
         });
         const data = await res.json();
+        track({
+          name: "response_received",
+          properties: {
+            status_class: statusClassOf(data?.status),
+            duration_ms: Date.now() - startedAt,
+            content_type: contentTypeOf(data?.headers),
+          },
+        });
+        if (urlFixPendingRef.current) {
+          urlFixPendingRef.current = false;
+          track({
+            name: "urlfix_sent",
+            properties: { status_class: statusClassOf(data?.status) },
+          });
+        }
         if (!opts?.apiName) {
           setResponseKey((k) => k + 1);
           setResponse({ ...data, request: { method: m, url: u, key: responseKey + 1 } });
@@ -939,6 +990,21 @@ export default function Home() {
         setLoading(false);
         return data;
       } catch {
+        track({
+          name: "response_received",
+          properties: {
+            status_class: "network_error",
+            duration_ms: Date.now() - startedAt,
+            content_type: "unknown",
+          },
+        });
+        if (urlFixPendingRef.current) {
+          urlFixPendingRef.current = false;
+          track({
+            name: "urlfix_sent",
+            properties: { status_class: "network_error" },
+          });
+        }
         if (!opts?.apiName) {
           setResponseKey((k) => k + 1);
           setResponse({ error: "Network error" });
@@ -1234,6 +1300,7 @@ export default function Home() {
                   method: item.method,
                   url: item.url,
                   headers: item.headers,
+                  source: "history",
                   ...(item.apiName ? { apiName: item.apiName } : {}),
                 })
               }
@@ -1335,6 +1402,9 @@ export default function Home() {
               sessionCardTests={sessionCardTests}
               onCardTested={handleCardTested}
               onViewLastResponse={handleViewLastResponse}
+              onUrlFixApplied={() => {
+                urlFixPendingRef.current = true;
+              }}
               diagState={diagState}
               diag={diag}
               lastRequest={lastExplorerReq}
@@ -3977,7 +4047,11 @@ function Sidebar({
   onThemeChange: (t: string) => void;
   history: HistoryEntry[];
   activeHistoryIndex: number | null;
-  onSelect: (item: HistoryEntry, index: number) => void;
+  onSelect: (
+    item: HistoryEntry,
+    index: number,
+    origin?: "history" | "import",
+  ) => void;
   onRetry: (item: HistoryEntry) => void;
   discoveryHistory: HistoryEntry[];
   activeDiscoveryIndex: number | null;
@@ -4020,7 +4094,7 @@ function Sidebar({
   const openSavedEndpoint = (endpoint: SavedFolderEndpoint) => {
     const index = historyIndexOf(endpoint);
     if (index < 0) return;
-    onSelect(history[index], index);
+    onSelect(history[index], index, "import");
   };
 
   const sidebarInsetDividerStyle: React.CSSProperties = {
@@ -6145,12 +6219,24 @@ function ExplainStrip({
             const secs = Math.max(1, failure.retryAfterSec ?? 1);
             setErrorText(`Too many requests, try again in ${secs}s.`);
             setState("error");
+            track({
+              name: "explain_failed",
+              properties: { reason: "rate_limited" },
+            });
           }
         } else if (res.status === 503) {
           setState("unavailable");
+          track({
+            name: "explain_failed",
+            properties: { reason: "http_503" },
+          });
         } else {
           setErrorText("Couldn't explain this response, try again.");
           setState("error");
+          track({
+            name: "explain_failed",
+            properties: { reason: "http_error" },
+          });
         }
         return;
       }
@@ -6161,6 +6247,7 @@ function ExplainStrip({
         name: "explain_completed",
         properties: {
           from_cache: explained.fromCache,
+          cached: explained.fromCache,
           latency_ms: Date.now() - startedAt,
           candidate_count: candidates.length,
         },
@@ -6173,6 +6260,10 @@ function ExplainStrip({
     } catch {
       setErrorText("Couldn't explain this response, try again.");
       setState("error");
+      track({
+        name: "explain_failed",
+        properties: { reason: "network_error" },
+      });
     }
   };
 
@@ -7378,6 +7469,7 @@ function MainContent({
   sessionCardTests,
   onCardTested,
   onViewLastResponse,
+  onUrlFixApplied,
   diagState,
   diag,
   lastRequest,
@@ -7471,6 +7563,7 @@ function MainContent({
   sessionCardTests: Record<string, { key: string; entry: HistoryEntry }>;
   onCardTested: (apiName: string, snapshot: HistoryEntry, key: string) => void;
   onViewLastResponse: (apiName: string) => void;
+  onUrlFixApplied: () => void;
   diagState:
     | "idle"
     | "loading"
@@ -7659,6 +7752,11 @@ function MainContent({
   };
   const handleUrlFixClick = () => {
     if (!diag?.urlFix) return;
+    track({
+      name: "urlfix_applied",
+      properties: { error_type: String(response?.status ?? "unknown") },
+    });
+    onUrlFixApplied();
     setStagedFix(null);
     setHeaderExpanded(false);
     setUrl(diag.urlFix.to);
@@ -12997,6 +13095,7 @@ function BrowseApiSection({
     url?: string;
     headers?: Record<string, string>;
     apiName?: string;
+    source?: RequestSource;
     suppressExplain?: boolean;
   }) =>
     | Promise<{
@@ -13354,6 +13453,10 @@ function BrowseApiSection({
     // explainCacheTick refreshes this after a fresh analysis is stored.
   }, [selectedApi, cardResult, cardAuthValue, explainCacheTick]);
   const selectApiForCard = (api: (typeof apis)[number]) => {
+    track({
+      name: "discover_api_opened",
+      properties: { api_id: curatedApiId(api.name) },
+    });
     setSelectedApi(api);
     const rec = sessionCardTests[api.name];
     setCardRepeat(!!rec);
@@ -13365,11 +13468,16 @@ function BrowseApiSection({
   const sendNoAuthCard = async (api: (typeof apis)[number]) => {
     if (gridSending || !api.url) return;
     setGridSending(api.name);
+    track({
+      name: "discover_example_used",
+      properties: { api_id: curatedApiId(api.name) },
+    });
     try {
       await onSend({
         method: "GET",
         url: api.url,
         apiName: api.name,
+        source: "discover",
       });
     } finally {
       setGridSending(null);
@@ -13387,11 +13495,16 @@ function BrowseApiSection({
     setCardStatus("sending");
     const key = cardAuthValue?.trim() ? cardAuthValue : "";
     const { url, headers } = buildCardRequest(selectedApi, key);
+    track({
+      name: "discover_example_used",
+      properties: { api_id: curatedApiId(selectedApi.name) },
+    });
     const data = await onSend({
       method: "GET",
       url,
       headers: Object.keys(headers).length ? headers : undefined,
       apiName: selectedApi.name,
+      source: "discover",
       suppressExplain: selectedApi.tag !== "No auth",
     });
     setCardResult({
@@ -17810,9 +17923,11 @@ function PostmanImportModal({
   const variableNames = [...missingForSelected, ...secretForSelected];
 
   const startFile = async (file: File) => {
+    track({ name: "import_started", properties: {} });
     setError(null);
     if (file.size > POSTMAN_MAX_FILE_BYTES) {
       setError("That file is over 5 MB. Export a smaller collection and try again.");
+      track({ name: "import_failed", properties: { reason: "file_too_large" } });
       return;
     }
     setFileName(file.name);
@@ -17830,6 +17945,7 @@ function PostmanImportModal({
       } catch {
         setError("That file isn't valid JSON. Export the collection again and retry.");
         setStep("choose");
+        track({ name: "import_failed", properties: { reason: "invalid_json" } });
         return;
       }
       const parsed = parsePostmanCollection(json);
@@ -17841,11 +17957,21 @@ function PostmanImportModal({
             : "That file isn't a Postman collection.",
         );
         setStep("choose");
+        track({
+          name: "import_failed",
+          properties: {
+            reason:
+              parsed.reason === "unsupported_version"
+                ? "unsupported_version"
+                : "not_collection",
+          },
+        });
         return;
       }
       if (!parsed.value.folders.length || parsed.value.stats.totalRequests === 0) {
         setError("That collection doesn't contain any requests.");
         setStep("choose");
+        track({ name: "import_failed", properties: { reason: "empty" } });
         return;
       }
       setCollection(parsed.value);
@@ -17868,6 +17994,7 @@ function PostmanImportModal({
     } catch {
       setError("Couldn't read that file. Try exporting it again.");
       setStep("choose");
+      track({ name: "import_failed", properties: { reason: "read_failed" } });
     }
   };
 
@@ -17962,6 +18089,10 @@ function PostmanImportModal({
       0,
     );
     onImport(importedFolders, entries);
+    track({
+      name: "import_completed",
+      properties: { request_count: importedRequests },
+    });
     setResult({
       importedRequests,
       folders: importedFolders.length,
